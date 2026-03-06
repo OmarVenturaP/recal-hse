@@ -1,55 +1,89 @@
 import { NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
 
-// Necesitamos convertir el secreto al formato que usa 'jose'
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 
 export async function middleware(request) {
-  // 1. Obtenemos la ruta a la que el usuario intenta entrar
+  // 1. Obtenemos la ruta
   const path = request.nextUrl.pathname;
 
-  // 2. Definimos qué áreas son públicas y cuáles protegidas
+  // 2. Definimos áreas
   const isPublicPath = path === '/login' || path === '/';
   const isDashboardPath = path.startsWith('/dashboard');
+  const isApiPath = path.startsWith('/api'); // NUEVO: Identificamos si intenta acceder a la base de datos
+  const isApiLogin = path.includes('/login') || path.includes('/auth');
 
-  // 3. Buscamos la cookie que guardamos en el login
+  // 3. Buscamos la cookie
   const token = request.cookies.get('hse_auth_token')?.value;
 
-  // 4. REGLA 1: Si intenta ir al Dashboard pero NO tiene token, lo regresamos al Login
-  if (!token && isDashboardPath) {
-    return NextResponse.redirect(new URL('/login', request.url));
+  // 4. REGLA 1: Sin token -> Redirigir (Dashboard) o Bloquear (API)
+  if (!token) {
+    if (isDashboardPath) {
+      return NextResponse.redirect(new URL('/login', request.url));
+    }
+    if (isApiPath && !isApiLogin) {
+      return NextResponse.json({ success: false, error: "Acceso denegado a la API" }, { status: 401 });
+    }
   }
 
-  // 5. REGLA 2: Si SÍ tiene token, lo verificamos criptográficamente
+  // 5. REGLA 2: Con token -> Verificar y procesar
   if (token) {
     try {
-      // Intentamos abrir el token con nuestra llave maestra
-      await jwtVerify(token, JWT_SECRET);
+      // Intentamos abrir el token
+      const { payload } = await jwtVerify(token, JWT_SECRET);
 
-      // Si el token es válido y el usuario intenta ir al login o a la landing, 
-      // lo redirigimos directamente a su área de trabajo (Dashboard)
+      // Si va al login estando logeado, lo mandamos al dashboard
       if (isPublicPath) {
         return NextResponse.redirect(new URL('/dashboard', request.url));
       }
 
+      // --- LA MAGIA SUCEDE AQUÍ ---
+      // NUEVO: Blindaje contra usuarios que deben cambiar contraseña
+      const isCambiarPasswordPath = path === '/cambiar-password';
+      
+      if (payload.requiere_cambio && !isCambiarPasswordPath && !isApiPath) {
+        return NextResponse.redirect(new URL('/cambiar-password', request.url));
+      }
+      
+      // Si NO requiere cambio, pero intenta ir a la pantalla de cambiar contraseña, lo regresamos al dashboard
+      if (!payload.requiere_cambio && isCambiarPasswordPath) {
+        return NextResponse.redirect(new URL('/dashboard', request.url));
+      }
+
+      // Clonamos los headers (cabeceras) de la petición original
+      const requestHeaders = new Headers(request.headers);
+      
+      requestHeaders.set('x-user-id', payload.id_usuario || payload.id);
+      requestHeaders.set('x-user-rol', payload.rol); // <-- AGREGAR ESTA LÍNEA
+
+      return NextResponse.next({
+        request: {
+          headers: requestHeaders,
+        },
+      });
+
     } catch (error) {
-      // Si el token expiró (pasaron las 8 horas) o alguien lo alteró manualmente:
-      // Lo mandamos al login y le borramos la cookie corrupta/vencida
+      // Token expirado o corrupto
+      if (isApiPath && !isApiLogin) {
+        return NextResponse.json({ success: false, error: "Token expirado o inválido" }, { status: 401 });
+      }
+      
       const response = NextResponse.redirect(new URL('/login', request.url));
       response.cookies.delete('hse_auth_token');
       return response;
     }
   }
 
-  // Si todo está en orden, dejamos que la petición continúe su camino normal
   return NextResponse.next();
 }
 
-// 6. Configuración: Le decimos a Next.js en qué rutas exactas debe ejecutar este guardia
+// 6. Configuración de rutas a proteger
 export const config = {
   matcher: [
     '/',
     '/login',
-    '/dashboard/:path*', // El asterisco protege todas las sub-rutas (ej. /dashboard/maquinaria)
+    '/dashboard/:path*',
+    '/api/:path*', // NUEVO: Ahora el guardia también protege todas tus consultas a MySQL
+    '/cambiar-password' // NUEVO: Protegemos la ruta de cambiar contraseña
   ]
 };

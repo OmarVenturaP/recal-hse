@@ -49,7 +49,7 @@ export default function LoginPage() {
         <div className="text-center mb-8">
           {/* Título con el azul corporativo */}
           <h2 className="text-3xl font-extrabold text-[var(--recal-blue)]">
-            RECAL HSE
+            <img src="https://res.cloudinary.com/ddl8myqbt/image/upload/v1772806384/recal-logo_ja7x2g.png" alt="Logo RECAL" className="w-25 h-08 inline-block mr-2" />
           </h2>
           <p className="text-gray-500 mt-2">Ingresa tus credenciales del sistema</p>
         </div>

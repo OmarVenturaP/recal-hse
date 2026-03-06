@@ -9,7 +9,9 @@ const pool = createPool({
   port: process.env.DB_PORT,
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
+  timezone: '-06:00',
+  dateStrings: true
 });
 
 export default pool;
