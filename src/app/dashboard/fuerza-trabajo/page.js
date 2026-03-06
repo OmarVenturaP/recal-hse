@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { Pencil, Trash2 } from 'lucide-react';
 
 export default function FuerzaTrabajoPage() {
+  const topRef = useRef(null); // Para el scroll suave
+
   const [trabajadores, setTrabajadores] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -10,18 +13,33 @@ export default function FuerzaTrabajoPage() {
   const [catPrincipales, setCatPrincipales] = useState([]);
   const [catCuadrillas, setCatCuadrillas] = useState([]);
 
-  // Estados para Filtros
+  // Estados para Filtros y Búsqueda
   const [filtroSub, setFiltroSub] = useState('');
   const [fechaInicio, setFechaInicio] = useState('');
   const [fechaFin, setFechaFin] = useState('');
+  const [busqueda, setBusqueda] = useState('');
 
-  // Estados para el Modal
+  // Estados para Ordenamiento
+  const [ordenPor, setOrdenPor] = useState('fecha_ingreso_obra');
+  const [ordenDireccion, setOrdenDireccion] = useState('DESC');
+
+  // Estados de Paginación
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+
+  // Estados para Exportación Excel
+  const currentYear = new Date().getFullYear();
+  const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0');
+  const [exportMes, setExportMes] = useState(currentMonth);
+  const [exportAnio, setExportAnio] = useState(String(currentYear));
+
+  // Estados para el Modal de Edición/Nuevo
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
 
-  // Estados para el Modal de Dar de Baja
+  // Estados para el Modal de Baja
   const [isBajaModalOpen, setIsBajaModalOpen] = useState(false);
   const [bajaId, setBajaId] = useState(null);
   const [bajaFecha, setBajaFecha] = useState('');
@@ -34,20 +52,16 @@ export default function FuerzaTrabajoPage() {
   
   const [formData, setFormData] = useState(formInicial);
 
-  // --- FUNCIONES AUXILIARES PARA EL MANEJO EXACTO DE FECHAS ---
-  
-  // 1. Formato para mostrar en la tabla: dd/mm/yyyy
+  // --- FUNCIONES DE FORMATO DE FECHAS ---
   const formatDDMMYYYY = (dateString) => {
     if (!dateString) return '';
     const date = new Date(dateString);
-    // Usamos getUTC para evitar que la zona horaria de México le reste 1 día por accidente
     const day = String(date.getUTCDate()).padStart(2, '0');
     const month = String(date.getUTCMonth() + 1).padStart(2, '0');
     const year = date.getUTCFullYear();
     return `${day}/${month}/${year}`;
   };
 
-  // 2. Formato para cargar en los inputs del Modal (yyyy-mm-dd)
   const formatForInput = (dateString) => {
     if (!dateString) return '';
     const date = new Date(dateString);
@@ -57,6 +71,7 @@ export default function FuerzaTrabajoPage() {
     return `${year}-${month}-${day}`;
   };
 
+  // --- CARGA DE DATOS ---
   useEffect(() => {
     const fetchCatalogos = async () => {
       try {
@@ -76,9 +91,10 @@ export default function FuerzaTrabajoPage() {
   const fetchTrabajadores = async () => {
     setLoading(true);
     try {
-      let url = '/api/fuerza-trabajo?';
-      if (filtroSub) url += `subcontratista_principal=${filtroSub}&`;
-      if (fechaInicio && fechaFin) url += `fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`;
+      let url = `/api/fuerza-trabajo?ordenPor=${ordenPor}&ordenDireccion=${ordenDireccion}&`;
+      if (filtroSub) url += `subcontratista=${filtroSub}&`; 
+      if (fechaInicio && fechaFin) url += `fechaInicio=${fechaInicio}&fechaFin=${fechaFin}&`;
+      if (busqueda) url += `busqueda=${encodeURIComponent(busqueda)}&`;
 
       const res = await fetch(url);
       const json = await res.json();
@@ -90,8 +106,60 @@ export default function FuerzaTrabajoPage() {
     }
   };
 
-  useEffect(() => { fetchTrabajadores(); }, [filtroSub, fechaInicio, fechaFin]);
+  useEffect(() => { 
+    fetchTrabajadores(); 
+  }, [filtroSub, fechaInicio, fechaFin, busqueda, ordenPor, ordenDireccion]);
 
+  useEffect(() => { 
+    setCurrentPage(1); 
+  }, [filtroSub, fechaInicio, fechaFin, busqueda, ordenPor, ordenDireccion]);
+
+  // --- LÓGICA DE PAGINACIÓN AVANZADA Y SCROLL ---
+  useEffect(() => {
+    if (topRef.current) {
+      topRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [currentPage]);
+
+  const totalPages = Math.ceil(trabajadores.length / itemsPerPage);
+  
+  const getPageNumbers = () => {
+    const maxPagesToShow = 5;
+    const pages = [];
+    if (totalPages <= maxPagesToShow) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      let startPage = Math.max(1, currentPage - 2);
+      let endPage = Math.min(totalPages, currentPage + 2);
+
+      if (currentPage <= 3) {
+        endPage = 5;
+      } else if (currentPage >= totalPages - 2) {
+        startPage = totalPages - 4;
+      }
+
+      for (let i = startPage; i <= endPage; i++) {
+        pages.push(i);
+      }
+    }
+    return pages;
+  };
+
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const trabajadoresPaginados = trabajadores.slice(indexOfFirstItem, indexOfLastItem);
+
+  // --- LÓGICA DE ORDENAMIENTO ---
+  const manejarOrden = (columna) => {
+    if (ordenPor === columna) {
+      setOrdenDireccion(ordenDireccion === 'ASC' ? 'DESC' : 'ASC');
+    } else {
+      setOrdenPor(columna);
+      setOrdenDireccion('ASC'); 
+    }
+  };
+
+  // --- HANDLERS DEL MODAL PRINCIPAL ---
   const handleNewClick = () => {
     setFormData(formInicial);
     setIsEditing(false);
@@ -118,12 +186,10 @@ export default function FuerzaTrabajoPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
     if (formData.nss && !/^\d{11}$/.test(formData.nss)) {
       alert("El NSS debe contener exactamente 11 dígitos numéricos.");
       return;
     }
-
     if (formData.fecha_alta_imss && formData.fecha_ingreso_obra) {
       const alta = new Date(formData.fecha_alta_imss);
       const ingreso = new Date(formData.fecha_ingreso_obra);
@@ -132,7 +198,6 @@ export default function FuerzaTrabajoPage() {
         return;
       }
     }
-
     setSaving(true);
     try {
       const url = '/api/fuerza-trabajo';
@@ -159,16 +224,14 @@ export default function FuerzaTrabajoPage() {
     }
   };
 
-  // Función para abrir la ventanita de Baja
+  // --- HANDLERS DEL MODAL DE BAJA ---
   const handleBajaClick = (id) => {
     setBajaId(id);
-    // Sugerimos la fecha de hoy por defecto para mayor rapidez
     const hoy = new Date().toISOString().split('T')[0];
     setBajaFecha(hoy);
     setIsBajaModalOpen(true);
   };
 
-  // Función para guardar la baja en MySQL
   const handleBajaSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -179,13 +242,10 @@ export default function FuerzaTrabajoPage() {
         body: JSON.stringify({ id_trabajador: bajaId, fecha_baja: bajaFecha })
       });
       const data = await res.json();
-      
       if (data.success) {
         setIsBajaModalOpen(false);
-        fetchTrabajadores(); // Refrescamos la tabla para que se pinte de rojo
-      } else {
-        alert(data.error);
-      }
+        fetchTrabajadores(); 
+      } else alert(data.error);
     } catch (error) {
       alert("Error de conexión");
     } finally {
@@ -193,93 +253,178 @@ export default function FuerzaTrabajoPage() {
     }
   };
 
+  const limpiarFiltros = () => {
+    setFiltroSub(''); setFechaInicio(''); setFechaFin(''); setBusqueda('');
+  };
+
   const cuadrillasFiltradas = catCuadrillas.filter(
     cuadrilla => cuadrilla.id_subcontratista_principal == formData.id_subcontratista_principal
   );
 
   return (
-    <div className="space-y-6 relative">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-[var(--recal-blue)]">Control de Fuerza de Trabajo</h2>
-        <button onClick={handleNewClick} className="bg-[var(--recal-blue)] hover:bg-[var(--recal-blue-hover)] text-white px-4 py-2 rounded-md font-medium shadow-sm">
-          + Nuevo Trabajador
-        </button>
+    <div className="space-y-6 relative" ref={topRef}>
+      
+      {/* HEADER Y BOTONES RESPONSIVOS */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center space-y-4 lg:space-y-0">
+        <h2 className="text-xl sm:text-2xl font-bold text-[var(--recal-blue)]">Control de Fuerza de Trabajo</h2>
+        
+        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 w-full lg:w-auto">
+          {/* CONTROL DE PERIODO PARA EXPORTACIÓN EXCEL */}
+          <div className="flex items-center justify-between sm:justify-start space-x-2 bg-gray-50 border border-gray-200 p-1.5 rounded-md shadow-sm w-full sm:w-auto">
+            <span className="text-xs font-bold text-gray-500 uppercase px-2 hidden md:inline">Periodo:</span>
+            <select className="text-sm border-gray-300 rounded py-1 pl-2 pr-8 focus:ring-[var(--recal-blue)] outline-none flex-1 sm:flex-none" value={exportMes} onChange={(e) => setExportMes(e.target.value)}>
+              <option value="01">Enero</option><option value="02">Febrero</option>
+              <option value="03">Marzo</option><option value="04">Abril</option>
+              <option value="05">Mayo</option><option value="06">Junio</option>
+              <option value="07">Julio</option><option value="08">Agosto</option>
+              <option value="09">Septiembre</option><option value="10">Octubre</option>
+              <option value="11">Noviembre</option><option value="12">Diciembre</option>
+            </select>
+            <select className="text-sm border-gray-300 rounded py-1 pl-2 pr-8 focus:ring-[var(--recal-blue)] outline-none flex-1 sm:flex-none" value={exportAnio} onChange={(e) => setExportAnio(e.target.value)}>
+              <option value="2024">2024</option><option value="2025">2025</option>
+              <option value="2026">2026</option><option value="2027">2027</option>
+            </select>
+          </div>
+
+          <a href={`/api/fuerza-trabajo/exportar?mes=${exportMes}&anio=${exportAnio}&subcontratista=${filtroSub}`} target="_blank" className="flex-1 sm:flex-none justify-center bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
+            <span className="mr-1 sm:mr-2">📊</span> Exportar Plantilla
+          </a>
+          
+          <button onClick={handleNewClick} className="w-full sm:w-auto bg-[var(--recal-blue)] hover:bg-[var(--recal-blue-hover)] text-white px-4 py-3 sm:py-2 rounded-md font-medium shadow-sm lg:ml-2">
+            + Nuevo Trabajador
+          </button>
+        </div>
       </div>
 
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div>
+      {/* PANEL DE FILTROS, BÚSQUEDA Y FECHAS */}
+      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 grid grid-cols-1 md:grid-cols-6 gap-4">
+        <div className="md:col-span-2">
+          <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Buscar Trabajador</label>
+          <div className="relative">
+            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">🔍</span>
+            <input type="text" placeholder="Num Empleado, Nombre, NSS..." 
+              className="w-full pl-10 border border-gray-300 rounded-md p-2 shadow-sm focus:ring-[var(--recal-blue)] outline-none sm:text-sm"
+              value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
+          </div>
+        </div>
+        
+        <div className="md:col-span-1">
           <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Contratista Principal</label>
-          <select className="w-full border-gray-300 rounded-md shadow-sm focus:ring-[var(--recal-blue)] sm:text-sm" 
+          <select className="w-full border-gray-300 rounded-md shadow-sm focus:ring-[var(--recal-blue)] p-2 sm:text-sm outline-none" 
             value={filtroSub} onChange={(e) => setFiltroSub(e.target.value)}>
-            <option value="">Todas las empresas...</option>
+            <option value="">Todas...</option>
             {catPrincipales.map(empresa => (
               <option key={empresa.id_subcontratista} value={empresa.id_subcontratista}>{empresa.razon_social}</option>
             ))}
           </select>
         </div>
-        <div>
+
+        <div className="md:col-span-1">
           <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Ingreso Desde</label>
-          <input type="date" className="w-full border-gray-300 rounded-md shadow-sm sm:text-sm" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} />
+          <input type="date" className="w-full border-gray-300 rounded-md p-2 shadow-sm sm:text-sm outline-none" 
+            value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} />
         </div>
-        <div>
+
+        <div className="md:col-span-1">
           <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Ingreso Hasta</label>
-          <input type="date" className="w-full border-gray-300 rounded-md shadow-sm sm:text-sm" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} />
+          <input type="date" className="w-full border-gray-300 rounded-md p-2 shadow-sm sm:text-sm outline-none" 
+            value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} />
         </div>
-        <div className="flex items-end">
-          <button onClick={() => { setFiltroSub(''); setFechaInicio(''); setFechaFin(''); }} className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-md font-medium sm:text-sm transition-colors">
-            Limpiar Filtros
+
+        <div className="md:col-span-1 flex items-end">
+          <button onClick={limpiarFiltros} className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-md font-medium sm:text-sm transition-colors border border-gray-300">
+            Limpiar
           </button>
         </div>
       </div>
 
+      {/* TABLA PRINCIPAL */}
       <div className="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+            <thead className="bg-gray-50 hidden md:table-header-group">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Puesto</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cuadrilla (FT)</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Origen</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase text-blue-800">Alta IMSS</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ingreso</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100" onClick={() => manejarOrden('nombre_trabajador')}>Nombre {ordenPor === 'nombre_trabajador' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100" onClick={() => manejarOrden('puesto_categoria')}>Categoría {ordenPor === 'puesto_categoria' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100" onClick={() => manejarOrden('nss')}>NSS {ordenPor === 'nss' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase cursor-pointer hover:bg-gray-100" onClick={() => manejarOrden('fecha_ingreso_obra')}>Ingreso {ordenPor === 'fecha_ingreso_obra' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100" onClick={() => manejarOrden('nombre_subcontratista')}>Contratista {ordenPor === 'nombre_subcontratista' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estatus</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+
+            <tbody className="bg-white divide-y md:divide-y-0 md:divide-gray-200 block md:table-row-group">
               {loading ? (
-                <tr><td colSpan="8" className="px-6 py-4 text-center text-sm text-gray-500">Cargando datos...</td></tr>
-              ) : trabajadores.map((t) => (
-                  <tr key={t.id_trabajador} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{t.nombre_trabajador}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{t.puesto_categoria}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{t.nombre_subcontratista_ft || '-'}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{t.origen}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-blue-900">
-                      {/* Formato DD/MM/YYYY aplicado aquí */}
-                      {t.fecha_alta_imss ? formatDDMMYYYY(t.fecha_alta_imss) : 'Sin Alta'}
+                <tr className="block md:table-row"><td colSpan="7" className="px-6 py-8 text-center text-sm text-gray-500 block md:table-cell">Cargando personal...</td></tr>
+              ) : trabajadores.length === 0 ? (
+                <tr className="block md:table-row">
+                  <td colSpan="7" className="px-6 py-12 text-center block md:table-cell">
+                    <div className="text-gray-400 text-4xl mb-2">🔍</div>
+                    <p className="text-sm font-medium text-gray-900">No se encontraron resultados</p>
+                  </td>
+                </tr>
+              ) : trabajadoresPaginados.map((t) => (
+                  <tr key={t.id_trabajador} className="block md:table-row border border-gray-200 md:border-none mb-4 md:mb-0 rounded-lg shadow-sm md:shadow-none p-4 md:p-0 hover:bg-gray-50">
+                    
+                    <td className="flex justify-between md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm font-bold text-[var(--recal-blue)] md:text-gray-900 border-b md:border-none">
+                      <span className="md:hidden font-bold text-gray-500">Nombre:</span>
+                      {t.nombre_trabajador}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {/* Formato DD/MM/YYYY aplicado aquí */}
+
+                    <td className="flex justify-between md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 border-b md:border-none">
+                      <span className="md:hidden font-bold text-gray-500">Categoría:</span>
+                      {t.puesto_categoria}
+                    </td>
+
+                    <td className="flex justify-between md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 border-b md:border-none">
+                      <span className="md:hidden font-bold text-gray-500">NSS:</span>
+                      {t.nss || 'N/A'}
+                    </td>
+
+                    <td className="flex justify-between md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 border-b md:border-none">
+                      <span className="md:hidden font-bold text-gray-500">Ingreso:</span>
                       {formatDDMMYYYY(t.fecha_ingreso_obra)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+
+                    <td className="flex justify-between md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 border-b md:border-none">
+                      <span className="md:hidden font-bold text-gray-500">Contratista:</span>
+                      {t.nombre_subcontratista || 'RECAL'}
+                    </td>
+
+                    <td className="flex justify-between md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm border-b md:border-none">
+                      <span className="md:hidden font-bold text-gray-500">Estatus:</span>
                       {t.fecha_baja ? (
                         <span className="px-2 inline-flex text-xs font-semibold rounded-full bg-red-100 text-red-800">Baja</span>
                       ) : (
                         <span className="px-2 inline-flex text-xs font-semibold rounded-full bg-green-100 text-green-800">Activo</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button onClick={() => handleEditClick(t)} className="text-[var(--recal-blue)] hover:text-blue-900 mr-4">Editar</button>
-                      
-                      {!t.fecha_baja ? (
-                        <button onClick={() => handleBajaClick(t.id_trabajador)} className="text-red-600 hover:text-red-900 font-bold">Dar de Baja</button>
-                      ) : (
-                        <span className="text-gray-400 italic text-xs">Retirado</span>
-                      )}
+
+                    <td className="flex justify-end items-center md:table-cell px-2 md:px-6 py-4 md:py-4 text-sm font-medium border-b md:border-none">
+                      <div className="flex justify-end items-center gap-2 md:gap-3">
+                        <button 
+                          onClick={() => handleEditClick(t)} 
+                          title="Editar Trabajador"
+                          className="text-[var(--recal-blue)] hover:text-blue-800 hover:bg-blue-50 p-2 rounded-md transition-colors flex items-center justify-center"
+                        >
+                          <Pencil className="w-4 h-4 sm:w-5 sm:h-5" />
+                        </button>
+                        
+                        {!t.fecha_baja ? (
+                          <button 
+                            onClick={() => handleBajaClick(t.id_trabajador)} 
+                            title="Dar de Baja"
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-md transition-colors flex items-center justify-center"
+                          >
+                            <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                          </button>
+                        ) : (
+                          <span className="text-gray-400 italic text-xs px-2 flex items-center h-full">Retirado</span>
+                        )}
+                      </div>
                     </td>
+
                   </tr>
                 ))
               }
@@ -288,6 +433,50 @@ export default function FuerzaTrabajoPage() {
         </div>
       </div>
 
+      {/* CONTROLES DE PAGINACIÓN AVANZADOS */}
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between bg-white px-4 py-3 border border-gray-200 rounded-lg shadow-sm gap-4 sm:gap-0 mt-4">
+          <div className="text-sm text-gray-700 text-center sm:text-left">
+            Mostrando del <span className="font-bold">{indexOfFirstItem + 1}</span> al <span className="font-bold">{Math.min(indexOfLastItem, trabajadores.length)}</span> de <span className="font-bold">{trabajadores.length}</span> trabajadores
+          </div>
+          <div>
+            <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+              <button onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1}
+                className={`relative inline-flex items-center px-3 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium ${currentPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-50'}`}>
+                Anterior
+              </button>
+              
+              {/* Números dinámicos (Visibles en Tablet y PC) */}
+              <div className="hidden md:flex">
+                {getPageNumbers().map(page => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium transition-colors
+                      ${currentPage === page 
+                        ? 'z-10 bg-blue-50 border-[var(--recal-blue)] text-[var(--recal-blue)]' 
+                        : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'}`}
+                  >
+                    {page}
+                  </button>
+                ))}
+              </div>
+
+              {/* Contador compacto (Visible solo en Celulares) */}
+              <span className="md:hidden relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+                {currentPage} / {totalPages}
+              </span>
+
+              <button onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages}
+                className={`relative inline-flex items-center px-3 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium ${currentPage === totalPages ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-50'}`}>
+                Siguiente
+              </button>
+            </nav>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 1: REGISTRO / EDICIÓN */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -297,78 +486,54 @@ export default function FuerzaTrabajoPage() {
               </h3>
               <button type="button" onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 font-bold text-xl">&times;</button>
             </div>
-            
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700">Nombre Completo *</label>
-                  <input required type="text" className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none" 
-                    value={formData.nombre_trabajador} onChange={e => setFormData({...formData, nombre_trabajador: e.target.value})} />
+                  <input required type="text" className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none" value={formData.nombre_trabajador} onChange={e => setFormData({...formData, nombre_trabajador: e.target.value})} />
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Puesto / Categoría *</label>
-                  <input required type="text" className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none" 
-                    value={formData.puesto_categoria} onChange={e => setFormData({...formData, puesto_categoria: e.target.value})} />
+                  <input required type="text" className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none" value={formData.puesto_categoria} onChange={e => setFormData({...formData, puesto_categoria: e.target.value})} />
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Origen *</label>
-                  <select className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none" 
-                    value={formData.origen} onChange={e => setFormData({...formData, origen: e.target.value})}>
+                  <select className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none" value={formData.origen} onChange={e => setFormData({...formData, origen: e.target.value})}>
                     <option value="Local">Local</option>
                     <option value="Foráneo">Foráneo</option>
                   </select>
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Número de Seguridad Social (NSS)</label>
-                  <input type="text" maxLength={11} className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none" 
-                    placeholder="11 dígitos"
-                    value={formData.nss} onChange={e => setFormData({...formData, nss: e.target.value})} />
+                  <input type="text" maxLength={11} className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none" placeholder="11 dígitos" value={formData.nss} onChange={e => setFormData({...formData, nss: e.target.value})} />
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Fecha Alta IMSS (Opcional)</label>
-                  <input type="date" className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none" 
-                    value={formData.fecha_alta_imss} onChange={e => setFormData({...formData, fecha_alta_imss: e.target.value})} />
+                  <input type="date" className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none" value={formData.fecha_alta_imss} onChange={e => setFormData({...formData, fecha_alta_imss: e.target.value})} />
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Fecha Ingreso a Obra *</label>
-                  <input required type="date" className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none" 
-                    value={formData.fecha_ingreso_obra} onChange={e => setFormData({...formData, fecha_ingreso_obra: e.target.value})} />
+                  <input required type="date" className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none" value={formData.fecha_ingreso_obra} onChange={e => setFormData({...formData, fecha_ingreso_obra: e.target.value})} />
                 </div>
-
                 <div className="md:col-span-1 bg-blue-50 p-3 rounded border border-blue-100">
                   <label className="block text-sm font-bold text-blue-900">Contratista Principal *</label>
-                  <select required className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none" 
-                    value={formData.id_subcontratista_principal} onChange={e => setFormData({...formData, id_subcontratista_principal: e.target.value, id_subcontratista_ft: ''})}>
+                  <select required className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none" value={formData.id_subcontratista_principal} onChange={e => setFormData({...formData, id_subcontratista_principal: e.target.value, id_subcontratista_ft: ''})}>
                     <option value="">Seleccione Principal...</option>
                     {catPrincipales.map(empresa => (
                       <option key={empresa.id_subcontratista} value={empresa.id_subcontratista}>{empresa.razon_social}</option>
                     ))}
                   </select>
                 </div>
-
                 <div className={`md:col-span-1 p-3 rounded border ${!formData.id_subcontratista_principal ? 'bg-gray-100 border-gray-200' : 'bg-white border-gray-300'}`}>
                   <label className="block text-sm font-medium text-gray-700">Cuadrilla (Opcional)</label>
-                  <select 
-                    disabled={!formData.id_subcontratista_principal}
-                    className={`mt-1 w-full rounded-md p-2 outline-none ${!formData.id_subcontratista_principal ? 'bg-gray-100 cursor-not-allowed text-gray-400 border-none' : 'border border-gray-300 focus:ring-[var(--recal-blue)]'}`}
-                    value={formData.id_subcontratista_ft} 
-                    onChange={e => setFormData({...formData, id_subcontratista_ft: e.target.value})}
-                  >
+                  <select disabled={!formData.id_subcontratista_principal} className={`mt-1 w-full rounded-md p-2 outline-none ${!formData.id_subcontratista_principal ? 'bg-gray-100 cursor-not-allowed text-gray-400 border-none' : 'border border-gray-300 focus:ring-[var(--recal-blue)]'}`} value={formData.id_subcontratista_ft} onChange={e => setFormData({...formData, id_subcontratista_ft: e.target.value})}>
                     <option value="">Ninguna...</option>
                     {cuadrillasFiltradas.map(cuadrilla => (
                       <option key={cuadrilla.id_subcontratista_ft} value={cuadrilla.id_subcontratista_ft}>{cuadrilla.nombre}</option>
                     ))}
                   </select>
                 </div>
-
               </div>
-
               <div className="pt-4 flex justify-end space-x-3 border-t mt-6">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>
                 <button type="submit" disabled={saving} className="px-4 py-2 bg-[var(--recal-blue)] text-white rounded-md hover:bg-[var(--recal-blue-hover)] transition-colors">
@@ -380,22 +545,19 @@ export default function FuerzaTrabajoPage() {
         </div>
       )}
 
-      {/* MODAL DE CONFIRMACIÓN DE BAJA */}
+      {/* MODAL 2: CONFIRMACIÓN DE BAJA */}
       {isBajaModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-sm w-full">
             <div className="px-6 py-4 border-b border-gray-200 bg-red-50 rounded-t-lg">
               <h3 className="text-lg font-bold text-red-700">Confirmar Baja de Personal</h3>
             </div>
-            
             <form onSubmit={handleBajaSubmit} className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Fecha de salida de la obra *</label>
-                <input required type="date" className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-red-500 outline-none" 
-                  value={bajaFecha} onChange={e => setBajaFecha(e.target.value)} />
+                <input required type="date" className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-red-500 outline-none" value={bajaFecha} onChange={e => setBajaFecha(e.target.value)} />
                 <p className="mt-2 text-xs text-gray-500">El trabajador se mantendrá en la base de datos para historial, pero se marcará como inactivo a partir de esta fecha.</p>
               </div>
-
               <div className="pt-4 flex justify-end space-x-3 border-t mt-6">
                 <button type="button" onClick={() => setIsBajaModalOpen(false)} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>
                 <button type="submit" disabled={saving} className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors font-medium">
