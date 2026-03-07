@@ -7,13 +7,17 @@ export default function LandingPage() {
       <nav className="bg-white shadow-md w-full z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
-            <div className="flex-shrink-0 flex items-center">
-              <span className="text-2xl font-bold text-blue-900">RECAL HSE</span>
+            {/* Logo */}
+            <div className="flex-shrink-0 flex items-center pr-2">
+              <span className="text-lg sm:text-xl md:text-2xl font-bold text-blue-900 leading-tight">
+                RECAL ESTRUCTURAS
+              </span>
             </div>
+            {/* Botón */}
             <div>
               <Link 
                 href="/login" 
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md text-sm font-medium transition-colors"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-6 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
               >
                 Iniciar Sesión
               </Link>
@@ -23,17 +27,22 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero Section */}
-      <main className="flex-grow flex items-center justify-center relative overflow-hidden">
-        {/* Aquí iría tu imagen de fondo real más adelante */}
+      <main className="flex-grow flex items-center justify-center relative overflow-hidden py-16 sm:py-0">
+        {/* Fondo y Overlay */}
         <div className="absolute inset-0 bg-slate-800 opacity-90 z-0"></div>
-        [Image of construction site worker with safety helmet and vest on a bridge construction]
+        <img 
+          src="https://recalglobal.com/wp-content/uploads/2024/06/DJI_0547-Edit.jpg" 
+          alt="Imagen de fondo" 
+          className="absolute inset-0 w-full h-full object-cover opacity-20 z-0"
+        />
         
+        {/* Contenido Principal */}
         <div className="relative z-10 text-center px-4 sm:px-6 lg:px-8">
-          <h1 className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight mb-4">
-            Sistema de Gestión de Seguridad y Medio Ambiente
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white tracking-tight mb-4">
+            Sistema de Gestión de Seguridad <br className="hidden sm:block" /> y Medio Ambiente
           </h1>
-          <p className="mt-4 text-xl text-gray-300 max-w-3xl mx-auto">
-            Control de liberaciones, gestión de maquinaria y fuerza de trabajo para el proyecto de la Línea K.
+          <p className="mt-4 text-base sm:text-lg md:text-xl text-gray-300 max-w-3xl mx-auto">
+            Gestión de maquinaria y fuerza de trabajo.
           </p>
         </div>
       </main>

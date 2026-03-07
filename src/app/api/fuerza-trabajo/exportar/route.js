@@ -82,7 +82,15 @@ export async function GET(request) {
       const row = worksheet.getRow(currentRow);
       row.height = 20; // Altura solicitada de 20 para todas las filas de datos
 
-      const formatoFecha = (fechaStr) => fechaStr ? new Date(fechaStr).toLocaleDateString('es-MX', { timeZone: 'UTC' }) : '';
+      const formatoFecha = (fechaStr) => {
+        if (!fechaStr) return '';
+        const fecha = new Date(fechaStr);
+        const dia = String(fecha.getUTCDate()).padStart(2, '0');
+        const mes = String(fecha.getUTCMonth() + 1).padStart(2, '0'); // Los meses van de 0 a 11
+        const anio = fecha.getUTCFullYear();
+        
+        return `${dia}/${mes}/${anio}`;
+      };
 
       // Llenado de celdas utilizando la nomenclatura por letras
       row.getCell('A').value = index;

@@ -64,7 +64,7 @@ export async function GET(request) {
       row.getCell('I').value = maquina.horometro ? `TOTAL DE H: ${maquina.horometro}` : 'N/A';
       row.getCell('J').value = maquina.ultimo_tipo_mantenimiento?.toUpperCase() || 'N/A';
 
-      if (maquina.ultima_fecha_mantenimiento) {
+      if (maquina.ultima_fecha_mantenimiento && maquina.ultima_fecha_mantenimiento > maquina.fecha_ingreso_obra) {
         const date = new Date(maquina.ultima_fecha_mantenimiento);
         const dia = String(date.getUTCDate()).padStart(2, '0');
         const mes = String(date.getUTCMonth() + 1).padStart(2, '0');
@@ -82,13 +82,13 @@ export async function GET(request) {
 
       // Copiar el formato (bordes, fuentes, centrado) de la fila 5 a las nuevas filas
       if (i > 0) {
-        const filaBase = worksheet.getRow(5);
+        const filaBase = worksheet.getRow(7);
         filaBase.eachCell({ includeEmpty: true }, (baseCell, colNumber) => {
           row.getCell(colNumber).style = baseCell.style;
         });
       } else {
-        row.eachCell({ includeEmpty: true }, (cell) => {
-          cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+          if(colNumber !== 7) cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
         });
       }
 

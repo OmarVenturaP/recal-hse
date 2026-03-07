@@ -74,7 +74,7 @@ export async function GET(request) {
           const imageId = workbook.addImage({ buffer: buffer, extension: 'jpeg' });
           worksheet.addImage(imageId, {
             tl: { col: 6.35, row: currentRow - 0.9 }, 
-            ext: { width: 160, height: 160 }, 
+            ext: { width: 200, height: 200 }, 
             editAs: 'oneCell' 
           });
         } catch (imgError) {

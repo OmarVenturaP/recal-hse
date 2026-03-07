@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2, Upload, FileSpreadsheet } from 'lucide-react';
 
 export default function FuerzaTrabajoPage() {
-  const topRef = useRef(null); // Para el scroll suave
+  const topRef = useRef(null); 
 
   const [trabajadores, setTrabajadores] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -43,6 +43,16 @@ export default function FuerzaTrabajoPage() {
   const [isBajaModalOpen, setIsBajaModalOpen] = useState(false);
   const [bajaId, setBajaId] = useState(null);
   const [bajaFecha, setBajaFecha] = useState('');
+
+  // --- NUEVOS ESTADOS: MODAL DE IMPORTACIÓN MASIVA ---
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [importSubcontratista, setImportSubcontratista] = useState('');
+  const [importPreviewData, setImportPreviewData] = useState([]); // Guarda la tabla temporal
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState('');
+  const [importFase, setImportFase] = useState(1); // Fase 1: Subir | Fase 2: Previsualizar
+  const [importResumen, setImportResumen] = useState({ totales: 0, nuevos: 0 });
 
   const formInicial = {
     numero_empleado: '', nombre_trabajador: '', puesto_categoria: '', 
@@ -106,19 +116,12 @@ export default function FuerzaTrabajoPage() {
     }
   };
 
-  useEffect(() => { 
-    fetchTrabajadores(); 
-  }, [filtroSub, fechaInicio, fechaFin, busqueda, ordenPor, ordenDireccion]);
+  useEffect(() => { fetchTrabajadores(); }, [filtroSub, fechaInicio, fechaFin, busqueda, ordenPor, ordenDireccion]);
+  useEffect(() => { setCurrentPage(1); }, [filtroSub, fechaInicio, fechaFin, busqueda, ordenPor, ordenDireccion]);
 
-  useEffect(() => { 
-    setCurrentPage(1); 
-  }, [filtroSub, fechaInicio, fechaFin, busqueda, ordenPor, ordenDireccion]);
-
-  // --- LÓGICA DE PAGINACIÓN AVANZADA Y SCROLL ---
+  // --- LÓGICA DE PAGINACIÓN AVANZADA ---
   useEffect(() => {
-    if (topRef.current) {
-      topRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    if (topRef.current) topRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [currentPage]);
 
   const totalPages = Math.ceil(trabajadores.length / itemsPerPage);
@@ -131,16 +134,9 @@ export default function FuerzaTrabajoPage() {
     } else {
       let startPage = Math.max(1, currentPage - 2);
       let endPage = Math.min(totalPages, currentPage + 2);
-
-      if (currentPage <= 3) {
-        endPage = 5;
-      } else if (currentPage >= totalPages - 2) {
-        startPage = totalPages - 4;
-      }
-
-      for (let i = startPage; i <= endPage; i++) {
-        pages.push(i);
-      }
+      if (currentPage <= 3) endPage = 5;
+      else if (currentPage >= totalPages - 2) startPage = totalPages - 4;
+      for (let i = startPage; i <= endPage; i++) pages.push(i);
     }
     return pages;
   };
@@ -149,22 +145,84 @@ export default function FuerzaTrabajoPage() {
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const trabajadoresPaginados = trabajadores.slice(indexOfFirstItem, indexOfLastItem);
 
-  // --- LÓGICA DE ORDENAMIENTO ---
   const manejarOrden = (columna) => {
-    if (ordenPor === columna) {
-      setOrdenDireccion(ordenDireccion === 'ASC' ? 'DESC' : 'ASC');
-    } else {
-      setOrdenPor(columna);
-      setOrdenDireccion('ASC'); 
+    if (ordenPor === columna) setOrdenDireccion(ordenDireccion === 'ASC' ? 'DESC' : 'ASC');
+    else { setOrdenPor(columna); setOrdenDireccion('ASC'); }
+  };
+
+  // --- HANDLERS: IMPORTACIÓN MASIVA ---
+  const handleOpenImportModal = () => {
+    setImportFile(null);
+    setImportSubcontratista('');
+    setImportPreviewData([]);
+    setImportError('');
+    setImportFase(1);
+    setIsImportModalOpen(true);
+  };
+
+  const handleAnalizarExcel = async (e) => {
+    e.preventDefault();
+    if (!importFile || !importSubcontratista) {
+      setImportError("Por favor selecciona un archivo y la contratista.");
+      return;
+    }
+
+    setImporting(true);
+    setImportError('');
+
+    const formData = new FormData();
+    formData.append('file', importFile);
+    formData.append('id_subcontratista_principal', importSubcontratista);
+
+    try {
+      const res = await fetch('/api/fuerza-trabajo/importar', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setImportPreviewData(data.data);
+        setImportResumen({ totales: data.totalesExcel, nuevos: data.nuevos });
+        setImportFase(2); // Pasamos a la fase de previsualización
+      } else {
+        setImportError(data.error || "Error al procesar el archivo.");
+      }
+    } catch (error) {
+      setImportError("Error de conexión con el servidor.");
+    } finally {
+      setImporting(false);
     }
   };
 
-  // --- HANDLERS DEL MODAL PRINCIPAL ---
+  const handleGuardarImportacion = async () => {
+    if (importPreviewData.length === 0) return;
+    setImporting(true);
+    try {
+      const res = await fetch('/api/fuerza-trabajo/importar', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trabajadores: importPreviewData }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setIsImportModalOpen(false);
+        fetchTrabajadores(); // Recargamos la tabla principal
+        alert(data.mensaje); // Feedback de éxito
+      } else {
+        setImportError(data.error || "Error al guardar en base de datos.");
+      }
+    } catch (error) {
+      setImportError("Error de conexión al guardar.");
+    } finally {
+      setImporting(false);
+    }
+  };
+
+
+  // --- HANDLERS: INDIVIDUALES (Nuevo, Editar, Baja) ---
   const handleNewClick = () => {
-    setFormData(formInicial);
-    setIsEditing(false);
-    setEditId(null);
-    setIsModalOpen(true);
+    setFormData(formInicial); setIsEditing(false); setEditId(null); setIsModalOpen(true);
   };
 
   const handleEditClick = (trabajador) => {
@@ -179,24 +237,17 @@ export default function FuerzaTrabajoPage() {
       id_subcontratista_ft: trabajador.id_subcontratista_ft || '',
       id_subcontratista_principal: trabajador.id_subcontratista_principal || ''
     });
-    setEditId(trabajador.id_trabajador);
-    setIsEditing(true);
-    setIsModalOpen(true);
+    setEditId(trabajador.id_trabajador); setIsEditing(true); setIsModalOpen(true);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (formData.nss && !/^\d{11}$/.test(formData.nss)) {
-      alert("El NSS debe contener exactamente 11 dígitos numéricos.");
-      return;
+      alert("El NSS debe contener exactamente 11 dígitos numéricos."); return;
     }
     if (formData.fecha_alta_imss && formData.fecha_ingreso_obra) {
-      const alta = new Date(formData.fecha_alta_imss);
-      const ingreso = new Date(formData.fecha_ingreso_obra);
-      if (alta > ingreso) {
-        alert("Error: La fecha de alta del IMSS no puede ser mayor a la fecha de ingreso a obra.");
-        return;
-      }
+      const alta = new Date(formData.fecha_alta_imss); const ingreso = new Date(formData.fecha_ingreso_obra);
+      if (alta > ingreso) { alert("Error: La fecha de alta del IMSS no puede ser mayor a la fecha de ingreso."); return; }
     }
     setSaving(true);
     try {
@@ -205,61 +256,33 @@ export default function FuerzaTrabajoPage() {
       const bodyData = isEditing ? { ...formData, id_trabajador: editId } : formData;
 
       const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bodyData)
+        method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(bodyData)
       });
       const data = await res.json();
       
-      if (data.success) {
-        setIsModalOpen(false);
-        fetchTrabajadores();
-      } else {
-        alert(data.error);
-      }
-    } catch (error) {
-      alert("Error de conexión al guardar");
-    } finally {
-      setSaving(false);
-    }
+      if (data.success) { setIsModalOpen(false); fetchTrabajadores(); } else alert(data.error);
+    } catch (error) { alert("Error de conexión al guardar"); } finally { setSaving(false); }
   };
 
-  // --- HANDLERS DEL MODAL DE BAJA ---
   const handleBajaClick = (id) => {
-    setBajaId(id);
-    const hoy = new Date().toISOString().split('T')[0];
-    setBajaFecha(hoy);
-    setIsBajaModalOpen(true);
+    setBajaId(id); setBajaFecha(new Date().toISOString().split('T')[0]); setIsBajaModalOpen(true);
   };
 
   const handleBajaSubmit = async (e) => {
-    e.preventDefault();
-    setSaving(true);
+    e.preventDefault(); setSaving(true);
     try {
       const res = await fetch('/api/fuerza-trabajo', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id_trabajador: bajaId, fecha_baja: bajaFecha })
       });
       const data = await res.json();
-      if (data.success) {
-        setIsBajaModalOpen(false);
-        fetchTrabajadores(); 
-      } else alert(data.error);
-    } catch (error) {
-      alert("Error de conexión");
-    } finally {
-      setSaving(false);
-    }
+      if (data.success) { setIsBajaModalOpen(false); fetchTrabajadores(); } else alert(data.error);
+    } catch (error) { alert("Error de conexión"); } finally { setSaving(false); }
   };
 
-  const limpiarFiltros = () => {
-    setFiltroSub(''); setFechaInicio(''); setFechaFin(''); setBusqueda('');
-  };
+  const limpiarFiltros = () => { setFiltroSub(''); setFechaInicio(''); setFechaFin(''); setBusqueda(''); };
 
-  const cuadrillasFiltradas = catCuadrillas.filter(
-    cuadrilla => cuadrilla.id_subcontratista_principal == formData.id_subcontratista_principal
-  );
+  const cuadrillasFiltradas = catCuadrillas.filter(c => c.id_subcontratista_principal == formData.id_subcontratista_principal);
 
   return (
     <div className="space-y-6 relative" ref={topRef}>
@@ -268,73 +291,61 @@ export default function FuerzaTrabajoPage() {
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center space-y-4 lg:space-y-0">
         <h2 className="text-xl sm:text-2xl font-bold text-[var(--recal-blue)]">Control de Fuerza de Trabajo</h2>
         
-        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 w-full lg:w-auto">
+        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full lg:w-auto">
+          
+          {/* BOTÓN DE IMPORTAR EXCEL */}
+          <button onClick={handleOpenImportModal} className="flex-1 sm:flex-none justify-center bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
+            <Upload className="w-4 h-4 mr-1 sm:mr-2" /> Importar Excel
+          </button>
+
           {/* CONTROL DE PERIODO PARA EXPORTACIÓN EXCEL */}
-          <div className="flex items-center justify-between sm:justify-start space-x-2 bg-gray-50 border border-gray-200 p-1.5 rounded-md shadow-sm w-full sm:w-auto">
-            <span className="text-xs font-bold text-gray-500 uppercase px-2 hidden md:inline">Periodo:</span>
-            <select className="text-sm border-gray-300 rounded py-1 pl-2 pr-8 focus:ring-[var(--recal-blue)] outline-none flex-1 sm:flex-none" value={exportMes} onChange={(e) => setExportMes(e.target.value)}>
-              <option value="01">Enero</option><option value="02">Febrero</option>
-              <option value="03">Marzo</option><option value="04">Abril</option>
-              <option value="05">Mayo</option><option value="06">Junio</option>
-              <option value="07">Julio</option><option value="08">Agosto</option>
-              <option value="09">Septiembre</option><option value="10">Octubre</option>
-              <option value="11">Noviembre</option><option value="12">Diciembre</option>
+          <div className="flex items-center justify-between sm:justify-start space-x-1 bg-gray-50 border border-gray-200 p-1 rounded-md shadow-sm w-full sm:w-auto">
+            <select className="text-sm border-gray-300 rounded py-1 pl-2 pr-6 focus:ring-[var(--recal-blue)] outline-none flex-1 sm:flex-none" value={exportMes} onChange={(e) => setExportMes(e.target.value)}>
+              <option value="01">Ene</option><option value="02">Feb</option><option value="03">Mar</option><option value="04">Abr</option>
+              <option value="05">May</option><option value="06">Jun</option><option value="07">Jul</option><option value="08">Ago</option>
+              <option value="09">Sep</option><option value="10">Oct</option><option value="11">Nov</option><option value="12">Dic</option>
             </select>
-            <select className="text-sm border-gray-300 rounded py-1 pl-2 pr-8 focus:ring-[var(--recal-blue)] outline-none flex-1 sm:flex-none" value={exportAnio} onChange={(e) => setExportAnio(e.target.value)}>
-              <option value="2024">2024</option><option value="2025">2025</option>
-              <option value="2026">2026</option><option value="2027">2027</option>
+            <select className="text-sm border-gray-300 rounded py-1 pl-2 pr-6 focus:ring-[var(--recal-blue)] outline-none flex-1 sm:flex-none" value={exportAnio} onChange={(e) => setExportAnio(e.target.value)}>
+              <option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option><option value="2027">2027</option>
             </select>
           </div>
 
           <a href={`/api/fuerza-trabajo/exportar?mes=${exportMes}&anio=${exportAnio}&subcontratista=${filtroSub}`} target="_blank" className="flex-1 sm:flex-none justify-center bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
-            <span className="mr-1 sm:mr-2">📊</span> Exportar Plantilla
+            <span className="mr-1 sm:mr-2">📊</span> Exportar
           </a>
           
           <button onClick={handleNewClick} className="w-full sm:w-auto bg-[var(--recal-blue)] hover:bg-[var(--recal-blue-hover)] text-white px-4 py-3 sm:py-2 rounded-md font-medium shadow-sm lg:ml-2">
-            + Nuevo Trabajador
+            + Nuevo
           </button>
         </div>
       </div>
 
-      {/* PANEL DE FILTROS, BÚSQUEDA Y FECHAS */}
+      {/* PANEL DE FILTROS */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 grid grid-cols-1 md:grid-cols-6 gap-4">
         <div className="md:col-span-2">
           <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Buscar Trabajador</label>
           <div className="relative">
             <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">🔍</span>
-            <input type="text" placeholder="Num Empleado, Nombre, NSS..." 
-              className="w-full pl-10 border border-gray-300 rounded-md p-2 shadow-sm focus:ring-[var(--recal-blue)] outline-none sm:text-sm"
-              value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
+            <input type="text" placeholder="Nombre, NSS..." className="w-full pl-10 border border-gray-300 rounded-md p-2 shadow-sm focus:ring-[var(--recal-blue)] outline-none sm:text-sm" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
           </div>
         </div>
-        
         <div className="md:col-span-1">
-          <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Contratista Principal</label>
-          <select className="w-full border-gray-300 rounded-md shadow-sm focus:ring-[var(--recal-blue)] p-2 sm:text-sm outline-none" 
-            value={filtroSub} onChange={(e) => setFiltroSub(e.target.value)}>
+          <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Contratista</label>
+          <select className="w-full border-gray-300 rounded-md shadow-sm focus:ring-[var(--recal-blue)] p-2 sm:text-sm outline-none" value={filtroSub} onChange={(e) => setFiltroSub(e.target.value)}>
             <option value="">Todas...</option>
-            {catPrincipales.map(empresa => (
-              <option key={empresa.id_subcontratista} value={empresa.id_subcontratista}>{empresa.razon_social}</option>
-            ))}
+            {catPrincipales.map(empresa => (<option key={empresa.id_subcontratista} value={empresa.id_subcontratista}>{empresa.razon_social}</option>))}
           </select>
         </div>
-
         <div className="md:col-span-1">
           <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Ingreso Desde</label>
-          <input type="date" className="w-full border-gray-300 rounded-md p-2 shadow-sm sm:text-sm outline-none" 
-            value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} />
+          <input type="date" className="w-full border-gray-300 rounded-md p-2 shadow-sm sm:text-sm outline-none" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} />
         </div>
-
         <div className="md:col-span-1">
           <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Ingreso Hasta</label>
-          <input type="date" className="w-full border-gray-300 rounded-md p-2 shadow-sm sm:text-sm outline-none" 
-            value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} />
+          <input type="date" className="w-full border-gray-300 rounded-md p-2 shadow-sm sm:text-sm outline-none" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} />
         </div>
-
         <div className="md:col-span-1 flex items-end">
-          <button onClick={limpiarFiltros} className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-md font-medium sm:text-sm transition-colors border border-gray-300">
-            Limpiar
-          </button>
+          <button onClick={limpiarFiltros} className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-md font-medium sm:text-sm transition-colors border border-gray-300">Limpiar</button>
         </div>
       </div>
 
@@ -353,7 +364,6 @@ export default function FuerzaTrabajoPage() {
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
               </tr>
             </thead>
-
             <tbody className="bg-white divide-y md:divide-y-0 md:divide-gray-200 block md:table-row-group">
               {loading ? (
                 <tr className="block md:table-row"><td colSpan="7" className="px-6 py-8 text-center text-sm text-gray-500 block md:table-cell">Cargando personal...</td></tr>
@@ -366,65 +376,33 @@ export default function FuerzaTrabajoPage() {
                 </tr>
               ) : trabajadoresPaginados.map((t) => (
                   <tr key={t.id_trabajador} className="block md:table-row border border-gray-200 md:border-none mb-4 md:mb-0 rounded-lg shadow-sm md:shadow-none p-4 md:p-0 hover:bg-gray-50">
-                    
                     <td className="flex justify-between md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm font-bold text-[var(--recal-blue)] md:text-gray-900 border-b md:border-none">
-                      <span className="md:hidden font-bold text-gray-500">Nombre:</span>
-                      {t.nombre_trabajador}
+                      <span className="md:hidden font-bold text-gray-500">Nombre:</span>{t.nombre_trabajador}
                     </td>
-
                     <td className="flex justify-between md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 border-b md:border-none">
-                      <span className="md:hidden font-bold text-gray-500">Categoría:</span>
-                      {t.puesto_categoria}
+                      <span className="md:hidden font-bold text-gray-500">Categoría:</span>{t.puesto_categoria}
                     </td>
-
                     <td className="flex justify-between md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 border-b md:border-none">
-                      <span className="md:hidden font-bold text-gray-500">NSS:</span>
-                      {t.nss || 'N/A'}
+                      <span className="md:hidden font-bold text-gray-500">NSS:</span>{t.nss || 'N/A'}
                     </td>
-
                     <td className="flex justify-between md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 border-b md:border-none">
-                      <span className="md:hidden font-bold text-gray-500">Ingreso:</span>
-                      {formatDDMMYYYY(t.fecha_ingreso_obra)}
+                      <span className="md:hidden font-bold text-gray-500">Ingreso:</span>{formatDDMMYYYY(t.fecha_ingreso_obra)}
                     </td>
-
                     <td className="flex justify-between md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 border-b md:border-none">
-                      <span className="md:hidden font-bold text-gray-500">Contratista:</span>
-                      {t.nombre_subcontratista || 'RECAL'}
+                      <span className="md:hidden font-bold text-gray-500">Contratista:</span>{t.nombre_subcontratista || 'RECAL'}
                     </td>
-
                     <td className="flex justify-between md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm border-b md:border-none">
                       <span className="md:hidden font-bold text-gray-500">Estatus:</span>
-                      {t.fecha_baja ? (
-                        <span className="px-2 inline-flex text-xs font-semibold rounded-full bg-red-100 text-red-800">Baja</span>
-                      ) : (
-                        <span className="px-2 inline-flex text-xs font-semibold rounded-full bg-green-100 text-green-800">Activo</span>
-                      )}
+                      {t.fecha_baja ? (<span className="px-2 inline-flex text-xs font-semibold rounded-full bg-red-100 text-red-800">Baja</span>) : (<span className="px-2 inline-flex text-xs font-semibold rounded-full bg-green-100 text-green-800">Activo</span>)}
                     </td>
-
                     <td className="flex justify-end items-center md:table-cell px-2 md:px-6 py-4 md:py-4 text-sm font-medium border-b md:border-none">
                       <div className="flex justify-end items-center gap-2 md:gap-3">
-                        <button 
-                          onClick={() => handleEditClick(t)} 
-                          title="Editar Trabajador"
-                          className="text-[var(--recal-blue)] hover:text-blue-800 hover:bg-blue-50 p-2 rounded-md transition-colors flex items-center justify-center"
-                        >
-                          <Pencil className="w-4 h-4 sm:w-5 sm:h-5" />
-                        </button>
-                        
+                        <button onClick={() => handleEditClick(t)} title="Editar" className="text-[var(--recal-blue)] hover:text-blue-800 hover:bg-blue-50 p-2 rounded-md"><Pencil className="w-4 h-4 sm:w-5 sm:h-5" /></button>
                         {!t.fecha_baja ? (
-                          <button 
-                            onClick={() => handleBajaClick(t.id_trabajador)} 
-                            title="Dar de Baja"
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-md transition-colors flex items-center justify-center"
-                          >
-                            <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
-                          </button>
-                        ) : (
-                          <span className="text-gray-400 italic text-xs px-2 flex items-center h-full">Retirado</span>
-                        )}
+                          <button onClick={() => handleBajaClick(t.id_trabajador)} title="Dar Baja" className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-md"><Trash2 className="w-4 h-4 sm:w-5 sm:h-5" /></button>
+                        ) : (<span className="text-gray-400 italic text-xs px-2 flex items-center h-full">Retirado</span>)}
                       </div>
                     </td>
-
                   </tr>
                 ))
               }
@@ -433,44 +411,22 @@ export default function FuerzaTrabajoPage() {
         </div>
       </div>
 
-      {/* CONTROLES DE PAGINACIÓN AVANZADOS */}
+      {/* CONTROLES DE PAGINACIÓN */}
       {totalPages > 1 && (
         <div className="flex flex-col sm:flex-row items-center justify-between bg-white px-4 py-3 border border-gray-200 rounded-lg shadow-sm gap-4 sm:gap-0 mt-4">
           <div className="text-sm text-gray-700 text-center sm:text-left">
             Mostrando del <span className="font-bold">{indexOfFirstItem + 1}</span> al <span className="font-bold">{Math.min(indexOfLastItem, trabajadores.length)}</span> de <span className="font-bold">{trabajadores.length}</span> trabajadores
           </div>
           <div>
-            <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-              <button onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1}
-                className={`relative inline-flex items-center px-3 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium ${currentPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-50'}`}>
-                Anterior
-              </button>
-              
-              {/* Números dinámicos (Visibles en Tablet y PC) */}
+            <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+              <button onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1} className={`relative inline-flex items-center px-3 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium ${currentPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-50'}`}>Anterior</button>
               <div className="hidden md:flex">
                 {getPageNumbers().map(page => (
-                  <button
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium transition-colors
-                      ${currentPage === page 
-                        ? 'z-10 bg-blue-50 border-[var(--recal-blue)] text-[var(--recal-blue)]' 
-                        : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'}`}
-                  >
-                    {page}
-                  </button>
+                  <button key={page} onClick={() => setCurrentPage(page)} className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium transition-colors ${currentPage === page ? 'z-10 bg-blue-50 border-[var(--recal-blue)] text-[var(--recal-blue)]' : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'}`}>{page}</button>
                 ))}
               </div>
-
-              {/* Contador compacto (Visible solo en Celulares) */}
-              <span className="md:hidden relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
-                {currentPage} / {totalPages}
-              </span>
-
-              <button onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages}
-                className={`relative inline-flex items-center px-3 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium ${currentPage === totalPages ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-50'}`}>
-                Siguiente
-              </button>
+              <span className="md:hidden relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">{currentPage} / {totalPages}</span>
+              <button onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages} className={`relative inline-flex items-center px-3 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium ${currentPage === totalPages ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-50'}`}>Siguiente</button>
             </nav>
           </div>
         </div>
@@ -481,10 +437,8 @@ export default function FuerzaTrabajoPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-[var(--recal-gray)]">
-              <h3 className="text-lg font-bold text-[var(--recal-blue)]">
-                {isEditing ? 'Editar Trabajador' : 'Registro de Nuevo Trabajador'}
-              </h3>
-              <button type="button" onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 font-bold text-xl">&times;</button>
+              <h3 className="text-lg font-bold text-[var(--recal-blue)]">{isEditing ? 'Editar Trabajador' : 'Registro de Nuevo Trabajador'}</h3>
+              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 font-bold text-xl">&times;</button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -499,8 +453,7 @@ export default function FuerzaTrabajoPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Origen *</label>
                   <select className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none" value={formData.origen} onChange={e => setFormData({...formData, origen: e.target.value})}>
-                    <option value="Local">Local</option>
-                    <option value="Foráneo">Foráneo</option>
+                    <option value="Local">Local</option><option value="Foráneo">Foráneo</option>
                   </select>
                 </div>
                 <div>
@@ -519,18 +472,14 @@ export default function FuerzaTrabajoPage() {
                   <label className="block text-sm font-bold text-blue-900">Contratista Principal *</label>
                   <select required className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none" value={formData.id_subcontratista_principal} onChange={e => setFormData({...formData, id_subcontratista_principal: e.target.value, id_subcontratista_ft: ''})}>
                     <option value="">Seleccione Principal...</option>
-                    {catPrincipales.map(empresa => (
-                      <option key={empresa.id_subcontratista} value={empresa.id_subcontratista}>{empresa.razon_social}</option>
-                    ))}
+                    {catPrincipales.map(empresa => (<option key={empresa.id_subcontratista} value={empresa.id_subcontratista}>{empresa.razon_social}</option>))}
                   </select>
                 </div>
                 <div className={`md:col-span-1 p-3 rounded border ${!formData.id_subcontratista_principal ? 'bg-gray-100 border-gray-200' : 'bg-white border-gray-300'}`}>
                   <label className="block text-sm font-medium text-gray-700">Cuadrilla (Opcional)</label>
                   <select disabled={!formData.id_subcontratista_principal} className={`mt-1 w-full rounded-md p-2 outline-none ${!formData.id_subcontratista_principal ? 'bg-gray-100 cursor-not-allowed text-gray-400 border-none' : 'border border-gray-300 focus:ring-[var(--recal-blue)]'}`} value={formData.id_subcontratista_ft} onChange={e => setFormData({...formData, id_subcontratista_ft: e.target.value})}>
                     <option value="">Ninguna...</option>
-                    {cuadrillasFiltradas.map(cuadrilla => (
-                      <option key={cuadrilla.id_subcontratista_ft} value={cuadrilla.id_subcontratista_ft}>{cuadrilla.nombre}</option>
-                    ))}
+                    {cuadrillasFiltradas.map(cuadrilla => (<option key={cuadrilla.id_subcontratista_ft} value={cuadrilla.id_subcontratista_ft}>{cuadrilla.nombre}</option>))}
                   </select>
                 </div>
               </div>
@@ -550,24 +499,147 @@ export default function FuerzaTrabajoPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-sm w-full">
             <div className="px-6 py-4 border-b border-gray-200 bg-red-50 rounded-t-lg">
-              <h3 className="text-lg font-bold text-red-700">Confirmar Baja de Personal</h3>
+              <h3 className="text-lg font-bold text-red-700">Confirmar Baja</h3>
             </div>
             <form onSubmit={handleBajaSubmit} className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Fecha de salida de la obra *</label>
                 <input required type="date" className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-red-500 outline-none" value={bajaFecha} onChange={e => setBajaFecha(e.target.value)} />
-                <p className="mt-2 text-xs text-gray-500">El trabajador se mantendrá en la base de datos para historial, pero se marcará como inactivo a partir de esta fecha.</p>
               </div>
               <div className="pt-4 flex justify-end space-x-3 border-t mt-6">
                 <button type="button" onClick={() => setIsBajaModalOpen(false)} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>
-                <button type="submit" disabled={saving} className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors font-medium">
-                  {saving ? 'Procesando...' : 'Confirmar Baja'}
-                </button>
+                <button type="submit" disabled={saving} className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors font-medium">{saving ? 'Procesando...' : 'Confirmar Baja'}</button>
               </div>
             </form>
           </div>
         </div>
       )}
+
+      {/* --- MODAL 3: IMPORTACIÓN DE EXCEL (Carga Masiva) --- */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[95vh] overflow-hidden flex flex-col">
+            
+            {/* Header del Modal */}
+            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-purple-50">
+              <div className="flex items-center">
+                <FileSpreadsheet className="w-6 h-6 text-purple-600 mr-2" />
+                <h3 className="text-xl font-bold text-purple-900">Importación Masiva de Personal</h3>
+              </div>
+              <button onClick={() => setIsImportModalOpen(false)} className="text-gray-400 hover:text-gray-600 font-bold text-2xl">&times;</button>
+            </div>
+
+            {/* Contenido */}
+            <div className="p-6 overflow-y-auto flex-1 bg-gray-50">
+              
+              {importError && (
+                <div className="mb-4 bg-red-50 border-l-4 border-red-500 text-red-700 p-4 text-sm shadow-sm">
+                  <p className="font-bold">Error de lectura</p>
+                  <p>{importError}</p>
+                </div>
+              )}
+
+              {/* FASE 1: Seleccionar Archivo y Contratista */}
+              {importFase === 1 && (
+                <form onSubmit={handleAnalizarExcel} className="space-y-6 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                  <p className="text-sm text-gray-600 mb-4 bg-blue-50 p-3 rounded border border-blue-100">
+                    Sube el formato oficial de Fuerza de Trabajo <b>(09_FUERZA_TRABAJO.xlsx)</b>. El sistema extraerá a los trabajadores a partir de la Fila 5, cruzará los datos con tu base instalada mediante el <b>NSS</b> y te mostrará únicamente a las personas que son nuevas en la obra.
+                  </p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">1. Selecciona a la Contratista Empleadora *</label>
+                      <select required className="w-full border border-gray-300 rounded-md p-3 focus:ring-purple-500 focus:border-purple-500 outline-none shadow-sm" value={importSubcontratista} onChange={(e) => setImportSubcontratista(e.target.value)}>
+                        <option value="">-- Elige una opción --</option>
+                        {catPrincipales.map(empresa => (
+                          <option key={empresa.id_subcontratista} value={empresa.id_subcontratista}>{empresa.razon_social}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">2. Sube el archivo Excel *</label>
+                      <input required type="file" accept=".xlsx, .xls" className="w-full border border-gray-300 rounded-md p-2 bg-gray-50 focus:outline-none file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100" onChange={(e) => setImportFile(e.target.files[0])} />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end pt-4">
+                    <button type="submit" disabled={importing} className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg flex items-center shadow-md transition-colors disabled:bg-gray-400">
+                      {importing ? 'Analizando documento...' : 'Cruzar Datos y Analizar'}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* FASE 2: Previsualización de Datos Nuevos */}
+              {importFase === 2 && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                      <p className="text-xs text-gray-500 font-bold uppercase">Total en el Excel</p>
+                      <p className="text-2xl font-bold text-gray-700">{importResumen.totales}</p>
+                    </div>
+                    <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                      <p className="text-xs text-gray-500 font-bold uppercase">Ya registrados (Omitidos)</p>
+                      <p className="text-2xl font-bold text-blue-600">{importResumen.totales - importResumen.nuevos}</p>
+                    </div>
+                    <div className="bg-purple-50 p-4 rounded-lg border border-purple-200 shadow-sm">
+                      <p className="text-xs text-purple-700 font-bold uppercase">Nuevos por guardar</p>
+                      <p className="text-3xl font-black text-purple-700">{importResumen.nuevos}</p>
+                    </div>
+                  </div>
+
+                  {importPreviewData.length === 0 ? (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-8 text-center">
+                      <p className="text-green-700 font-bold text-lg mb-2">¡Todo al día!</p>
+                      <p className="text-green-600">Todos los trabajadores de este Excel ya existen actualmente en tu base de datos. No hay nada nuevo que agregar.</p>
+                    </div>
+                  ) : (
+                    <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+                      <div className="max-h-64 overflow-y-auto">
+                        <table className="min-w-full divide-y divide-gray-200 text-sm">
+                          <thead className="bg-gray-100 sticky top-0">
+                            <tr>
+                              <th className="px-4 py-3 text-left font-bold text-gray-600">Nombre</th>
+                              <th className="px-4 py-3 text-left font-bold text-gray-600">Categoría</th>
+                              <th className="px-4 py-3 text-left font-bold text-gray-600">NSS</th>
+                              <th className="px-4 py-3 text-left font-bold text-gray-600">Ingreso</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {importPreviewData.map((t, idx) => (
+                              <tr key={idx} className="hover:bg-gray-50">
+                                <td className="px-4 py-2 font-medium text-gray-900">{t.nombre_trabajador}</td>
+                                <td className="px-4 py-2 text-gray-600">{t.puesto_categoria}</td>
+                                <td className="px-4 py-2 text-gray-600">{t.nss || 'S/N'}</td>
+                                <td className="px-4 py-2 text-gray-600">{formatDDMMYYYY(t.fecha_ingreso_obra)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Footer del Modal */}
+            <div className="px-6 py-4 border-t border-gray-200 bg-white flex justify-end space-x-3">
+              <button onClick={() => setIsImportModalOpen(false)} className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 font-medium transition-colors">
+                Cancelar
+              </button>
+              {importFase === 2 && importPreviewData.length > 0 && (
+                <button onClick={handleGuardarImportacion} disabled={importing} className="px-6 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 font-bold transition-colors shadow-md flex items-center disabled:bg-gray-400">
+                  {importing ? 'Guardando...' : `Guardar ${importResumen.nuevos} Nuevos Registros`}
+                </button>
+              )}
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

@@ -63,14 +63,14 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Usuario / Correo</label>
+            <label className="block text-sm font-medium text-gray-700">Correo</label>
             <input 
               type="email" 
               required
               value={correo}
               onChange={(e) => setCorreo(e.target.value)}
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[var(--recal-blue)] focus:ring-[var(--recal-blue)] px-4 py-2 border outline-none transition-colors"
-              placeholder="master@recal.com"
+              placeholder="correo@recalhse.com"
             />
           </div>
 
