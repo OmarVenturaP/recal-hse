@@ -490,14 +490,14 @@ export default function MaquinariaPage() {
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div><label className="block text-sm font-medium text-gray-700">Num. Económico *</label><input required type="text" className="mt-1 w-full border border-gray-300 rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.num_economico} onChange={e => setFormData({...formData, num_economico: e.target.value})} /></div>
-                <div><label className="block text-sm font-medium text-gray-700">Tipo de Equipo *</label><input required type="text" className="mt-1 w-full border border-gray-300 rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.tipo} onChange={e => setFormData({...formData, tipo: e.target.value})} /></div>
-                <div><label className="block text-sm font-medium text-gray-700">Marca</label><input type="text" className="mt-1 w-full border border-gray-300 rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.marca} onChange={e => setFormData({...formData, marca: e.target.value})} /></div>
-                <div><label className="block text-sm font-medium text-gray-700">Modelo</label><input type="text" className="mt-1 w-full border border-gray-300 rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.modelo} onChange={e => setFormData({...formData, modelo: e.target.value})} /></div>
+                <div><label className="block text-sm font-medium text-gray-700">Num. Económico (opcional)</label><input type="text" className="mt-1 w-full border border-gray-300 rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.num_economico} onChange={e => setFormData({...formData, num_economico: e.target.value.toUpperCase()})} /></div>
+                <div><label className="block text-sm font-medium text-gray-700">Tipo de Equipo *</label><input required type="text" className="mt-1 w-full border border-gray-300 rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.tipo} onChange={e => setFormData({...formData, tipo: e.target.value.toUpperCase()})} /></div>
+                <div><label className="block text-sm font-medium text-gray-700">Marca *</label><input required type="text" className="mt-1 w-full border border-gray-300 rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.marca} onChange={e => setFormData({...formData, marca: e.target.value.toUpperCase()})} /></div>
+                <div><label className="block text-sm font-medium text-gray-700">Modelo (opcional)</label><input type="text" className="mt-1 w-full border border-gray-300 rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.modelo} onChange={e => setFormData({...formData, modelo: e.target.value.toUpperCase()})} /></div>
                 <div><label className="block text-sm font-medium text-gray-700">Año</label><input type="text" className="mt-1 w-full border border-gray-300 rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.anio} onChange={e => setFormData({...formData, anio: e.target.value})} /></div>
-                <div><label className="block text-sm font-medium text-gray-700">Color</label><input type="text" className="mt-1 w-full border border-gray-300 rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.color} onChange={e => setFormData({...formData, color: e.target.value})} /></div>
-                <div><label className="block text-sm font-medium text-gray-700">Número de Serie</label><input type="text" className="mt-1 w-full border border-gray-300 rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.serie} onChange={e => setFormData({...formData, serie: e.target.value})} /></div>
-                <div><label className="block text-sm font-medium text-gray-700">Placa</label><input type="text" className="mt-1 w-full border border-gray-300 rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.placa} onChange={e => setFormData({...formData, placa: e.target.value})} /></div>
+                <div><label className="block text-sm font-medium text-gray-700">Color (opcional)</label><input type="text" className="mt-1 w-full border border-gray-300 rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.color} onChange={e => setFormData({...formData, color: e.target.value})} /></div>
+                <div><label className="block text-sm font-medium text-gray-700">Número de Serie (opcional)</label><input type="text" className="mt-1 w-full border border-gray-300 rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.serie} onChange={e => setFormData({...formData, serie: e.target.value})} /></div>
+                <div><label className="block text-sm font-medium text-gray-700">Placa (opcional)</label><input type="text" className="mt-1 w-full border border-gray-300 rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.placa} onChange={e => setFormData({...formData, placa: e.target.value})} /></div>
                 <div><label className="block text-sm font-bold text-blue-900">Horómetro Actual</label><input type="number" step="0.01" className="mt-1 w-full border border-gray-300 rounded-md p-2 bg-blue-50 outline-none focus:ring-[var(--recal-blue)]" value={formData.horometro} onChange={e => setFormData({...formData, horometro: e.target.value})} /></div>
                 <div><label className="block text-sm font-bold text-blue-900">Mantenimiento cada (Hrs)</label><input type="number" className="mt-1 w-full border border-gray-300 rounded-md p-2 bg-blue-50 outline-none focus:ring-[var(--recal-blue)]" value={formData.intervalo_mantenimiento} onChange={e => setFormData({...formData, intervalo_mantenimiento: e.target.value})} /></div>
                 <div><label className="block text-sm font-medium text-gray-700">Fecha Ingreso a Obra *</label><input required type="date" className="mt-1 w-full border border-gray-300 rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.fecha_ingreso_obra} onChange={e => setFormData({...formData, fecha_ingreso_obra: e.target.value})} /></div>
@@ -577,9 +577,15 @@ export default function MaquinariaPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Horómetro al servicio *</label>
-                    <input required type="number" step="0.01" className="w-full border border-gray-300 rounded p-2 text-sm outline-none focus:border-[var(--recal-blue)]" 
-                      value={formMantenimiento.horometro_mantenimiento} onChange={e => setFormMantenimiento({...formMantenimiento, horometro_mantenimiento: e.target.value})} />
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Horómetro al servicio</label>
+                    <input 
+                      type="number" 
+                      step="0.01" 
+                      className="w-full border border-gray-300 rounded p-2 text-sm outline-none focus:border-[var(--recal-blue)]" 
+                      value={formMantenimiento.horometro_mantenimiento} 
+                      onChange={e => setFormMantenimiento({...formMantenimiento, horometro_mantenimiento: e.target.value})} 
+                      placeholder='Opcional si es equipo menor'
+                    />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Observaciones</label>

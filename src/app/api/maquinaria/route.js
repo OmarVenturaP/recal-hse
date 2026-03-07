@@ -97,7 +97,7 @@ export async function POST(request) {
     const fecha_ingreso_obra = formData.get('fecha_ingreso_obra'); const id_subcontratista = formData.get('id_subcontratista');
 
     if (serie && serie.trim() !== '') {
-      const queryBusqueda = `SELECT tipo, marca FROM Maquinaria_Equipo WHERE serie = ? AND id_maquinaria != ? LIMIT 1`;
+      const queryBusqueda = `SELECT tipo, marca FROM Maquinaria_Equipo WHERE serie = ? LIMIT 1`;
       const [existeSerie] = await pool.query(queryBusqueda, [serie]);
       
       if (existeSerie.length > 0) {
@@ -130,12 +130,28 @@ export async function POST(request) {
       (num_economico, tipo, marca, anio, modelo, color, serie, placa, horometro, intervalo_mantenimiento, fecha_ingreso_obra, id_subcontratista, imagen_url, usuario_registro) 
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
+    
+    // AQUÍ ESTÁ LA MAGIA: Agregamos || null a los campos opcionales
     const [result] = await pool.query(query, [
-      num_economico, tipo, marca, anio || null, modelo, color || null, serie || null, placa || null, horometro || null, intervalo_mantenimiento || null, fecha_ingreso_obra, id_subcontratista || null, imagen_url, id_usuario_actual
+      num_economico || null, 
+      tipo || null, 
+      marca || null, 
+      anio || null, 
+      modelo || null, 
+      color || null, 
+      serie || null, 
+      placa || null, 
+      horometro || null, 
+      intervalo_mantenimiento || null, 
+      fecha_ingreso_obra || null, 
+      id_subcontratista || null, 
+      imagen_url, 
+      id_usuario_actual
     ]);
 
     return NextResponse.json({ success: true, id: result.insertId, imagen_url });
   } catch (error) {
+    console.error("Error exacto en POST MySQL:", error); // <-- Esto te dirá el error real en tu terminal
     return NextResponse.json({ success: false, error: "Error al guardar" }, { status: 500 });
   }
 }
@@ -164,9 +180,8 @@ export async function PUT(request) {
     }
 
     const file = formData.get('imagen'); 
-    let imagen_url = formData.get('imagen_url_actual'); // Mantenemos la foto actual por defecto
+    let imagen_url = formData.get('imagen_url_actual');
 
-    // Si el usuario subió una nueva foto al editar, la subimos a Cloudinary y reemplazamos la URL
     if (file && file !== 'null' && file.size > 0) {
       const bytes = await file.arrayBuffer();
       const buffer = Buffer.from(bytes);
@@ -186,12 +201,29 @@ export async function PUT(request) {
       SET num_economico=?, tipo=?, marca=?, anio=?, modelo=?, color=?, serie=?, placa=?, horometro=?, intervalo_mantenimiento=?, fecha_ingreso_obra=?, id_subcontratista=?, imagen_url=?, usuario_actualizacion=?
       WHERE id_maquinaria=?
     `;
+    
+    // Aplicamos también el || null aquí
     await pool.query(query, [
-      num_economico, tipo, marca, anio || null, modelo, color || null, serie || null, placa || null, horometro || null, intervalo_mantenimiento || null, fecha_ingreso_obra, id_subcontratista || null, imagen_url, id_usuario_actual, id_maquinaria
+      num_economico || null, 
+      tipo || null, 
+      marca || null, 
+      anio || null, 
+      modelo || null, 
+      color || null, 
+      serie || null, 
+      placa || null, 
+      horometro || null, 
+      intervalo_mantenimiento || null, 
+      fecha_ingreso_obra || null, 
+      id_subcontratista || null, 
+      imagen_url, 
+      id_usuario_actual, 
+      id_maquinaria
     ]);
 
     return NextResponse.json({ success: true, mensaje: "Actualizado correctamente" });
   } catch (error) {
+    console.error("Error exacto en PUT MySQL:", error);
     return NextResponse.json({ success: false, error: "Error al actualizar" }, { status: 500 });
   }
 }

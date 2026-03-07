@@ -34,8 +34,8 @@ export async function POST(request) {
     const body = await request.json();
     const { id_maquinaria, fecha_mantenimiento, tipo_mantenimiento, horometro_mantenimiento, observaciones } = body;
 
-    // Validación de seguridad
-    if (!id_maquinaria || !fecha_mantenimiento || !tipo_mantenimiento || !horometro_mantenimiento) {
+    // Validación de seguridad (Ya NO exigimos el horometro_mantenimiento)
+    if (!id_maquinaria || !fecha_mantenimiento || !tipo_mantenimiento) {
       return NextResponse.json({ error: "Faltan campos obligatorios para registrar el servicio." }, { status: 400 });
     }
 
@@ -45,20 +45,25 @@ export async function POST(request) {
       VALUES (?, ?, ?, ?, ?)
     `;
     
+    // Si viene vacío o indefinido, enviamos null a MySQL
+    const horometroFinal = horometro_mantenimiento ? parseFloat(horometro_mantenimiento) : null;
+
     const [result] = await pool.query(query, [
       id_maquinaria, 
       fecha_mantenimiento, 
       tipo_mantenimiento, 
-      horometro_mantenimiento, 
-      observaciones || null // Si no hay observaciones, mandamos nulo para que MySQL no marque error
+      horometroFinal, 
+      observaciones || null
     ]);
 
-    // Opcional pero recomendado: Actualizar también el horómetro actual de la máquina principal
-    // para que siempre esté sincronizada con su último servicio.
-    await pool.query(
-      `UPDATE Maquinaria_Equipo SET horometro = ? WHERE id_maquinaria = ?`,
-      [horometro_mantenimiento, id_maquinaria]
-    );
+    // Opcional: Actualizar el horómetro principal de la máquina 
+    // SOLO si el usuario ingresó un nuevo horómetro en este servicio.
+    if (horometroFinal !== null) {
+      await pool.query(
+        `UPDATE Maquinaria_Equipo SET horometro = ? WHERE id_maquinaria = ?`,
+        [horometroFinal, id_maquinaria]
+      );
+    }
 
     return NextResponse.json({ 
       success: true, 
