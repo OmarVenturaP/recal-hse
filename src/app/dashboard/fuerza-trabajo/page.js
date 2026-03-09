@@ -13,10 +13,22 @@ export default function FuerzaTrabajoPage() {
   const [catPrincipales, setCatPrincipales] = useState([]);
   const [catCuadrillas, setCatCuadrillas] = useState([]);
 
-  // Estados para Filtros y Búsqueda
+  // --- FECHAS POR DEFECTO (Última Semana) ---
+  const getDateString = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  
+  const hoy = new Date();
+  const haceUnaSemana = new Date();
+  haceUnaSemana.setDate(hoy.getDate() - 6);
+
+  // Estados Unificados para Filtros y Exportación
+  const [fechaInicio, setFechaInicio] = useState(getDateString(haceUnaSemana));
+  const [fechaFin, setFechaFin] = useState(getDateString(hoy));
   const [filtroSub, setFiltroSub] = useState('');
-  const [fechaInicio, setFechaInicio] = useState('');
-  const [fechaFin, setFechaFin] = useState('');
   const [busqueda, setBusqueda] = useState('');
 
   // Estados para Ordenamiento
@@ -26,12 +38,6 @@ export default function FuerzaTrabajoPage() {
   // Estados de Paginación
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
-
-  // Estados para Exportación Excel
-  const currentYear = new Date().getFullYear();
-  const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0');
-  const [exportMes, setExportMes] = useState(currentMonth);
-  const [exportAnio, setExportAnio] = useState(String(currentYear));
 
   // Estados para el Modal de Edición/Nuevo
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -44,14 +50,14 @@ export default function FuerzaTrabajoPage() {
   const [bajaId, setBajaId] = useState(null);
   const [bajaFecha, setBajaFecha] = useState('');
 
-  // --- NUEVOS ESTADOS: MODAL DE IMPORTACIÓN MASIVA ---
+  // Estados de Importación Masiva
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importFile, setImportFile] = useState(null);
   const [importSubcontratista, setImportSubcontratista] = useState('');
-  const [importPreviewData, setImportPreviewData] = useState([]); // Guarda la tabla temporal
+  const [importPreviewData, setImportPreviewData] = useState([]); 
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState('');
-  const [importFase, setImportFase] = useState(1); // Fase 1: Subir | Fase 2: Previsualizar
+  const [importFase, setImportFase] = useState(1); 
   const [importResumen, setImportResumen] = useState({ totales: 0, nuevos: 0 });
 
   const formInicial = {
@@ -62,7 +68,6 @@ export default function FuerzaTrabajoPage() {
   
   const [formData, setFormData] = useState(formInicial);
 
-  // --- FUNCIONES DE FORMATO DE FECHAS ---
   const formatDDMMYYYY = (dateString) => {
     if (!dateString) return '';
     const date = new Date(dateString);
@@ -81,7 +86,6 @@ export default function FuerzaTrabajoPage() {
     return `${year}-${month}-${day}`;
   };
 
-  // --- CARGA DE DATOS ---
   useEffect(() => {
     const fetchCatalogos = async () => {
       try {
@@ -91,9 +95,7 @@ export default function FuerzaTrabajoPage() {
           setCatPrincipales(data.principales);
           setCatCuadrillas(data.cuadrillas);
         }
-      } catch (error) {
-        console.error("Error cargando catálogos", error);
-      }
+      } catch (error) {}
     };
     fetchCatalogos();
   }, []);
@@ -110,7 +112,6 @@ export default function FuerzaTrabajoPage() {
       const json = await res.json();
       if (json.success) setTrabajadores(json.data);
     } catch (error) {
-      console.error("Error cargando datos", error);
     } finally {
       setLoading(false);
     }
@@ -119,7 +120,6 @@ export default function FuerzaTrabajoPage() {
   useEffect(() => { fetchTrabajadores(); }, [filtroSub, fechaInicio, fechaFin, busqueda, ordenPor, ordenDireccion]);
   useEffect(() => { setCurrentPage(1); }, [filtroSub, fechaInicio, fechaFin, busqueda, ordenPor, ordenDireccion]);
 
-  // --- LÓGICA DE PAGINACIÓN AVANZADA ---
   useEffect(() => {
     if (topRef.current) topRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [currentPage]);
@@ -150,49 +150,40 @@ export default function FuerzaTrabajoPage() {
     else { setOrdenPor(columna); setOrdenDireccion('ASC'); }
   };
 
-  // --- HANDLERS: IMPORTACIÓN MASIVA ---
+  // --- NUEVA FUNCIÓN DE EXPORTACIÓN CON CONFIRMACIÓN ---
+  const handleExportarClick = () => {
+    if (!fechaInicio || !fechaFin) {
+      alert("Por favor selecciona las fechas de la semana que deseas exportar.");
+      return;
+    }
+    const confirmacion = window.confirm(`¿Confirmas que deseas exportar únicamente al personal activo en el periodo del ${formatDDMMYYYY(fechaInicio)} al ${formatDDMMYYYY(fechaFin)}?`);
+    if (confirmacion) {
+      const url = `/api/fuerza-trabajo/exportar?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}&subcontratista=${filtroSub}`;
+      window.open(url, '_blank');
+    }
+  };
+
   const handleOpenImportModal = () => {
-    setImportFile(null);
-    setImportSubcontratista('');
-    setImportPreviewData([]);
-    setImportError('');
-    setImportFase(1);
-    setIsImportModalOpen(true);
+    setImportFile(null); setImportSubcontratista(''); setImportPreviewData([]);
+    setImportError(''); setImportFase(1); setIsImportModalOpen(true);
   };
 
   const handleAnalizarExcel = async (e) => {
     e.preventDefault();
-    if (!importFile || !importSubcontratista) {
-      setImportError("Por favor selecciona un archivo y la contratista.");
-      return;
-    }
-
-    setImporting(true);
-    setImportError('');
+    if (!importFile || !importSubcontratista) { setImportError("Por favor selecciona un archivo y la contratista."); return; }
+    setImporting(true); setImportError('');
 
     const formData = new FormData();
-    formData.append('file', importFile);
-    formData.append('id_subcontratista_principal', importSubcontratista);
+    formData.append('file', importFile); formData.append('id_subcontratista_principal', importSubcontratista);
 
     try {
-      const res = await fetch('/api/fuerza-trabajo/importar', {
-        method: 'POST',
-        body: formData,
-      });
+      const res = await fetch('/api/fuerza-trabajo/importar', { method: 'POST', body: formData });
       const data = await res.json();
 
       if (res.ok && data.success) {
-        setImportPreviewData(data.data);
-        setImportResumen({ totales: data.totalesExcel, nuevos: data.nuevos });
-        setImportFase(2); // Pasamos a la fase de previsualización
-      } else {
-        setImportError(data.error || "Error al procesar el archivo.");
-      }
-    } catch (error) {
-      setImportError("Error de conexión con el servidor.");
-    } finally {
-      setImporting(false);
-    }
+        setImportPreviewData(data.data); setImportResumen({ totales: data.totalesExcel, nuevos: data.nuevos }); setImportFase(2);
+      } else setImportError(data.error || "Error al procesar el archivo.");
+    } catch (error) { setImportError("Error de conexión con el servidor."); } finally { setImporting(false); }
   };
 
   const handleGuardarImportacion = async () => {
@@ -200,27 +191,15 @@ export default function FuerzaTrabajoPage() {
     setImporting(true);
     try {
       const res = await fetch('/api/fuerza-trabajo/importar', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ trabajadores: importPreviewData }),
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trabajadores: importPreviewData }),
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setIsImportModalOpen(false);
-        fetchTrabajadores(); // Recargamos la tabla principal
-        alert(data.mensaje); // Feedback de éxito
-      } else {
-        setImportError(data.error || "Error al guardar en base de datos.");
-      }
-    } catch (error) {
-      setImportError("Error de conexión al guardar.");
-    } finally {
-      setImporting(false);
-    }
+        setIsImportModalOpen(false); fetchTrabajadores(); alert(data.mensaje); 
+      } else setImportError(data.error || "Error al guardar en base de datos.");
+    } catch (error) { setImportError("Error de conexión al guardar."); } finally { setImporting(false); }
   };
 
-
-  // --- HANDLERS: INDIVIDUALES (Nuevo, Editar, Baja) ---
   const handleNewClick = () => {
     setFormData(formInicial); setIsEditing(false); setEditId(null); setIsModalOpen(true);
   };
@@ -272,15 +251,19 @@ export default function FuerzaTrabajoPage() {
     e.preventDefault(); setSaving(true);
     try {
       const res = await fetch('/api/fuerza-trabajo', {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id_trabajador: bajaId, fecha_baja: bajaFecha })
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id_trabajador: bajaId, fecha_baja: bajaFecha })
       });
       const data = await res.json();
       if (data.success) { setIsBajaModalOpen(false); fetchTrabajadores(); } else alert(data.error);
     } catch (error) { alert("Error de conexión"); } finally { setSaving(false); }
   };
 
-  const limpiarFiltros = () => { setFiltroSub(''); setFechaInicio(''); setFechaFin(''); setBusqueda(''); };
+  const limpiarFiltros = () => { 
+    setFiltroSub(''); 
+    setBusqueda(''); 
+    setFechaInicio(getDateString(haceUnaSemana));
+    setFechaFin(getDateString(hoy));
+  };
 
   const cuadrillasFiltradas = catCuadrillas.filter(c => c.id_subcontratista_principal == formData.id_subcontratista_principal);
 
@@ -288,40 +271,37 @@ export default function FuerzaTrabajoPage() {
     <div className="space-y-6 relative" ref={topRef}>
       
       {/* HEADER Y BOTONES RESPONSIVOS */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center space-y-4 lg:space-y-0">
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center space-y-4 xl:space-y-0">
         <h2 className="text-xl sm:text-2xl font-bold text-[var(--recal-blue)]">Control de Fuerza de Trabajo</h2>
         
-        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full lg:w-auto">
+        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full xl:w-auto">
           
-          {/* BOTÓN DE IMPORTAR EXCEL */}
           <button onClick={handleOpenImportModal} className="flex-1 sm:flex-none justify-center bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
             <Upload className="w-4 h-4 mr-1 sm:mr-2" /> Importar Excel
           </button>
 
-          {/* CONTROL DE PERIODO PARA EXPORTACIÓN EXCEL */}
-          <div className="flex items-center justify-between sm:justify-start space-x-1 bg-gray-50 border border-gray-200 p-1 rounded-md shadow-sm w-full sm:w-auto">
-            <select className="text-sm border-gray-300 rounded py-1 pl-2 pr-6 focus:ring-[var(--recal-blue)] outline-none flex-1 sm:flex-none" value={exportMes} onChange={(e) => setExportMes(e.target.value)}>
-              <option value="01">Ene</option><option value="02">Feb</option><option value="03">Mar</option><option value="04">Abr</option>
-              <option value="05">May</option><option value="06">Jun</option><option value="07">Jul</option><option value="08">Ago</option>
-              <option value="09">Sep</option><option value="10">Oct</option><option value="11">Nov</option><option value="12">Dic</option>
-            </select>
-            <select className="text-sm border-gray-300 rounded py-1 pl-2 pr-6 focus:ring-[var(--recal-blue)] outline-none flex-1 sm:flex-none" value={exportAnio} onChange={(e) => setExportAnio(e.target.value)}>
-              <option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option><option value="2027">2027</option>
-            </select>
+          {/* CONTROL UNIFICADO DE PERIODO POR RANGOS DE FECHA */}
+          <div className="flex items-center justify-between sm:justify-start space-x-1 bg-gray-50 border border-gray-200 p-1.5 rounded-md shadow-sm w-full sm:w-auto">
+            <span className="text-xs font-bold text-gray-500 uppercase px-2 hidden md:inline">Filtro / Exportación:</span>
+            <input type="date" className="text-xs sm:text-sm border-gray-300 rounded py-1 px-1 sm:px-2 focus:ring-[var(--recal-blue)] outline-none flex-1 sm:flex-none w-full sm:w-36" 
+              value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} />
+            <span className="text-xs font-bold text-gray-400 px-1">al</span>
+            <input type="date" className="text-xs sm:text-sm border-gray-300 rounded py-1 px-1 sm:px-2 focus:ring-[var(--recal-blue)] outline-none flex-1 sm:flex-none w-full sm:w-36" 
+              value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} />
           </div>
 
-          <a href={`/api/fuerza-trabajo/exportar?mes=${exportMes}&anio=${exportAnio}&subcontratista=${filtroSub}`} target="_blank" className="flex-1 sm:flex-none justify-center bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
+          <button onClick={handleExportarClick} className="flex-1 sm:flex-none justify-center bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
             <span className="mr-1 sm:mr-2">📊</span> Exportar
-          </a>
+          </button>
           
-          <button onClick={handleNewClick} className="w-full sm:w-auto bg-[var(--recal-blue)] hover:bg-[var(--recal-blue-hover)] text-white px-4 py-3 sm:py-2 rounded-md font-medium shadow-sm lg:ml-2">
+          <button onClick={handleNewClick} className="w-full sm:w-auto bg-[var(--recal-blue)] hover:bg-[var(--recal-blue-hover)] text-white px-4 py-3 sm:py-2 rounded-md font-medium shadow-sm xl:ml-2">
             + Nuevo
           </button>
         </div>
       </div>
 
-      {/* PANEL DE FILTROS */}
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 grid grid-cols-1 md:grid-cols-6 gap-4">
+      {/* PANEL DE FILTROS REDUCIDO */}
+      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="md:col-span-2">
           <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Buscar Trabajador</label>
           <div className="relative">
@@ -336,16 +316,8 @@ export default function FuerzaTrabajoPage() {
             {catPrincipales.map(empresa => (<option key={empresa.id_subcontratista} value={empresa.id_subcontratista}>{empresa.razon_social}</option>))}
           </select>
         </div>
-        <div className="md:col-span-1">
-          <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Ingreso Desde</label>
-          <input type="date" className="w-full border-gray-300 rounded-md p-2 shadow-sm sm:text-sm outline-none" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} />
-        </div>
-        <div className="md:col-span-1">
-          <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Ingreso Hasta</label>
-          <input type="date" className="w-full border-gray-300 rounded-md p-2 shadow-sm sm:text-sm outline-none" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} />
-        </div>
         <div className="md:col-span-1 flex items-end">
-          <button onClick={limpiarFiltros} className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-md font-medium sm:text-sm transition-colors border border-gray-300">Limpiar</button>
+          <button onClick={limpiarFiltros} className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-md font-medium sm:text-sm transition-colors border border-gray-300">Limpiar Todo</button>
         </div>
       </div>
 
@@ -371,7 +343,7 @@ export default function FuerzaTrabajoPage() {
                 <tr className="block md:table-row">
                   <td colSpan="7" className="px-6 py-12 text-center block md:table-cell">
                     <div className="text-gray-400 text-4xl mb-2">🔍</div>
-                    <p className="text-sm font-medium text-gray-900">No se encontraron resultados</p>
+                    <p className="text-sm font-medium text-gray-900">No se encontraron resultados en esta semana</p>
                   </td>
                 </tr>
               ) : trabajadoresPaginados.map((t) => (
@@ -393,7 +365,7 @@ export default function FuerzaTrabajoPage() {
                     </td>
                     <td className="flex justify-between md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm border-b md:border-none">
                       <span className="md:hidden font-bold text-gray-500">Estatus:</span>
-                      {t.fecha_baja ? (<span className="px-2 inline-flex text-xs font-semibold rounded-full bg-red-100 text-red-800">Baja</span>) : (<span className="px-2 inline-flex text-xs font-semibold rounded-full bg-green-100 text-green-800">Activo</span>)}
+                      {t.fecha_baja ? (<span className="px-2 inline-flex text-xs font-semibold rounded-full bg-red-100 text-red-800">Baja: {formatDDMMYYYY(t.fecha_baja)}</span>) : (<span className="px-2 inline-flex text-xs font-semibold rounded-full bg-green-100 text-green-800">Activo</span>)}
                     </td>
                     <td className="flex justify-end items-center md:table-cell px-2 md:px-6 py-4 md:py-4 text-sm font-medium border-b md:border-none">
                       <div className="flex justify-end items-center gap-2 md:gap-3">

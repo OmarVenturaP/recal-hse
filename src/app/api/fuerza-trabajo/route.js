@@ -1,72 +1,62 @@
 import { NextResponse } from 'next/server';
 import pool from '../../../lib/db';
 
+// --- GET: Listar Trabajadores (Para la tabla del Dashboard) ---
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
-    
-    // Capturamos todos los parámetros del frontend
-    const idPrincipal = searchParams.get('subcontratista'); // Ojo: en el frontend lo mandamos como 'subcontratista'
+    const subcontratista = searchParams.get('subcontratista');
     const fechaInicio = searchParams.get('fechaInicio');
     const fechaFin = searchParams.get('fechaFin');
     const busqueda = searchParams.get('busqueda');
     const ordenPor = searchParams.get('ordenPor') || 'fecha_ingreso_obra';
     const ordenDireccion = searchParams.get('ordenDireccion') || 'DESC';
 
-    let query = `
-      SELECT 
-        f.id_trabajador, f.numero_empleado, f.nombre_trabajador, f.puesto_categoria, 
-        f.nss, f.fecha_ingreso_obra, f.fecha_alta_imss, f.fecha_baja, f.origen, 
-        f.id_subcontratista_ft, 
-        f.id_subcontratista_principal,
-        s.nombre AS nombre_subcontratista_ft,
-        p.razon_social AS nombre_subcontratista
-      FROM Fuerza_Trabajo f
-      LEFT JOIN Subcontratistas_Fuerza_Trabajo s ON f.id_subcontratista_ft = s.id_subcontratista_ft
-      LEFT JOIN Subcontratistas p ON f.id_subcontratista_principal = p.id_subcontratista
-      WHERE 1=1
-    `;
+    let whereClause = "WHERE 1=1";
     const queryParams = [];
 
-    // 1. Filtro por Contratista Principal
-    if (idPrincipal) { 
-      query += ` AND f.id_subcontratista_principal = ?`; 
-      queryParams.push(idPrincipal); 
+    // 1. Filtro por Contratista
+    if (subcontratista) {
+      whereClause += ` AND f.id_subcontratista_principal = ?`;
+      queryParams.push(subcontratista);
     }
 
-    // 2. Filtro por Fechas de Ingreso
-    if (fechaInicio && fechaFin) { 
-      query += ` AND f.fecha_ingreso_obra BETWEEN ? AND ?`; 
-      queryParams.push(fechaInicio, fechaFin); 
+    // 2. Filtro de Fechas (La Regla Matemática Correcta)
+    if (fechaInicio && fechaFin) {
+      // Entró a la obra antes o durante la fecha límite
+      // Y (Sigue activo, o su baja fue después de la fecha de inicio)
+      whereClause += ` AND DATE(f.fecha_ingreso_obra) <= ? AND (f.fecha_baja IS NULL OR DATE(f.fecha_baja) >= ?)`;
+      
+      // ¡El orden de estos parámetros es vital para que la ecuación funcione!
+      queryParams.push(fechaFin, fechaInicio);
+    } else {
+      // Si el usuario limpia los filtros, mostramos solo al personal activo actual
+      whereClause += ` AND f.fecha_baja IS NULL`;
     }
 
-    // 3. Buscador Global por Texto
+    // 3. Filtro de Búsqueda de Texto
     if (busqueda) {
-      query += ` AND (f.numero_empleado LIKE ? OR f.nombre_trabajador LIKE ? OR f.puesto_categoria LIKE ? OR f.nss LIKE ?)`;
+      whereClause += ` AND (f.nombre_trabajador LIKE ? OR f.nss LIKE ? OR f.puesto_categoria LIKE ?)`;
       const textoBuscado = `%${busqueda}%`;
-      queryParams.push(textoBuscado, textoBuscado, textoBuscado, textoBuscado);
+      queryParams.push(textoBuscado, textoBuscado, textoBuscado);
     }
 
-    // 4. Lógica Segura de Ordenamiento (Lista Blanca)
-    const columnasPermitidas = {
-      'numero_empleado': 'f.numero_empleado',
-      'nombre_trabajador': 'f.nombre_trabajador',
-      'puesto_categoria': 'f.puesto_categoria',
-      'nss': 'f.nss',
-      'fecha_ingreso_obra': 'f.fecha_ingreso_obra',
-      'nombre_subcontratista': 'p.razon_social'
-    };
-    
-    const columnaSegura = columnasPermitidas[ordenPor] || 'f.fecha_ingreso_obra';
-    const direccionSegura = ordenDireccion.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
-
-    query += ` ORDER BY ${columnaSegura} ${direccionSegura}`;
+    const query = `
+      SELECT 
+        f.*,
+        s.razon_social AS nombre_subcontratista
+      FROM Fuerza_Trabajo f
+      LEFT JOIN Subcontratistas s ON f.id_subcontratista_principal = s.id_subcontratista
+      ${whereClause}
+      ORDER BY ${ordenPor} ${ordenDireccion}
+    `;
 
     const [rows] = await pool.query(query, queryParams);
     return NextResponse.json({ success: true, data: rows });
+
   } catch (error) {
-    console.error(error);
-    return NextResponse.json({ success: false, error: "Error en BD" }, { status: 500 });
+    console.error("Error en GET Fuerza Trabajo:", error);
+    return NextResponse.json({ success: false, error: "Error de base de datos" }, { status: 500 });
   }
 }
 

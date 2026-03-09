@@ -312,7 +312,7 @@ export default function MaquinariaPage() {
         <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full lg:w-auto">
           
           <button onClick={handleOpenImportModal} className="flex-1 sm:flex-none justify-center bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
-            <Upload className="w-4 h-4 mr-1 sm:mr-2" /> Importar
+            <Upload className="w-4 h-4 mr-1 sm:mr-2" /> Importar Excel
           </button>
 
           <div className="flex items-center justify-between sm:justify-start space-x-1 bg-gray-50 border border-gray-200 p-1 rounded-md shadow-sm w-full sm:w-auto">

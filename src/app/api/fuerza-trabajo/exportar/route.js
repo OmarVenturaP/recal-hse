@@ -4,30 +4,40 @@ import ExcelJS from 'exceljs';
 import path from 'path';
 import fs from 'fs';
 
+const generarTextoPeriodo = (inicioStr, finStr) => {
+  const meses = {
+    1: 'ENERO', 2: 'FEBRERO', 3: 'MARZO', 4: 'ABRIL', 5: 'MAYO', 6: 'JUNIO',
+    7: 'JULIO', 8: 'AGOSTO', 9: 'SEPTIEMBRE', 10: 'OCTUBRE', 11: 'NOVIEMBRE', 12: 'DICIEMBRE'
+  };
+
+  const [y1, m1, d1] = inicioStr.split('-').map(Number);
+  const [y2, m2, d2] = finStr.split('-').map(Number);
+
+  if (y1 === y2) {
+    if (m1 === m2) {
+      return `${String(d1).padStart(2, '0')} AL ${String(d2).padStart(2, '0')} DE ${meses[m1]} ${y1}`;
+    } else {
+      return `${String(d1).padStart(2, '0')} DE ${meses[m1]} AL ${String(d2).padStart(2, '0')} DE ${meses[m2]} ${y1}`;
+    }
+  } else {
+    return `${String(d1).padStart(2, '0')} DE ${meses[m1]} ${y1} AL ${String(d2).padStart(2, '0')} DE ${meses[m2]} ${y2}`;
+  }
+};
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
-    const mes = searchParams.get('mes'); 
-    const anio = searchParams.get('anio'); 
+    const fechaInicio = searchParams.get('fechaInicio'); 
+    const fechaFin = searchParams.get('fechaFin'); 
     const idPrincipal = searchParams.get('subcontratista');
 
-    if (!mes || !anio) {
-      return NextResponse.json({ error: "Mes y Año son requeridos" }, { status: 400 });
+    if (!fechaInicio || !fechaFin) {
+      return NextResponse.json({ error: "Las fechas de inicio y fin son requeridas" }, { status: 400 });
     }
 
-    const year = parseInt(anio);
-    const month = parseInt(mes);
-    
-    const ultimoDia = new Date(year, month, 0).getDate();
-    const primerDiaMesStr = `${year}-${String(month).padStart(2, '0')}-01`;
-    const ultimoDiaMesStr = `${year}-${String(month).padStart(2, '0')}-${String(ultimoDia).padStart(2, '0')}`;
+    const periodoTexto = generarTextoPeriodo(fechaInicio, fechaFin);
 
-    const nombresMeses = {
-      1: 'ENERO', 2: 'FEBRERO', 3: 'MARZO', 4: 'ABRIL', 5: 'MAYO', 6: 'JUNIO',
-      7: 'JULIO', 8: 'AGOSTO', 9: 'SEPTIEMBRE', 10: 'OCTUBRE', 11: 'NOVIEMBRE', 12: 'DICIEMBRE'
-    };
-    const periodoTexto = `${nombresMeses[month]} ${year}`;
-
+    // --- AJUSTE AQUÍ: USO DE DATE() PARA INCLUIR TODOS LOS ACTIVOS EN EL RANGO ---
     let query = `
       SELECT 
         f.nombre_trabajador, f.puesto_categoria, f.nss, 
@@ -37,10 +47,11 @@ export async function GET(request) {
       FROM Fuerza_Trabajo f
       LEFT JOIN Subcontratistas p ON f.id_subcontratista_principal = p.id_subcontratista
       LEFT JOIN Subcontratistas_Fuerza_Trabajo s ON f.id_subcontratista_ft = s.id_subcontratista_ft
-      WHERE f.fecha_ingreso_obra <= ? 
-      AND (f.fecha_baja IS NULL OR f.fecha_baja >= ?)
+      WHERE DATE(f.fecha_ingreso_obra) <= ? 
+      AND (f.fecha_baja IS NULL OR DATE(f.fecha_baja) >= ?)
     `;
-    const queryParams = [ultimoDiaMesStr, primerDiaMesStr];
+    // El orden de los parámetros es vital: fechaFin primero, fechaInicio después.
+    const queryParams = [fechaFin, fechaInicio];
 
     if (idPrincipal) {
       query += ` AND f.id_subcontratista_principal = ?`;
@@ -63,36 +74,31 @@ export async function GET(request) {
 
     const nombreContratista = rows.length > 0 ? rows[0].empresa_principal : (idPrincipal ? 'CONTRATISTA SELECCIONADA' : 'MÚLTIPLES CONTRATISTAS');
     
-    // Inyectamos encabezados generales
     worksheet.getCell('D3').value = `CONTRATISTA: ${nombreContratista}`;
     worksheet.getCell('H3').value = periodoTexto;
 
     let currentRow = 5; 
     let index = 1;
 
-    // --- CICLO MODIFICADO USANDO LA TÉCNICA DE SPLICEROWS ---
     for (let i = 0; i < rows.length; i++) {
       const r = rows[i];
 
-      // A partir del segundo trabajador, insertamos una fila vacía para empujar las firmas hacia abajo
       if (i > 0) {
         worksheet.spliceRows(currentRow, 0, []); 
       }
 
       const row = worksheet.getRow(currentRow);
-      row.height = 20; // Altura solicitada de 20 para todas las filas de datos
+      row.height = 20; 
 
       const formatoFecha = (fechaStr) => {
         if (!fechaStr) return '';
         const fecha = new Date(fechaStr);
         const dia = String(fecha.getUTCDate()).padStart(2, '0');
-        const mes = String(fecha.getUTCMonth() + 1).padStart(2, '0'); // Los meses van de 0 a 11
+        const mes = String(fecha.getUTCMonth() + 1).padStart(2, '0'); 
         const anio = fecha.getUTCFullYear();
-        
         return `${dia}/${mes}/${anio}`;
       };
 
-      // Llenado de celdas utilizando la nomenclatura por letras
       row.getCell('A').value = index;
       row.getCell('B').value = r.nombre_trabajador;
       row.getCell('C').value = r.puesto_categoria;
@@ -104,14 +110,12 @@ export async function GET(request) {
       row.getCell('I').value = r.origen === 'Local' ? 'X' : '';
       row.getCell('J').value = r.origen === 'Foráneo' ? 'X' : '';
 
-      // Copiar el formato (bordes, fuentes) de la primera fila de datos (Fila 5 original) a las nuevas filas
       if (i > 0) {
         const filaBase = worksheet.getRow(5);
         filaBase.eachCell({ includeEmpty: true }, (baseCell, colNumber) => {
           row.getCell(colNumber).style = baseCell.style;
         });
       } else {
-        // Para la fila 5, aseguramos la alineación básica
         row.getCell('A').alignment = { vertical: 'middle', horizontal: 'center' };
         row.getCell('B').alignment = { vertical: 'middle', horizontal: 'center' };
         row.getCell('C').alignment = { vertical: 'middle', horizontal: 'center' };
@@ -129,12 +133,13 @@ export async function GET(request) {
     }
 
     const buffer = await workbook.xlsx.writeBuffer();
+    const nombreArchivoSeguro = periodoTexto.replace(/ /g, '_');
 
     return new NextResponse(buffer, {
       status: 200,
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': `attachment; filename=Fuerza_Trabajo_${periodoTexto.replace(' ', '_')}.xlsx`,
+        'Content-Disposition': `attachment; filename="Fuerza_Trabajo_${nombreArchivoSeguro}.xlsx"`,
       },
     });
 
