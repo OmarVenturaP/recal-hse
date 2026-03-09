@@ -15,7 +15,7 @@ export async function GET(request) {
     const idSubcontratista = searchParams.get('subcontratista');
     const mes = searchParams.get('mes');
     const anio = searchParams.get('anio');
-    const busqueda = searchParams.get('busqueda'); // NUEVO: Capturamos el texto a buscar
+    const busqueda = searchParams.get('busqueda'); 
 
     let whereClause = "WHERE 1=1";
     const queryParams = [];
@@ -37,13 +37,10 @@ export async function GET(request) {
       queryParams.push(idSubcontratista); 
     }
 
-    // NUEVO: Buscador Global Multiparámetro
+    // Buscador Global Multiparámetro
     if (busqueda) {
-      // Usamos LIKE con comodines (%) para que busque coincidencias parciales en cualquier parte del texto
       whereClause += ` AND (m.num_economico LIKE ? OR m.tipo LIKE ? OR m.marca LIKE ? OR m.modelo LIKE ? OR m.serie LIKE ? OR m.placa LIKE ?)`;
-      
       const textoBuscado = `%${busqueda}%`;
-      // Como tenemos 6 signos de interrogación en el OR, inyectamos el mismo texto 6 veces
       queryParams.push(textoBuscado, textoBuscado, textoBuscado, textoBuscado, textoBuscado, textoBuscado);
     }
 
@@ -63,6 +60,7 @@ export async function GET(request) {
     
     const [rows] = await pool.query(query, queryParams);
 
+    // Lógica de cálculo de estado de mantenimiento
     const dataConCalculos = rows.map(maquina => {
       let horasRestantes = null;
       let estadoMantenimiento = 'N/A';
@@ -82,6 +80,7 @@ export async function GET(request) {
 
     return NextResponse.json({ success: true, data: dataConCalculos });
   } catch (error) {
+    console.error("Error en GET Maquinaria:", error);
     return NextResponse.json({ success: false, error: "Error de BD" }, { status: 500 });
   }
 }
@@ -90,20 +89,40 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const formData = await request.formData();
-    const num_economico = formData.get('num_economico'); const tipo = formData.get('tipo');
-    const marca = formData.get('marca'); const anio = formData.get('anio'); const modelo = formData.get('modelo');
-    const color = formData.get('color'); const serie = formData.get('serie'); const placa = formData.get('placa');
-    const horometro = formData.get('horometro'); const intervalo_mantenimiento = formData.get('intervalo_mantenimiento');
-    const fecha_ingreso_obra = formData.get('fecha_ingreso_obra'); const id_subcontratista = formData.get('id_subcontratista');
+    
+    // Extracción segura: Si viene vacío o dice "null", lo volvemos un null real de JavaScript
+    const extractField = (key) => {
+      const val = formData.get(key);
+      return (!val || val.trim() === '' || val === 'null') ? null : val.trim();
+    };
 
-    if (serie && serie.trim() !== '') {
-      const queryBusqueda = `SELECT tipo, marca FROM Maquinaria_Equipo WHERE serie = ? AND id_maquinaria != ? LIMIT 1`;
+    const num_economico = extractField('num_economico'); 
+    const tipo = extractField('tipo');
+    const marca = extractField('marca'); 
+    const anio = extractField('anio'); 
+    const modelo = extractField('modelo');
+    const color = extractField('color'); 
+    const serie = extractField('serie'); 
+    const placa = extractField('placa');
+    const horometro = extractField('horometro'); 
+    const intervalo_mantenimiento = extractField('intervalo_mantenimiento');
+    const fecha_ingreso_obra = extractField('fecha_ingreso_obra'); 
+    const id_subcontratista = extractField('id_subcontratista');
+
+    // Validaciones de obligatoriedad (Tipo, Marca, Año, Fecha, Contratista)
+    if (!tipo || !marca || !anio || !fecha_ingreso_obra || !id_subcontratista) {
+      return NextResponse.json({ success: false, error: "Los campos Tipo, Marca, Año, Fecha de Ingreso y Contratista son obligatorios." }, { status: 400 });
+    }
+
+    // Validación de Serie duplicada (Solo si escribieron una serie)
+    if (serie) {
+      const queryBusqueda = `SELECT marca, modelo FROM Maquinaria_Equipo WHERE serie = ? LIMIT 1`;
       const [existeSerie] = await pool.query(queryBusqueda, [serie]);
       
       if (existeSerie.length > 0) {
         return NextResponse.json({ 
           success: false, 
-          error: `Ese número de serie ya pertenece al equipo: ${existeSerie[0].marca} / ${existeSerie[0].modelo}. No puedes duplicarlo.` 
+          error: `Ese número de serie ya pertenece al equipo: ${existeSerie[0].marca} / ${existeSerie[0].modelo || 'S/M'}. No puedes duplicarlo.` 
         }, { status: 400 });
       }
     }
@@ -111,32 +130,50 @@ export async function POST(request) {
     const file = formData.get('imagen'); 
     let imagen_url = null;
 
-    if (file && file !== 'null' && file.size > 0) {
-      const bytes = await file.arrayBuffer();
-      const buffer = Buffer.from(bytes);
-      const fileBase64 = `data:${file.type};base64,${buffer.toString('base64')}`;
-      const uploadResponse = await cloudinary.uploader.upload(fileBase64, { folder: 'recal_hse_maquinaria' });
-      imagen_url = uploadResponse.secure_url; 
+    if (file && typeof file !== 'string' && file.size > 0) {
+      try {
+        const bytes = await file.arrayBuffer();
+        const buffer = Buffer.from(bytes);
+        const fileBase64 = `data:${file.type};base64,${buffer.toString('base64')}`;
+        const uploadResponse = await cloudinary.uploader.upload(fileBase64, { folder: 'recal_hse_maquinaria' });
+        imagen_url = uploadResponse.secure_url; 
+      } catch (imgError) {
+        console.error("Error subiendo imagen:", imgError);
+        // Continuamos sin imagen si Cloudinary falla
+      }
     }
 
     const id_usuario_actual = request.headers.get('x-user-id');
-
-    if (!id_usuario_actual) {
-      return NextResponse.json({ error: "Usuario no identificado" }, { status: 401 });
-    }
+    if (!id_usuario_actual) return NextResponse.json({ error: "Usuario no identificado" }, { status: 401 });
 
     const query = `
       INSERT INTO Maquinaria_Equipo 
       (num_economico, tipo, marca, anio, modelo, color, serie, placa, horometro, intervalo_mantenimiento, fecha_ingreso_obra, id_subcontratista, imagen_url, usuario_registro) 
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
+    
     const [result] = await pool.query(query, [
-      num_economico, tipo, marca, anio || null, modelo, color || null, serie || null, placa || null, horometro || null, intervalo_mantenimiento || null, fecha_ingreso_obra, id_subcontratista || null, imagen_url, id_usuario_actual
+      num_economico, 
+      tipo, 
+      marca, 
+      anio, 
+      modelo, 
+      color, 
+      serie, 
+      placa, 
+      horometro, 
+      intervalo_mantenimiento, 
+      fecha_ingreso_obra, 
+      id_subcontratista, 
+      imagen_url, 
+      id_usuario_actual
     ]);
 
     return NextResponse.json({ success: true, id: result.insertId, imagen_url });
+
   } catch (error) {
-    return NextResponse.json({ success: false, error: "Error al guardar" }, { status: 500 });
+    console.error("Error en POST Maquinaria:", error);
+    return NextResponse.json({ success: false, error: "Error al guardar en base de datos. Verifica los datos ingresados." }, { status: 500 });
   }
 }
 
@@ -144,14 +181,32 @@ export async function POST(request) {
 export async function PUT(request) {
   try {
     const formData = await request.formData();
-    const id_maquinaria = formData.get('id_maquinaria');
-    const num_economico = formData.get('num_economico'); const tipo = formData.get('tipo');
-    const marca = formData.get('marca'); const anio = formData.get('anio'); const modelo = formData.get('modelo');
-    const color = formData.get('color'); const serie = formData.get('serie'); const placa = formData.get('placa');
-    const horometro = formData.get('horometro'); const intervalo_mantenimiento = formData.get('intervalo_mantenimiento');
-    const fecha_ingreso_obra = formData.get('fecha_ingreso_obra'); const id_subcontratista = formData.get('id_subcontratista');
     
-    if (serie && serie.trim() !== '') {
+    const extractField = (key) => {
+      const val = formData.get(key);
+      return (!val || val.trim() === '' || val === 'null') ? null : val.trim();
+    };
+
+    const id_maquinaria = extractField('id_maquinaria');
+    const num_economicoVal = formData.get('num_economico');
+    const num_economico = (!num_economicoVal || num_economicoVal.trim() === '' || num_economicoVal === 'null') ? 'S/N' : num_economicoVal.trim();
+    const tipo = extractField('tipo');
+    const marca = extractField('marca'); 
+    const anio = extractField('anio'); 
+    const modelo = extractField('modelo');
+    const color = extractField('color'); 
+    const serie = extractField('serie'); 
+    const placa = extractField('placa');
+    const horometro = extractField('horometro'); 
+    const intervalo_mantenimiento = extractField('intervalo_mantenimiento');
+    const fecha_ingreso_obra = extractField('fecha_ingreso_obra'); 
+    const id_subcontratista = extractField('id_subcontratista');
+
+    if (!tipo || !marca || !anio || !fecha_ingreso_obra || !id_subcontratista) {
+      return NextResponse.json({ success: false, error: "Los campos Tipo, Marca, Año, Fecha de Ingreso y Contratista son obligatorios." }, { status: 400 });
+    }
+    
+    if (serie) {
       const queryBusqueda = `SELECT tipo, marca FROM Maquinaria_Equipo WHERE serie = ? AND id_maquinaria != ? LIMIT 1`;
       const [existeSerie] = await pool.query(queryBusqueda, [serie, id_maquinaria]);
       
@@ -164,35 +219,37 @@ export async function PUT(request) {
     }
 
     const file = formData.get('imagen'); 
-    let imagen_url = formData.get('imagen_url_actual'); // Mantenemos la foto actual por defecto
+    let imagen_url = extractField('imagen_url_actual');
 
-    // Si el usuario subió una nueva foto al editar, la subimos a Cloudinary y reemplazamos la URL
-    if (file && file !== 'null' && file.size > 0) {
-      const bytes = await file.arrayBuffer();
-      const buffer = Buffer.from(bytes);
-      const fileBase64 = `data:${file.type};base64,${buffer.toString('base64')}`;
-      const uploadResponse = await cloudinary.uploader.upload(fileBase64, { folder: 'recal_hse_maquinaria' });
-      imagen_url = uploadResponse.secure_url; 
+    if (file && typeof file !== 'string' && file.size > 0) {
+      try {
+        const bytes = await file.arrayBuffer();
+        const buffer = Buffer.from(bytes);
+        const fileBase64 = `data:${file.type};base64,${buffer.toString('base64')}`;
+        const uploadResponse = await cloudinary.uploader.upload(fileBase64, { folder: 'recal_hse_maquinaria' });
+        imagen_url = uploadResponse.secure_url; 
+      } catch (imgError) {
+        console.error("Error subiendo imagen en Edición:", imgError);
+      }
     }
 
     const id_usuario_actual = request.headers.get('x-user-id');
-
-    if (!id_usuario_actual) {
-      return NextResponse.json({ error: "Usuario no identificado" }, { status: 401 });
-    }
+    if (!id_usuario_actual) return NextResponse.json({ error: "Usuario no identificado" }, { status: 401 });
 
     const query = `
       UPDATE Maquinaria_Equipo 
       SET num_economico=?, tipo=?, marca=?, anio=?, modelo=?, color=?, serie=?, placa=?, horometro=?, intervalo_mantenimiento=?, fecha_ingreso_obra=?, id_subcontratista=?, imagen_url=?, usuario_actualizacion=?
       WHERE id_maquinaria=?
     `;
+    
     await pool.query(query, [
-      num_economico, tipo, marca, anio || null, modelo, color || null, serie || null, placa || null, horometro || null, intervalo_mantenimiento || null, fecha_ingreso_obra, id_subcontratista || null, imagen_url, id_usuario_actual, id_maquinaria
+      num_economico, tipo, marca, anio, modelo, color, serie, placa, horometro, intervalo_mantenimiento, fecha_ingreso_obra, id_subcontratista, imagen_url, id_usuario_actual, id_maquinaria
     ]);
 
     return NextResponse.json({ success: true, mensaje: "Actualizado correctamente" });
   } catch (error) {
-    return NextResponse.json({ success: false, error: "Error al actualizar" }, { status: 500 });
+    console.error("Error en PUT Maquinaria:", error);
+    return NextResponse.json({ success: false, error: "Error al actualizar la base de datos." }, { status: 500 });
   }
 }
 
@@ -206,13 +263,12 @@ export async function PATCH(request) {
       return NextResponse.json({ error: "Usuario no identificado" }, { status: 401 });
     }
     
-    // Al actualizar el usuario_actualizacion, el Trigger se dará cuenta y guardará quién lo dio de baja
-    await pool.query(`UPDATE Maquinaria_Equipo SET fecha_baja = ?, usuario_actualizacion = ? WHERE id_maquinaria = ?`, [fecha_baja, id_usuario_actual, id_maquinaria]);
     if (!id_maquinaria || !fecha_baja) return NextResponse.json({ error: "Faltan datos" }, { status: 400 });
 
-    await pool.query(`UPDATE Maquinaria_Equipo SET fecha_baja = ? WHERE id_maquinaria = ?`, [fecha_baja, id_maquinaria]);
+    await pool.query(`UPDATE Maquinaria_Equipo SET fecha_baja = ?, usuario_actualizacion = ? WHERE id_maquinaria = ?`, [fecha_baja, id_usuario_actual, id_maquinaria]);
     return NextResponse.json({ success: true, mensaje: "Equipo dado de baja" });
   } catch (error) {
+    console.error("Error en PATCH Maquinaria:", error);
     return NextResponse.json({ success: false, error: "Error en BD" }, { status: 500 });
   }
 }

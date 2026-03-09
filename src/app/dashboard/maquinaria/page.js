@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { ClipboardList, Pencil, Trash2 } from 'lucide-react';
+import { ClipboardList, Pencil, Trash2, Upload, Tractor } from 'lucide-react';
 
 export default function MaquinariaPage() {
-  const topRef = useRef(null); // Referencia para el scroll suave
+  const topRef = useRef(null); 
 
   // Estados de Paginación
   const [currentPage, setCurrentPage] = useState(1);
@@ -43,6 +43,16 @@ export default function MaquinariaPage() {
   const [isBajaModalOpen, setIsBajaModalOpen] = useState(false);
   const [bajaId, setBajaId] = useState(null);
   const [bajaFecha, setBajaFecha] = useState('');
+
+  // --- NUEVOS ESTADOS: MODAL DE IMPORTACIÓN MASIVA ---
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [importSubcontratista, setImportSubcontratista] = useState('');
+  const [importPreviewData, setImportPreviewData] = useState([]); 
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState('');
+  const [importFase, setImportFase] = useState(1); 
+  const [importResumen, setImportResumen] = useState({ totales: 0, nuevos: 0 });
 
   // Estados para Modal de Historial
   const [isHistorialOpen, setIsHistorialOpen] = useState(false);
@@ -97,15 +107,10 @@ export default function MaquinariaPage() {
   };
 
   useEffect(() => { fetchMaquinaria(); }, [filtroSub, exportMes, exportAnio, busqueda]);
-
-  // Regresar a la página 1 al usar filtros
   useEffect(() => { setCurrentPage(1); }, [busqueda, filtroSub, exportMes, exportAnio]);
 
-  // --- LÓGICA DE PAGINACIÓN AVANZADA Y SCROLL ---
   useEffect(() => {
-    if (topRef.current) {
-      topRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    if (topRef.current) topRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [currentPage]);
 
   const totalPages = Math.ceil(maquinaria.length / itemsPerPage);
@@ -118,16 +123,9 @@ export default function MaquinariaPage() {
     } else {
       let startPage = Math.max(1, currentPage - 2);
       let endPage = Math.min(totalPages, currentPage + 2);
-
-      if (currentPage <= 3) {
-        endPage = 5;
-      } else if (currentPage >= totalPages - 2) {
-        startPage = totalPages - 4;
-      }
-
-      for (let i = startPage; i <= endPage; i++) {
-        pages.push(i);
-      }
+      if (currentPage <= 3) endPage = 5;
+      else if (currentPage >= totalPages - 2) startPage = totalPages - 4;
+      for (let i = startPage; i <= endPage; i++) pages.push(i);
     }
     return pages;
   };
@@ -136,13 +134,78 @@ export default function MaquinariaPage() {
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const maquinariaPaginada = maquinaria.slice(indexOfFirstItem, indexOfLastItem);
 
+  // --- HANDLERS: IMPORTACIÓN MASIVA ---
+  const handleOpenImportModal = () => {
+    setImportFile(null);
+    setImportSubcontratista('');
+    setImportPreviewData([]);
+    setImportError('');
+    setImportFase(1);
+    setIsImportModalOpen(true);
+  };
+
+  const handleAnalizarExcel = async (e) => {
+    e.preventDefault();
+    if (!importFile || !importSubcontratista) {
+      setImportError("Por favor selecciona un archivo y la contratista.");
+      return;
+    }
+
+    setImporting(true);
+    setImportError('');
+
+    const formData = new FormData();
+    formData.append('file', importFile);
+    formData.append('id_subcontratista_principal', importSubcontratista);
+
+    try {
+      const res = await fetch('/api/maquinaria/importar', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setImportPreviewData(data.data);
+        setImportResumen({ totales: data.totalesExcel, nuevos: data.nuevos });
+        setImportFase(2); 
+      } else {
+        setImportError(data.error || "Error al procesar el archivo.");
+      }
+    } catch (error) {
+      setImportError("Error de conexión con el servidor.");
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleGuardarImportacion = async () => {
+    if (importPreviewData.length === 0) return;
+    setImporting(true);
+    try {
+      const res = await fetch('/api/maquinaria/importar', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ maquinarias: importPreviewData }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setIsImportModalOpen(false);
+        fetchMaquinaria(); 
+        alert(data.mensaje); 
+      } else {
+        setImportError(data.error || "Error al guardar en base de datos.");
+      }
+    } catch (error) {
+      setImportError("Error de conexión al guardar.");
+    } finally {
+      setImporting(false);
+    }
+  };
+
   // --- ACCIONES DE EDICIÓN Y NUEVO ---
   const handleNewClick = () => {
-    setFormData(formInicial);
-    setImageFile(null);
-    setIsEditing(false);
-    setEditId(null);
-    setIsModalOpen(true);
+    setFormData(formInicial); setImageFile(null); setIsEditing(false); setEditId(null); setIsModalOpen(true);
   };
 
   const handleEditClick = (m) => {
@@ -152,19 +215,13 @@ export default function MaquinariaPage() {
       serie: m.serie || '', placa: m.placa || '', horometro: m.horometro_actual || '', 
       intervalo_mantenimiento: m.intervalo_mantenimiento || '', 
       fecha_ingreso_obra: formatForInput(m.fecha_ingreso_obra), 
-      id_subcontratista: m.id_subcontratista || '',
-      imagen_url_actual: m.imagen_url || ''
+      id_subcontratista: m.id_subcontratista || '', imagen_url_actual: m.imagen_url || ''
     });
-    setImageFile(null); 
-    setEditId(m.id_maquinaria);
-    setIsEditing(true);
-    setIsModalOpen(true);
+    setImageFile(null); setEditId(m.id_maquinaria); setIsEditing(true); setIsModalOpen(true);
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    
+    e.preventDefault(); setSaving(true);
     const submitData = new FormData();
     Object.keys(formData).forEach(key => submitData.append(key, formData[key]));
     if (isEditing) submitData.append('id_maquinaria', editId);
@@ -174,48 +231,26 @@ export default function MaquinariaPage() {
       const method = isEditing ? 'PUT' : 'POST';
       const res = await fetch('/api/maquinaria', { method, body: submitData });
       const data = await res.json();
-      
-      if (data.success) {
-        setIsModalOpen(false);
-        setImageFile(null);
-        fetchMaquinaria();
-      } else alert(data.error);
-    } catch (error) {
-      alert("Error al guardar");
-    } finally {
-      setSaving(false);
-    }
+      if (data.success) { setIsModalOpen(false); setImageFile(null); fetchMaquinaria(); } else alert(data.error);
+    } catch (error) { alert("Error al guardar"); } finally { setSaving(false); }
   };
 
-  // --- ACCIONES DE BAJA ---
   const handleBajaClick = (id) => {
-    setBajaId(id);
-    setBajaFecha(new Date().toISOString().split('T')[0]);
-    setIsBajaModalOpen(true);
+    setBajaId(id); setBajaFecha(new Date().toISOString().split('T')[0]); setIsBajaModalOpen(true);
   };
 
   const handleBajaSubmit = async (e) => {
-    e.preventDefault();
-    setSaving(true);
+    e.preventDefault(); setSaving(true);
     try {
       const res = await fetch('/api/maquinaria', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id_maquinaria: bajaId, fecha_baja: bajaFecha })
       });
       const data = await res.json();
-      if (data.success) {
-        setIsBajaModalOpen(false);
-        fetchMaquinaria();
-      } else alert(data.error);
-    } catch (error) {
-      alert("Error de conexión");
-    } finally {
-      setSaving(false);
-    }
+      if (data.success) { setIsBajaModalOpen(false); fetchMaquinaria(); } else alert(data.error);
+    } catch (error) { alert("Error de conexión"); } finally { setSaving(false); }
   };
 
-  // --- HISTORIAL ---
   const abrirHistorial = async (maquina) => {
     setMaquinaSeleccionada(maquina);
     setFormMantenimiento({ fecha_mantenimiento: '', tipo_mantenimiento: 'Preventivo', horometro_mantenimiento: '', observaciones: '' });
@@ -228,19 +263,14 @@ export default function MaquinariaPage() {
   };
 
   const handleMantenimientoSubmit = async (e) => {
-    e.preventDefault();
-    setSaving(true);
+    e.preventDefault(); setSaving(true);
     try {
       const res = await fetch('/api/maquinaria/mantenimiento', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...formMantenimiento, id_maquinaria: maquinaSeleccionada.id_maquinaria })
       });
       const data = await res.json();
-      if (data.success) {
-        abrirHistorial(maquinaSeleccionada);
-        fetchMaquinaria(); 
-      }
+      if (data.success) { abrirHistorial(maquinaSeleccionada); fetchMaquinaria(); }
     } catch (error) {} finally { setSaving(false); }
   };
 
@@ -263,35 +293,36 @@ export default function MaquinariaPage() {
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center space-y-4 lg:space-y-0">
         <h2 className="text-xl sm:text-2xl font-bold text-[var(--recal-blue)]">Maquinaria y Equipo</h2>
         
-        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 w-full lg:w-auto">
+        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full lg:w-auto">
+          
+          {/* BOTÓN DE IMPORTAR EXCEL */}
+          <button onClick={handleOpenImportModal} className="flex-1 sm:flex-none justify-center bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
+            <Upload className="w-4 h-4 mr-1 sm:mr-2" /> Importar
+          </button>
+
           {/* CONTROL DE PERIODO PARA EXPORTACIÓN */}
-          <div className="flex items-center justify-between sm:justify-start space-x-2 bg-gray-50 border border-gray-200 p-1.5 rounded-md shadow-sm w-full sm:w-auto">
-            <span className="text-xs font-bold text-gray-500 uppercase px-2 hidden md:inline">Reporte:</span>
-            <select className="text-sm border-gray-300 rounded py-1 pl-2 pr-8 focus:ring-[var(--recal-blue)] outline-none flex-1 sm:flex-none" value={exportMes} onChange={(e) => setExportMes(e.target.value)}>
-              <option value="01">Enero</option><option value="02">Febrero</option>
-              <option value="03">Marzo</option><option value="04">Abril</option>
-              <option value="05">Mayo</option><option value="06">Junio</option>
-              <option value="07">Julio</option><option value="08">Agosto</option>
-              <option value="09">Septiembre</option><option value="10">Octubre</option>
-              <option value="11">Noviembre</option><option value="12">Diciembre</option>
+          <div className="flex items-center justify-between sm:justify-start space-x-1 bg-gray-50 border border-gray-200 p-1 rounded-md shadow-sm w-full sm:w-auto">
+            <select className="text-sm border-gray-300 rounded py-1 pl-2 pr-6 focus:ring-[var(--recal-blue)] outline-none flex-1 sm:flex-none" value={exportMes} onChange={(e) => setExportMes(e.target.value)}>
+              <option value="01">Ene</option><option value="02">Feb</option><option value="03">Mar</option><option value="04">Abr</option>
+              <option value="05">May</option><option value="06">Jun</option><option value="07">Jul</option><option value="08">Ago</option>
+              <option value="09">Sep</option><option value="10">Oct</option><option value="11">Nov</option><option value="12">Dic</option>
             </select>
-            <select className="text-sm border-gray-300 rounded py-1 pl-2 pr-8 focus:ring-[var(--recal-blue)] outline-none flex-1 sm:flex-none" value={exportAnio} onChange={(e) => setExportAnio(e.target.value)}>
-              <option value="2024">2024</option><option value="2025">2025</option>
-              <option value="2026">2026</option><option value="2027">2027</option>
+            <select className="text-sm border-gray-300 rounded py-1 pl-2 pr-6 focus:ring-[var(--recal-blue)] outline-none flex-1 sm:flex-none" value={exportAnio} onChange={(e) => setExportAnio(e.target.value)}>
+              <option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option><option value="2027">2027</option>
             </select>
           </div>
 
-          <div className="flex gap-2 w-full sm:w-auto">
+          <div className="flex gap-1 w-full sm:w-auto">
             <a href={`/api/maquinaria/exportar-utilizacion?mes=${exportMes}&anio=${exportAnio}`} target="_blank" className="flex-1 sm:flex-none justify-center bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
-              <span className="mr-1 sm:mr-2">📊</span> <span className="hidden sm:inline">11. Prog Utilización</span><span className="sm:hidden">Utilización</span>
+              <span className="mr-1">📊</span> <span className="hidden sm:inline">Utilización</span><span className="sm:hidden">Util</span>
             </a>
             <a href={`/api/maquinaria/exportar-plan-servicio?mes=${exportMes}&anio=${exportAnio}`} target="_blank" className="flex-1 sm:flex-none justify-center bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
-              <span className="mr-1 sm:mr-2">🛠️</span> <span className="hidden sm:inline">12. Plan Servicio</span><span className="sm:hidden">Servicio</span>
+              <span className="mr-1">🛠️</span> <span className="hidden sm:inline">Servicio</span><span className="sm:hidden">Serv</span>
             </a>
           </div>
           
           <button onClick={handleNewClick} className="w-full sm:w-auto bg-[var(--recal-blue)] hover:bg-[var(--recal-blue-hover)] text-white px-4 py-3 sm:py-2 rounded-md font-medium shadow-sm lg:ml-2">
-            + Registrar Equipo
+            + Nuevo
           </button>
         </div>
       </div>
@@ -367,7 +398,7 @@ export default function MaquinariaPage() {
                       <span className="md:hidden font-bold text-gray-500">Equipo:</span>
                       <div className="text-right md:text-left">
                         <div className="text-sm text-gray-900">{m.marca} / {m.modelo}</div>
-                        <div className="text-xs font-bold text-gray-500 bg-gray-100 inline-block px-1 mt-1 rounded">Num. Eco: {m.num_economico}</div>
+                        <div className="text-xs font-bold text-gray-500 bg-gray-100 inline-block px-1 mt-1 rounded">Num. Eco: {m.num_economico || 'S/N'}</div>
                       </div>
                     </td>
                     
@@ -397,36 +428,11 @@ export default function MaquinariaPage() {
                     
                     <td className="flex justify-end items-center md:table-cell px-2 md:px-4 py-4 md:py-4 text-sm font-medium border-b md:border-none">
                       <div className="flex justify-end items-center gap-2 md:gap-3">
-                        
-                        {/* Botón Historial */}
-                        <button 
-                          onClick={() => abrirHistorial(m)} 
-                          title="Historial de Servicio"
-                          className="text-[var(--recal-blue)] bg-blue-50 hover:bg-blue-100 p-2 rounded-md border border-blue-200 transition-colors flex items-center justify-center"
-                        >
-                          <ClipboardList className="w-4 h-4 sm:w-5 sm:h-5" />
-                        </button>
-                        
-                        {/* Botón Editar */}
-                        <button 
-                          onClick={() => handleEditClick(m)} 
-                          title="Editar Equipo"
-                          className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-2 rounded-md transition-colors flex items-center justify-center"
-                        >
-                          <Pencil className="w-4 h-4 sm:w-5 sm:h-5" />
-                        </button>
-                        
-                        {/* Botón Baja */}
+                        <button onClick={() => abrirHistorial(m)} title="Historial de Servicio" className="text-[var(--recal-blue)] bg-blue-50 hover:bg-blue-100 p-2 rounded-md border border-blue-200 transition-colors"><ClipboardList className="w-4 h-4 sm:w-5 sm:h-5" /></button>
+                        <button onClick={() => handleEditClick(m)} title="Editar Equipo" className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-2 rounded-md transition-colors"><Pencil className="w-4 h-4 sm:w-5 sm:h-5" /></button>
                         {!m.fecha_baja && (
-                          <button 
-                            onClick={() => handleBajaClick(m.id_maquinaria)} 
-                            title="Dar de Baja"
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-md transition-colors flex items-center justify-center"
-                          >
-                            <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
-                          </button>
+                          <button onClick={() => handleBajaClick(m.id_maquinaria)} title="Dar de Baja" className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-md transition-colors"><Trash2 className="w-4 h-4 sm:w-5 sm:h-5" /></button>
                         )}
-
                       </div>
                     </td>
                   </tr>
@@ -445,36 +451,14 @@ export default function MaquinariaPage() {
           </div>
           <div>
             <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-              <button onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1}
-                className={`relative inline-flex items-center px-3 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium ${currentPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-50'}`}>
-                Anterior
-              </button>
-              
-              {/* Números dinámicos (Visibles en Tablet y PC) */}
+              <button onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1} className={`relative inline-flex items-center px-3 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium ${currentPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-50'}`}>Anterior</button>
               <div className="hidden md:flex">
                 {getPageNumbers().map(page => (
-                  <button
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium transition-colors
-                      ${currentPage === page 
-                        ? 'z-10 bg-blue-50 border-[var(--recal-blue)] text-[var(--recal-blue)]' 
-                        : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'}`}
-                  >
-                    {page}
-                  </button>
+                  <button key={page} onClick={() => setCurrentPage(page)} className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium transition-colors ${currentPage === page ? 'z-10 bg-blue-50 border-[var(--recal-blue)] text-[var(--recal-blue)]' : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'}`}>{page}</button>
                 ))}
               </div>
-
-              {/* Contador compacto (Visible solo en Celulares) */}
-              <span className="md:hidden relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
-                {currentPage} / {totalPages}
-              </span>
-
-              <button onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages}
-                className={`relative inline-flex items-center px-3 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium ${currentPage === totalPages ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-50'}`}>
-                Siguiente
-              </button>
+              <span className="md:hidden relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">{currentPage} / {totalPages}</span>
+              <button onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages} className={`relative inline-flex items-center px-3 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium ${currentPage === totalPages ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-50'}`}>Siguiente</button>
             </nav>
           </div>
         </div>
@@ -490,7 +474,7 @@ export default function MaquinariaPage() {
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div><label className="block text-sm font-medium text-gray-700">Num. Económico (opcional)</label><input type="text" className="mt-1 w-full border border-gray-300 rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.num_economico ? formData.num_economico : 'N/A'} onChange={e => setFormData({...formData, num_economico: e.target.value.toUpperCase()})} /></div>
+                <div><label className="block text-sm font-medium text-gray-700">Num. Económico (opcional)</label><input type="text" className="mt-1 w-full border border-gray-300 rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.num_economico} onChange={e => setFormData({...formData, num_economico: e.target.value.toUpperCase()})} /></div>
                 <div><label className="block text-sm font-medium text-gray-700">Tipo de Equipo *</label><input required type="text" className="mt-1 w-full border border-gray-300 rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.tipo} onChange={e => setFormData({...formData, tipo: e.target.value.toUpperCase()})} /></div>
                 <div><label className="block text-sm font-medium text-gray-700">Marca *</label><input required type="text" className="mt-1 w-full border border-gray-300 rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.marca} onChange={e => setFormData({...formData, marca: e.target.value.toUpperCase()})} /></div>
                 <div><label className="block text-sm font-medium text-gray-700">Modelo (opcional)</label><input type="text" className="mt-1 w-full border border-gray-300 rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.modelo} onChange={e => setFormData({...formData, modelo: e.target.value.toUpperCase()})} /></div>
@@ -556,7 +540,7 @@ export default function MaquinariaPage() {
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full flex flex-col max-h-[90vh]">
             <div className="px-4 md:px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-[var(--recal-blue)] text-white rounded-t-lg">
-              <h3 className="text-base md:text-lg font-bold truncate pr-4">Servicios: {maquinaSeleccionada.num_economico}</h3>
+              <h3 className="text-base md:text-lg font-bold truncate pr-4">Servicios: {maquinaSeleccionada.num_economico || 'S/N'}</h3>
               <button onClick={() => setIsHistorialOpen(false)} className="text-white hover:text-gray-200 font-bold text-xl md:text-2xl">&times;</button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col md:grid md:grid-cols-3 gap-6 bg-gray-50">
@@ -579,12 +563,8 @@ export default function MaquinariaPage() {
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Horómetro al servicio</label>
                     <input 
-                      type="number" 
-                      step="0.01" 
-                      className="w-full border border-gray-300 rounded p-2 text-sm outline-none focus:border-[var(--recal-blue)]" 
-                      value={formMantenimiento.horometro_mantenimiento} 
-                      onChange={e => setFormMantenimiento({...formMantenimiento, horometro_mantenimiento: e.target.value})} 
-                      placeholder='Opcional si es equipo menor'
+                      type="number" step="0.01" className="w-full border border-gray-300 rounded p-2 text-sm outline-none focus:border-[var(--recal-blue)]" 
+                      value={formMantenimiento.horometro_mantenimiento} onChange={e => setFormMantenimiento({...formMantenimiento, horometro_mantenimiento: e.target.value})} placeholder='Opcional si es equipo menor'
                     />
                   </div>
                   <div>
@@ -622,6 +602,120 @@ export default function MaquinariaPage() {
           </div>
         </div>
       )}
+
+      {/* --- MODAL 4: IMPORTACIÓN MASIVA DE MAQUINARIA --- */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[95vh] overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-purple-50">
+              <div className="flex items-center">
+                <Tractor className="w-6 h-6 text-purple-600 mr-2" />
+                <h3 className="text-xl font-bold text-purple-900">Importación Masiva de Equipo</h3>
+              </div>
+              <button onClick={() => setIsImportModalOpen(false)} className="text-gray-400 hover:text-gray-600 font-bold text-2xl">&times;</button>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1 bg-gray-50">
+              {importError && (
+                <div className="mb-4 bg-red-50 border-l-4 border-red-500 text-red-700 p-4 text-sm shadow-sm">
+                  <p className="font-bold">Aviso de Lectura</p>
+                  <p className="whitespace-pre-line">{importError}</p>
+                </div>
+              )}
+
+              {importFase === 1 && (
+                <form onSubmit={handleAnalizarExcel} className="space-y-6 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                  <p className="text-sm text-gray-600 mb-4 bg-blue-50 p-3 rounded border border-blue-100">
+                    Sube el Plan de Servicio Oficial <b>(12_PLAN_SERVICIO.xlsx)</b>. El sistema extraerá los equipos a partir de la Fila 7, cruzará los datos mediante el <b>Número de Serie</b> y te mostrará los equipos nuevos a registrar.
+                  </p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">1. Selecciona la Contratista Propietaria *</label>
+                      <select required className="w-full border border-gray-300 rounded-md p-3 focus:ring-purple-500 outline-none shadow-sm" value={importSubcontratista} onChange={(e) => setImportSubcontratista(e.target.value)}>
+                        <option value="">-- Elige una opción --</option>
+                        {catPrincipales.map(empresa => (
+                          <option key={empresa.id_subcontratista} value={empresa.id_subcontratista}>{empresa.razon_social}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">2. Sube el archivo Excel *</label>
+                      <input required type="file" accept=".xlsx, .xls" className="w-full border border-gray-300 rounded-md p-2 bg-gray-50 focus:outline-none file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100" onChange={(e) => setImportFile(e.target.files[0])} />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end pt-4">
+                    <button type="submit" disabled={importing} className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg flex items-center shadow-md transition-colors disabled:bg-gray-400">
+                      {importing ? 'Analizando documento...' : 'Cruzar Datos y Analizar'}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {importFase === 2 && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                      <p className="text-xs text-gray-500 font-bold uppercase">Equipos en el Excel</p>
+                      <p className="text-2xl font-bold text-gray-700">{importResumen.totales}</p>
+                    </div>
+                    <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                      <p className="text-xs text-gray-500 font-bold uppercase">Ya registrados</p>
+                      <p className="text-2xl font-bold text-blue-600">{importResumen.totales - importResumen.nuevos}</p>
+                    </div>
+                    <div className="bg-purple-50 p-4 rounded-lg border border-purple-200 shadow-sm">
+                      <p className="text-xs text-purple-700 font-bold uppercase">Nuevos por guardar</p>
+                      <p className="text-3xl font-black text-purple-700">{importResumen.nuevos}</p>
+                    </div>
+                  </div>
+
+                  {importPreviewData.length === 0 ? (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-8 text-center">
+                      <p className="text-green-700 font-bold text-lg mb-2">¡Inventario Cuadrado!</p>
+                      <p className="text-green-600">Todos los números de serie detectados en este Excel ya existen activos en tu base de datos.</p>
+                    </div>
+                  ) : (
+                    <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+                      <div className="max-h-64 overflow-y-auto">
+                        <table className="min-w-full divide-y divide-gray-200 text-sm">
+                          <thead className="bg-gray-100 sticky top-0">
+                            <tr>
+                              <th className="px-4 py-3 text-left font-bold text-gray-600">Tipo</th>
+                              <th className="px-4 py-3 text-left font-bold text-gray-600">Marca / Modelo</th>
+                              <th className="px-4 py-3 text-left font-bold text-gray-600">Número de Serie</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {importPreviewData.map((m, idx) => (
+                              <tr key={idx} className="hover:bg-gray-50">
+                                <td className="px-4 py-2 font-medium text-gray-900">{m.tipo}</td>
+                                <td className="px-4 py-2 text-gray-600">{m.marca} / {m.modelo || '-'}</td>
+                                <td className="px-4 py-2 text-gray-600 font-mono">{m.serie}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-200 bg-white flex justify-end space-x-3">
+              <button onClick={() => setIsImportModalOpen(false)} className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 font-medium transition-colors">Cancelar</button>
+              {importFase === 2 && importPreviewData.length > 0 && (
+                <button onClick={handleGuardarImportacion} disabled={importing} className="px-6 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 font-bold transition-colors shadow-md flex items-center disabled:bg-gray-400">
+                  {importing ? 'Guardando...' : `Guardar ${importResumen.nuevos} Equipos`}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
