@@ -238,7 +238,8 @@ export default function UsuariosPage() {
                   <label className="block text-sm font-bold text-purple-900 mb-1">Rol de Sistema *</label>
                   <select className="w-full border border-gray-300 rounded p-2 bg-purple-50 outline-none focus:ring-[var(--recal-blue)]" 
                     value={formData.rol} onChange={e => setFormData({...formData, rol: e.target.value})}>
-                    <option value="Usuario">Usuario (Consulta/Edición Base)</option>
+                    <option value="Gerencia">Gerencia (Consulta)</option>
+                    <option value="Usuario">Usuario (Consulta/Edición)</option>
                     <option value="Admin">Admin (Aprobaciones)</option>
                     <option value="Master">Master (Control Total)</option>
                   </select>

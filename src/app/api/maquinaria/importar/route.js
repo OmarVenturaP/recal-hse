@@ -2,6 +2,28 @@ import { NextResponse } from 'next/server';
 import pool from '../../../../lib/db';
 import ExcelJS from 'exceljs';
 
+// --- FUNCIÓN EXTRACTORA NIVEL DIOS ---
+// Destruye los [object Object] de Excel cuando las celdas tienen negritas o colores mezclados
+const parseCell = (cell) => {
+  if (!cell || cell.value === null || cell.value === undefined) return '';
+  
+  // Si es un objeto (Rich Text o Fórmula)
+  if (typeof cell.value === 'object') {
+    if (cell.value.richText) {
+      return cell.value.richText.map(rt => rt.text).join('').trim();
+    }
+    if (cell.value.result !== undefined) {
+      return cell.value.result.toString().trim();
+    }
+    if (cell.value instanceof Date) {
+      return cell.value.toISOString().split('T')[0];
+    }
+  }
+  
+  // Si es texto normal o número
+  return cell.value.toString().trim();
+};
+
 export async function POST(request) {
   try {
     const formData = await request.formData();
@@ -23,23 +45,41 @@ export async function POST(request) {
     const seriesList = [];
     const erroresValidacion = [];
 
-    // Recorremos desde la Fila 7 en adelante (Formato 12_PLAN_SERVICIO)
+    let detenerLectura = false; 
+
+    // Recorremos desde la Fila 7 en adelante
     worksheet.eachRow((row, rowNumber) => {
+      if (detenerLectura) return; 
+
       if (rowNumber >= 7) {
-        const tipo = row.getCell(2).value?.toString().trim();
-        if (!tipo) return; // Si la columna B (Tipo) está vacía, saltamos la fila
+        // --- 1. SENSOR DE PARO AUTOMÁTICO ---
+        // Si la celda B o C están combinadas (típico de las firmas de ELABORÓ/REVISÓ), paramos.
+        if (row.getCell(2).isMerged || row.getCell(3).isMerged) {
+          detenerLectura = true;
+          return;
+        }
 
-        const marca = row.getCell(3).value?.toString().trim() || 'S/M';
-        const anio = row.getCell(4).value?.toString().trim() || '';
-        const modelo = row.getCell(5).value?.toString().trim() || '';
-        const color = row.getCell(6).value?.toString().trim() || '';
-        const placa = row.getCell(8).value?.toString().trim() || '';
+        const tipo = parseCell(row.getCell(2)).toUpperCase();
         
-        // Limpieza del número de serie
-        const serieRaw = row.getCell(7).value;
-        const serie = serieRaw ? serieRaw.toString().trim().toUpperCase() : '';
+        // Sensor de respaldo por palabras clave (por si no combinaron las celdas)
+        if (tipo.includes('ELABORO') || tipo.includes('ELABORÓ') || tipo.includes('REVISO') || tipo.includes('OBSERVACION')) {
+          detenerLectura = true;
+          return;
+        }
 
-        // --- VALIDACIÓN ESTRICTA ---
+        if (!tipo) return; // Saltamos filas totalmente vacías en medio de la tabla
+
+        // --- 2. EXTRACCIÓN DE DATOS ---
+        const marca = parseCell(row.getCell(3)) || 'S/M';
+        const anio = parseCell(row.getCell(4)) || '';
+        const modelo = parseCell(row.getCell(5)) || '';
+        const color = parseCell(row.getCell(6)) || '';
+        const placa = parseCell(row.getCell(8)) || '';
+        
+        // Limpieza EXTREMA del número de serie (Quitamos espacios invisibles y forzamos mayúsculas)
+        const serieBruta = parseCell(row.getCell(7));
+        const serie = serieBruta.toUpperCase().replace(/\s+/g, '');
+
         if (!serie) {
           erroresValidacion.push(`Fila ${rowNumber} (${tipo} ${marca}): Es obligatorio el Número de Serie.`);
         }
@@ -60,29 +100,26 @@ export async function POST(request) {
     });
 
     if (excelMaquinaria.length === 0) {
-      return NextResponse.json({ error: "No se encontró maquinaria en el archivo (Fila 7 en adelante)." }, { status: 400 });
+      return NextResponse.json({ error: "No se encontró maquinaria válida o el formato es incorrecto." }, { status: 400 });
     }
 
-    // Frenamos si hay errores y avisamos al usuario
     if (erroresValidacion.length > 0) {
       const mensajeError = `Por favor corrige el Excel:\n• ${erroresValidacion.slice(0, 5).join('\n• ')}${erroresValidacion.length > 5 ? '\n... y más errores.' : ''}`;
       return NextResponse.json({ error: mensajeError }, { status: 400 });
     }
 
-    // --- CRUCE INTELIGENTE CON LA BASE DE DATOS ---
-    // Solo cruzamos con los equipos que están "ACTIVOS" (fecha_baja IS NULL)
+    // --- 3. CRUCE ANTI-DUPLICADOS BLINDADO ---
     let yaExistentes = [];
     if (seriesList.length > 0) {
-      const [filas] = await pool.query(
-        `SELECT serie FROM Maquinaria_Equipo WHERE fecha_baja IS NULL AND serie IN (?)`,
-        [seriesList]
-      );
-      yaExistentes = filas;
+      // Traemos todas las series activas de la BD
+      const [filas] = await pool.query(`SELECT serie FROM Maquinaria_Equipo WHERE fecha_baja IS NULL`);
+      // Las limpiamos de igual manera (sin espacios, mayúsculas puras) para comparar manzanas con manzanas
+      yaExistentes = filas.map(f => (f.serie || '').toString().toUpperCase().replace(/\s+/g, ''));
     }
 
-    // Filtramos para dejar solo la maquinaria "Nueva" (o que reingresa tras una baja previa)
+    // Filtramos para dejar solo la maquinaria que de verdad es "Nueva"
     const nuevaMaquinaria = excelMaquinaria.filter(excelRow => {
-      return !yaExistentes.some(db => db.serie === excelRow.serie);
+      return !yaExistentes.includes(excelRow.serie);
     });
 
     return NextResponse.json({ 
@@ -106,7 +143,6 @@ export async function PUT(request) {
       return NextResponse.json({ error: "No hay maquinaria para guardar" }, { status: 400 });
     }
 
-    // Como el Excel de Mantenimiento no trae "Fecha de Ingreso a Obra", usamos la fecha actual (hoy) por defecto
     const fechaIngresoActual = new Date().toISOString().split('T')[0]; 
 
     for (const m of maquinarias) {

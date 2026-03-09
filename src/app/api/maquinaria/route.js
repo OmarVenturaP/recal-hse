@@ -16,6 +16,8 @@ export async function GET(request) {
     const mes = searchParams.get('mes');
     const anio = searchParams.get('anio');
     const busqueda = searchParams.get('busqueda'); 
+    const ordenPor = searchParams.get('ordenPor') || 'fecha_ingreso_obra';
+    const ordenDireccion = searchParams.get('ordenDireccion') || 'DESC';
 
     let whereClause = "WHERE 1=1";
     const queryParams = [];
@@ -55,7 +57,7 @@ export async function GET(request) {
       FROM Maquinaria_Equipo m
       LEFT JOIN Subcontratistas s ON m.id_subcontratista = s.id_subcontratista
       ${whereClause}
-      ORDER BY m.fecha_ingreso_obra DESC
+      ORDER BY ${ordenPor} ${ordenDireccion}
     `;
     
     const [rows] = await pool.query(query, queryParams);
