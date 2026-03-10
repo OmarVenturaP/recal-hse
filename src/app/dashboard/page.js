@@ -35,7 +35,7 @@ export default function DashboardHome() {
       <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
         
         {/* TARJETA: MAQUINARIA */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center justify-center relative overflow-hidden group hover:shadow-md transition-shadow">
+        <a href="/dashboard/maquinaria" className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center justify-center relative overflow-hidden group hover:shadow-md transition-shadow">
           <div className="absolute top-0 w-full h-1 bg-green-500"></div>
           <div className="bg-green-50 p-3 rounded-full mb-3 text-green-600">
             <Tractor className="w-8 h-8" />
@@ -46,10 +46,10 @@ export default function DashboardHome() {
           ) : (
             <p className="text-4xl font-black text-gray-800 mt-2">{stats.maquinaria}</p>
           )}
-        </div>
+        </a>
 
-        {/* TARJETA: FUERZA DE TRABAJO */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center justify-center relative overflow-hidden group hover:shadow-md transition-shadow">
+        {/* TARJETA: PERSONAL */}
+        <a href="/dashboard/fuerza-trabajo" className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center justify-center relative overflow-hidden group hover:shadow-md transition-shadow">
           <div className="absolute top-0 w-full h-1 bg-orange-500"></div>
           <div className="bg-orange-50 p-3 rounded-full mb-3 text-orange-600">
             <HardHat className="w-8 h-8" />
@@ -60,7 +60,7 @@ export default function DashboardHome() {
           ) : (
             <p className="text-4xl font-black text-gray-800 mt-2">{stats.personal}</p>
           )}
-        </div>
+        </a>
 
         {/* TARJETA: DOSSIER (Próximo Módulo) 
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center justify-center relative overflow-hidden opacity-60">
