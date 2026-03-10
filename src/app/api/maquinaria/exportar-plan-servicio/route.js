@@ -51,18 +51,20 @@ export async function GET(request) {
       const row = worksheet.getRow(currentRow);
       row.height = 100; // El alto de tu formato 12
 
+      const toUpper = (val) => val ? String(val).toUpperCase() : 'N/A';
+
       // Llenado de celdas
       row.getCell('A').value = index;
-      row.getCell('B').value = maquina.tipo || 'N/A';
-      row.getCell('C').value = maquina.marca || 'N/A';
-      row.getCell('D').value = maquina.anio || 'N/A';
-      row.getCell('E').value = maquina.modelo || 'N/A';
-      row.getCell('F').value = maquina.color || 'N/A';
-      row.getCell('G').value = maquina.serie || 'N/A';
+      row.getCell('B').value = toUpper(maquina.tipo);
+      row.getCell('C').value = toUpper(maquina.marca);
+      row.getCell('D').value = toUpper(maquina.anio);
+      row.getCell('E').value = toUpper(maquina.modelo);
+      row.getCell('F').value = toUpper(maquina.color);
+      row.getCell('G').value = toUpper(maquina.serie);
       row.getCell('H').value = maquina.placa || 'N/A';
       
       row.getCell('I').value = maquina.horometro ? `TOTAL DE H: ${maquina.horometro}` : 'N/A';
-      row.getCell('J').value = maquina.ultimo_tipo_mantenimiento?.toUpperCase() || 'N/A';
+      row.getCell('J').value = toUpper(maquina.ultimo_tipo_mantenimiento);
 
       if (maquina.ultima_fecha_mantenimiento && maquina.ultima_fecha_mantenimiento > maquina.fecha_ingreso_obra) {
         const date = new Date(maquina.ultima_fecha_mantenimiento);

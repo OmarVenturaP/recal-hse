@@ -12,6 +12,7 @@ export default function FuerzaTrabajoPage() {
   // Catálogos
   const [catPrincipales, setCatPrincipales] = useState([]);
   const [catCuadrillas, setCatCuadrillas] = useState([]);
+  const [catPuestos, setCatPuestos] = useState([]);
 
   // --- FECHAS POR DEFECTO (Última Semana) ---
   const getDateString = (date) => {
@@ -85,6 +86,29 @@ export default function FuerzaTrabajoPage() {
     const day = String(date.getUTCDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   };
+
+    useEffect(() => {
+    const fetchCatalogos = async () => {
+      try {
+        const res = await fetch('/api/catalogos/subcontratistas');
+        const data = await res.json();
+        if (data.success) {
+          setCatPrincipales(data.principales);
+          setCatCuadrillas(data.cuadrillas);
+        }
+
+        // --- CARGAR PUESTOS DESDE LA API ---
+        const resPuestos = await fetch('/api/fuerza-trabajo/puestos');
+        const dataPuestos = await resPuestos.json();
+        if (dataPuestos.success) {
+          setCatPuestos(dataPuestos.puestos);
+        }
+      } catch (error) {
+        console.error("Error cargando catálogos", error);
+      }
+    };
+    fetchCatalogos();
+  }, []);
 
   useEffect(() => {
     const fetchCatalogos = async () => {
@@ -420,7 +444,17 @@ export default function FuerzaTrabajoPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Puesto / Categoría *</label>
-                  <input required type="text" className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none" value={formData.puesto_categoria} onChange={e => setFormData({...formData, puesto_categoria: e.target.value})} />
+                  <select 
+                    required 
+                    className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none bg-white" 
+                    value={formData.puesto_categoria} 
+                    onChange={e => setFormData({...formData, puesto_categoria: e.target.value})}
+                  >
+                    <option value="">Seleccione un puesto...</option>
+                    {catPuestos.map((puesto, index) => (
+                      <option key={index} value={puesto}>{puesto}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Origen *</label>

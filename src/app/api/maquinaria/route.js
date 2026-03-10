@@ -124,7 +124,7 @@ export async function POST(request) {
       if (existeSerie.length > 0) {
         return NextResponse.json({ 
           success: false, 
-          error: `Ese número de serie ya pertenece al equipo: ${existeSerie[0].marca} / ${existeSerie[0].modelo || 'S/M'}. No puedes duplicarlo.` 
+          error: `Ese número de serie ya pertenece al equipo: ${existeSerie[0].marca} / ${existeSerie[0].modelo || 'S/N'}. No puedes duplicarlo.` 
         }, { status: 400 });
       }
     }

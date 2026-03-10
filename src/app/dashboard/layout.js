@@ -78,7 +78,6 @@ useEffect(() => {
         <div className="p-6 text-center border-b border-blue-800 flex justify-between items-center md:block">
           <div>
             <img src="https://res.cloudinary.com/ddl8myqbt/image/upload/v1772806608/circle-logo-recal_ibfgo7.png" alt="Logo RECAL" className="w-12 h-12 inline-block rounded-full" />
-            <p className="text-xs text-blue-300 mt-2">Línea K - Interoceánico</p>
           </div>
           {/* Botón para cerrar el menú (solo visible en celular) */}
           <button onClick={closeSidebar} className="md:hidden text-blue-300 hover:text-white text-2xl font-bold">

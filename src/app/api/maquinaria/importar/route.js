@@ -70,7 +70,7 @@ export async function POST(request) {
         if (!tipo) return; // Saltamos filas totalmente vacías en medio de la tabla
 
         // --- 2. EXTRACCIÓN DE DATOS ---
-        const marca = parseCell(row.getCell(3)) || 'S/M';
+        const marca = parseCell(row.getCell(3)) || 'S/N';
         const anio = parseCell(row.getCell(4)) || '';
         const modelo = parseCell(row.getCell(5)) || '';
         const color = parseCell(row.getCell(6)) || '';

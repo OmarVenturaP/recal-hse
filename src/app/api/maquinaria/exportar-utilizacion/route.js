@@ -48,11 +48,14 @@ export async function GET(request) {
       const row = worksheet.getRow(currentRow);
       row.height = 180; 
 
+      const toUpper = (val) => val ? String(val).toUpperCase() : 'N/A';
+
       row.getCell('A').value = index;
-      row.getCell('B').value = maquina.tipo || '-';
-      row.getCell('C').value = `${maquina.marca || ''} / ${maquina.modelo || ''}`.trim() || '-';
-      row.getCell('D').value = maquina.color || '-';
-      row.getCell('E').value = maquina.num_economico || '-';
+      row.getCell('B').value = toUpper(maquina.tipo);
+      const marcaModelo = `${maquina.marca || ''} / ${maquina.modelo || ''}`.trim();
+      row.getCell('C').value = toUpper(marcaModelo);
+      row.getCell('D').value = toUpper(maquina.color);
+      row.getCell('E').value = toUpper(maquina.num_economico);
 
       if (maquina.fecha_ingreso_obra) {
         const date = new Date(maquina.fecha_ingreso_obra);
