@@ -4,7 +4,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       {/* Navbar */}
-      <nav className="bg-white shadow-md w-full z-10">
+      <nav className="bg-white dark:bg-slate-800 shadow-md w-full z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             

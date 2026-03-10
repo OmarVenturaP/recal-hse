@@ -310,7 +310,7 @@ export default function FuerzaTrabajoPage() {
       
       {/* HEADER Y BOTONES RESPONSIVOS */}
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center space-y-4 xl:space-y-0">
-        <h2 className="text-xl sm:text-2xl font-bold text-[var(--recal-blue)]">Control de Fuerza de Trabajo</h2>
+        <h2 className="text-xl sm:text-2xl font-bold text-[var(--recal-blue)] dark:text-white">Control de Fuerza de Trabajo</h2>
         
         <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full xl:w-auto">
           
@@ -319,12 +319,12 @@ export default function FuerzaTrabajoPage() {
           </button>
 
           {/* CONTROL UNIFICADO DE PERIODO POR RANGOS DE FECHA */}
-          <div className="flex items-center justify-between sm:justify-start space-x-1 bg-gray-50 border border-gray-200 p-1.5 rounded-md shadow-sm w-full sm:w-auto">
-            <span className="text-xs font-bold text-gray-500 uppercase px-2 hidden md:inline">Filtro / Exportación:</span>
-            <input type="date" className="text-xs sm:text-sm border-gray-300 rounded py-1 px-1 sm:px-2 focus:ring-[var(--recal-blue)] outline-none flex-1 sm:flex-none w-full sm:w-36" 
+          <div className="flex items-center justify-between sm:justify-start space-x-1 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 p-1.5 rounded-md shadow-sm w-full sm:w-auto">
+            <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase px-2 hidden md:inline">Filtro / Exportación:</span>
+            <input type="date" className="text-xs sm:text-sm bg-transparent border-gray-300 dark:border-slate-600 dark:text-gray-200 rounded py-1 px-1 sm:px-2 focus:ring-[var(--recal-blue)] outline-none flex-1 sm:flex-none w-full sm:w-36" 
               value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} />
-            <span className="text-xs font-bold text-gray-400 px-1">al</span>
-            <input type="date" className="text-xs sm:text-sm border-gray-300 rounded py-1 px-1 sm:px-2 focus:ring-[var(--recal-blue)] outline-none flex-1 sm:flex-none w-full sm:w-36" 
+            <span className="text-xs font-bold text-gray-400 dark:text-gray-500 px-1">al</span>
+            <input type="date" className="text-xs sm:text-sm bg-transparent border-gray-300 dark:border-slate-600 dark:text-gray-200 rounded py-1 px-1 sm:px-2 focus:ring-[var(--recal-blue)] outline-none flex-1 sm:flex-none w-full sm:w-36" 
               value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} />
           </div>
 
@@ -339,98 +339,98 @@ export default function FuerzaTrabajoPage() {
       </div>
 
       {/* PANEL DE FILTROS REDUCIDO */}
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="md:col-span-2">
-          <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Buscar Trabajador</label>
+          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Buscar Trabajador</label>
           <div className="relative">
             <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">🔍</span>
-            <input type="text" placeholder="Nombre, NSS..." className="w-full pl-10 border border-gray-300 rounded-md p-2 shadow-sm focus:ring-[var(--recal-blue)] outline-none sm:text-sm" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
+            <input type="text" placeholder="Nombre, NSS..." className="w-full pl-10 bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 shadow-sm focus:ring-[var(--recal-blue)] outline-none sm:text-sm" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
           </div>
         </div>
         <div className="md:col-span-1">
-          <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Contratista</label>
-          <select className="w-full border-gray-300 rounded-md shadow-sm focus:ring-[var(--recal-blue)] p-2 sm:text-sm outline-none" value={filtroSub} onChange={(e) => setFiltroSub(e.target.value)}>
+          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Contratista</label>
+          <select className="w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md shadow-sm focus:ring-[var(--recal-blue)] p-2 sm:text-sm outline-none" value={filtroSub} onChange={(e) => setFiltroSub(e.target.value)}>
             <option value="">Todas...</option>
             {catPrincipales.map(empresa => (<option key={empresa.id_subcontratista} value={empresa.id_subcontratista}>{empresa.razon_social}</option>))}
           </select>
         </div>
         <div className="md:col-span-1 flex items-end">
-          <button onClick={limpiarFiltros} className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-md font-medium sm:text-sm transition-colors border border-gray-300">Limpiar Todo</button>
+          <button onClick={limpiarFiltros} className="w-full bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-md font-medium sm:text-sm transition-colors border border-gray-300 dark:border-slate-600">Limpiar Todo</button>
         </div>
       </div>
 
       {/* TABLA PRINCIPAL */}
-      <div className="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
+      <div className="bg-white dark:bg-slate-800 shadow-sm rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50 hidden md:table-header-group">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+            <thead className="bg-gray-50 dark:bg-slate-900 hidden md:table-header-group">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100" onClick={() => manejarOrden('nombre_trabajador')}>Nombre {ordenPor === 'nombre_trabajador' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100" onClick={() => manejarOrden('puesto_categoria')}>Categoría {ordenPor === 'puesto_categoria' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100" onClick={() => manejarOrden('nss')}>NSS {ordenPor === 'nss' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-blue-800 uppercase cursor-pointer hover:bg-gray-100" onClick={() => manejarOrden('fecha_ingreso_obra')}>Ingreso {ordenPor === 'fecha_ingreso_obra' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100" onClick={() => manejarOrden('nombre_subcontratista')}>Contratista {ordenPor === 'nombre_subcontratista' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estatus</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('nombre_trabajador')}>Nombre {ordenPor === 'nombre_trabajador' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('puesto_categoria')}>Categoría {ordenPor === 'puesto_categoria' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('nss')}>NSS {ordenPor === 'nss' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--recal-blue)] dark:text-blue-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('fecha_ingreso_obra')}>Ingreso {ordenPor === 'fecha_ingreso_obra' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('nombre_subcontratista')}>Contratista {ordenPor === 'nombre_subcontratista' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Estatus</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Acciones</th>
                 {(userRole === 'Admin' || userRole === 'Master') && (
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Trazabilidad</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Trazabilidad</th>
                 )}
               </tr>
             </thead>
-            <tbody className="bg-white divide-y md:divide-y-0 md:divide-gray-200 block md:table-row-group">
+            <tbody className="bg-white dark:bg-slate-800 divide-y md:divide-y-0 md:divide-gray-200 dark:md:divide-slate-700 block md:table-row-group">
               {loading ? (
-                <tr className="block md:table-row"><td colSpan="7" className="px-6 py-8 text-center text-sm text-gray-500 block md:table-cell">Cargando personal...</td></tr>
+                <tr className="block md:table-row"><td colSpan="8" className="px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400 block md:table-cell">Cargando personal...</td></tr>
               ) : trabajadores.length === 0 ? (
                 <tr className="block md:table-row">
-                  <td colSpan="7" className="px-6 py-12 text-center block md:table-cell">
-                    <div className="text-gray-400 text-4xl mb-2">🔍</div>
-                    <p className="text-sm font-medium text-gray-900">No se encontraron resultados en esta semana</p>
+                  <td colSpan="8" className="px-6 py-12 text-center block md:table-cell">
+                    <div className="text-gray-400 dark:text-gray-500 text-4xl mb-2">🔍</div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-200">No se encontraron resultados en esta semana</p>
                   </td>
                 </tr>
               ) : trabajadoresPaginados.map((t) => (
-                  <tr key={t.id_trabajador} className="block md:table-row border border-gray-200 md:border-none mb-4 md:mb-0 rounded-lg shadow-sm md:shadow-none p-4 md:p-0 hover:bg-gray-50">
-                    <td className="flex justify-between md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm font-bold text-[var(--recal-blue)] md:text-gray-900 border-b md:border-none">
-                      <span className="md:hidden font-bold text-gray-500">Nombre:</span>{t.nombre_trabajador}
+                  <tr key={t.id_trabajador} className="block md:table-row border border-gray-200 dark:border-slate-700 md:border-none mb-4 md:mb-0 rounded-lg shadow-sm md:shadow-none p-4 md:p-0 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
+                    <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm font-bold text-[var(--recal-blue)] dark:text-white md:text-gray-900 border-b dark:border-slate-700 md:border-none">
+                      <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Nombre:</span>{t.nombre_trabajador}
                     </td>
-                    <td className="flex justify-between md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 border-b md:border-none">
-                      <span className="md:hidden font-bold text-gray-500">Categoría:</span>{t.puesto_categoria}
+                    <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
+                      <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Categoría:</span>{t.puesto_categoria}
                     </td>
-                    <td className="flex justify-between md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 border-b md:border-none">
-                      <span className="md:hidden font-bold text-gray-500">NSS:</span>{t.nss || 'N/A'}
+                    <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
+                      <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">NSS:</span>{t.nss || 'N/A'}
                     </td>
-                    <td className="flex justify-between md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 border-b md:border-none">
-                      <span className="md:hidden font-bold text-gray-500">Ingreso:</span>{formatDDMMYYYY(t.fecha_ingreso_obra)}
+                    <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
+                      <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Ingreso:</span>{formatDDMMYYYY(t.fecha_ingreso_obra)}
                     </td>
-                    <td className="flex justify-between md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 border-b md:border-none">
-                      <span className="md:hidden font-bold text-gray-500">Contratista:</span>{t.nombre_subcontratista || 'RECAL'}
+                    <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
+                      <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Contratista:</span>{t.nombre_subcontratista || 'RECAL'}
                     </td>
-                    <td className="flex justify-between md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm border-b md:border-none">
-                      <span className="md:hidden font-bold text-gray-500">Estatus:</span>
-                      {t.fecha_baja ? (<span className="px-2 inline-flex text-xs font-semibold rounded-full bg-red-100 text-red-800">Baja: {formatDDMMYYYY(t.fecha_baja)}</span>) : (<span className="px-2 inline-flex text-xs font-semibold rounded-full bg-green-100 text-green-800">Activo</span>)}
+                    <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm border-b dark:border-slate-700 md:border-none">
+                      <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Estatus:</span>
+                      {t.fecha_baja ? (<span className="px-2 inline-flex text-xs font-semibold rounded-full bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300">Baja: {formatDDMMYYYY(t.fecha_baja)}</span>) : (<span className="px-2 inline-flex text-xs font-semibold rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">Activo</span>)}
                     </td>
-                    <td className="flex justify-end items-center md:table-cell px-2 md:px-6 py-4 md:py-4 text-sm font-medium border-b md:border-none">
+                    <td className="flex justify-end items-center md:table-cell px-2 md:px-6 py-4 md:py-4 text-sm font-medium border-b dark:border-slate-700 md:border-none">
                       <div className="flex justify-end items-center gap-2 md:gap-3">
-                        <button onClick={() => handleEditClick(t)} title="Editar" className="text-[var(--recal-blue)] hover:text-blue-800 hover:bg-blue-50 p-2 rounded-md"><Pencil className="w-4 h-4 sm:w-5 sm:h-5" /></button>
+                        <button onClick={() => handleEditClick(t)} title="Editar" className="text-[var(--recal-blue)] dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 p-2 rounded-md transition-colors"><Pencil className="w-4 h-4 sm:w-5 sm:h-5" /></button>
                         {!t.fecha_baja ? (
-                          <button onClick={() => handleBajaClick(t.id_trabajador)} title="Dar Baja" className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-md"><Trash2 className="w-4 h-4 sm:w-5 sm:h-5" /></button>
-                        ) : (<span className="text-gray-400 italic text-xs px-2 flex items-center h-full">Retirado</span>)}
+                          <button onClick={() => handleBajaClick(t.id_trabajador)} title="Dar Baja" className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 p-2 rounded-md transition-colors"><Trash2 className="w-4 h-4 sm:w-5 sm:h-5" /></button>
+                        ) : (<span className="text-gray-400 dark:text-gray-500 italic text-xs px-2 flex items-center h-full">Retirado</span>)}
                       </div>
                     </td>
                       {(userRole === 'Admin' || userRole === 'Master') && (
-                        <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 border-b md:border-none">
-                          <span className="md:hidden font-bold text-gray-500 text-sm">Trazabilidad:</span>
+                        <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 border-b dark:border-slate-700 md:border-none">
+                          <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 text-sm">Trazabilidad:</span>
                           <div className="flex flex-col items-end md:items-start gap-1">
                             {t.creador ? (
-                              <span className="bg-green-100 text-gray-500 px-2 py-0.5 rounded text-[10px] font-bold border border-gray-200 w-max" title="Registrado por">
+                              <span className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 px-2 py-0.5 rounded text-[10px] font-bold border border-green-200 dark:border-green-800 w-max" title="Registrado por">
                                 Agregó: {t.creador}
                               </span>
                             ) : (
-                              <span className="bg-gray-100 text-gray-500 px-2 py-0.5 rounded text-[10px] font-bold border border-gray-200 w-max" title="Registrado por Master">
+                              <span className="bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-400 px-2 py-0.5 rounded text-[10px] font-bold border border-gray-200 dark:border-slate-600 w-max" title="Registrado por Master">
                                 Agregó: Master
                               </span>
                             )}
                             {t.modificador && (
-                              <span className="bg-yellow-100 text-gray-500 px-2 py-0.5 rounded text-[10px] font-bold border border-gray-200 w-max" title="Modificado por">
+                              <span className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 px-2 py-0.5 rounded text-[10px] font-bold border border-yellow-200 dark:border-yellow-800 w-max" title="Modificado por">
                                 Modificó: {t.modificador}
                               </span>
                             )}
@@ -447,20 +447,20 @@ export default function FuerzaTrabajoPage() {
 
       {/* CONTROLES DE PAGINACIÓN */}
       {totalPages > 1 && (
-        <div className="flex flex-col sm:flex-row items-center justify-between bg-white px-4 py-3 border border-gray-200 rounded-lg shadow-sm gap-4 sm:gap-0 mt-4">
-          <div className="text-sm text-gray-700 text-center sm:text-left">
+        <div className="flex flex-col sm:flex-row items-center justify-between bg-white dark:bg-slate-800 px-4 py-3 border border-gray-200 dark:border-slate-700 rounded-lg shadow-sm gap-4 sm:gap-0 mt-4">
+          <div className="text-sm text-gray-700 dark:text-gray-300 text-center sm:text-left">
             Mostrando del <span className="font-bold">{indexOfFirstItem + 1}</span> al <span className="font-bold">{Math.min(indexOfLastItem, trabajadores.length)}</span> de <span className="font-bold">{trabajadores.length}</span> trabajadores
           </div>
           <div>
             <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-              <button onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1} className={`relative inline-flex items-center px-3 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium ${currentPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-50'}`}>Anterior</button>
+              <button onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1} className={`relative inline-flex items-center px-3 py-2 rounded-l-md border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm font-medium ${currentPage === 1 ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors'}`}>Anterior</button>
               <div className="hidden md:flex">
                 {getPageNumbers().map(page => (
-                  <button key={page} onClick={() => setCurrentPage(page)} className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium transition-colors ${currentPage === page ? 'z-10 bg-blue-50 border-[var(--recal-blue)] text-[var(--recal-blue)]' : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'}`}>{page}</button>
+                  <button key={page} onClick={() => setCurrentPage(page)} className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium transition-colors ${currentPage === page ? 'z-10 bg-blue-50 dark:bg-blue-900/30 border-[var(--recal-blue)] dark:border-blue-500 text-[var(--recal-blue)] dark:text-blue-400' : 'bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}>{page}</button>
                 ))}
               </div>
-              <span className="md:hidden relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">{currentPage} / {totalPages}</span>
-              <button onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages} className={`relative inline-flex items-center px-3 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium ${currentPage === totalPages ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-50'}`}>Siguiente</button>
+              <span className="md:hidden relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm font-medium text-gray-700 dark:text-gray-300">{currentPage} / {totalPages}</span>
+              <button onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages} className={`relative inline-flex items-center px-3 py-2 rounded-r-md border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm font-medium ${currentPage === totalPages ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors'}`}>Siguiente</button>
             </nav>
           </div>
         </div>
@@ -468,67 +468,67 @@ export default function FuerzaTrabajoPage() {
 
       {/* MODAL 1: REGISTRO / EDICIÓN */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-[var(--recal-gray)]">
-              <h3 className="text-lg font-bold text-[var(--recal-blue)]">{isEditing ? 'Editar Trabajador' : 'Registro de Nuevo Trabajador'}</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 font-bold text-xl">&times;</button>
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border dark:border-slate-700">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center bg-[var(--recal-gray)] dark:bg-slate-900">
+              <h3 className="text-lg font-bold text-[var(--recal-blue)] dark:text-white">{isEditing ? 'Editar Trabajador' : 'Registro de Nuevo Trabajador'}</h3>
+              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 font-bold text-xl">&times;</button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700">Nombre Completo *</label>
-                  <input required type="text" className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none" value={formData.nombre_trabajador} onChange={e => setFormData({...formData, nombre_trabajador: e.target.value})} />
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Nombre Completo *</label>
+                  <input required type="text" className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none" value={formData.nombre_trabajador} onChange={e => setFormData({...formData, nombre_trabajador: e.target.value})} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Puesto / Categoría *</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Puesto / Categoría *</label>
                   <select 
                     required 
-                    className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none bg-white" 
+                    className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none" 
                     value={formData.puesto_categoria} 
                     onChange={e => setFormData({...formData, puesto_categoria: e.target.value})}
                   >
-                    <option value="">Seleccione un puesto...</option>
+                    <option value="" className="dark:bg-slate-800">Seleccione un puesto...</option>
                     {catPuestos.map((puesto, index) => (
-                      <option key={index} value={puesto}>{puesto}</option>
+                      <option key={index} value={puesto} className="dark:bg-slate-800">{puesto}</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Origen *</label>
-                  <select className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none" value={formData.origen} onChange={e => setFormData({...formData, origen: e.target.value})}>
-                    <option value="Local">Local</option><option value="Foráneo">Foráneo</option>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Origen *</label>
+                  <select className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none" value={formData.origen} onChange={e => setFormData({...formData, origen: e.target.value})}>
+                    <option value="Local" className="dark:bg-slate-800">Local</option><option value="Foráneo" className="dark:bg-slate-800">Foráneo</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Número de Seguridad Social (NSS)</label>
-                  <input type="text" maxLength={11} className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none" placeholder="11 dígitos" value={formData.nss} onChange={e => setFormData({...formData, nss: e.target.value})} />
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Número de Seguridad Social (NSS)</label>
+                  <input type="text" maxLength={11} className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none placeholder-gray-400 dark:placeholder-gray-500" placeholder="11 dígitos" value={formData.nss} onChange={e => setFormData({...formData, nss: e.target.value})} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Fecha Alta IMSS (Opcional)</label>
-                  <input type="date" className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none" value={formData.fecha_alta_imss} onChange={e => setFormData({...formData, fecha_alta_imss: e.target.value})} />
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Fecha Alta IMSS (Opcional)</label>
+                  <input type="date" className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none" value={formData.fecha_alta_imss} onChange={e => setFormData({...formData, fecha_alta_imss: e.target.value})} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Fecha Ingreso a Obra *</label>
-                  <input required type="date" className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none" value={formData.fecha_ingreso_obra} onChange={e => setFormData({...formData, fecha_ingreso_obra: e.target.value})} />
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Fecha Ingreso a Obra *</label>
+                  <input required type="date" className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none" value={formData.fecha_ingreso_obra} onChange={e => setFormData({...formData, fecha_ingreso_obra: e.target.value})} />
                 </div>
-                <div className="md:col-span-1 bg-blue-50 p-3 rounded border border-blue-100">
-                  <label className="block text-sm font-bold text-blue-900">Contratista Principal *</label>
-                  <select required className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none" value={formData.id_subcontratista_principal} onChange={e => setFormData({...formData, id_subcontratista_principal: e.target.value, id_subcontratista_ft: ''})}>
-                    <option value="">Seleccione Principal...</option>
-                    {catPrincipales.map(empresa => (<option key={empresa.id_subcontratista} value={empresa.id_subcontratista}>{empresa.razon_social}</option>))}
+                <div className="md:col-span-1 bg-blue-50 dark:bg-blue-900/20 p-3 rounded border border-blue-100 dark:border-blue-800/50">
+                  <label className="block text-sm font-bold text-blue-900 dark:text-blue-400">Contratista Principal *</label>
+                  <select required className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none" value={formData.id_subcontratista_principal} onChange={e => setFormData({...formData, id_subcontratista_principal: e.target.value, id_subcontratista_ft: ''})}>
+                    <option value="" className="dark:bg-slate-800">Seleccione Principal...</option>
+                    {catPrincipales.map(empresa => (<option key={empresa.id_subcontratista} value={empresa.id_subcontratista} className="dark:bg-slate-800">{empresa.razon_social}</option>))}
                   </select>
                 </div>
-                <div className={`md:col-span-1 p-3 rounded border ${!formData.id_subcontratista_principal ? 'bg-gray-100 border-gray-200' : 'bg-white border-gray-300'}`}>
-                  <label className="block text-sm font-medium text-gray-700">Cuadrilla (Opcional)</label>
-                  <select disabled={!formData.id_subcontratista_principal} className={`mt-1 w-full rounded-md p-2 outline-none ${!formData.id_subcontratista_principal ? 'bg-gray-100 cursor-not-allowed text-gray-400 border-none' : 'border border-gray-300 focus:ring-[var(--recal-blue)]'}`} value={formData.id_subcontratista_ft} onChange={e => setFormData({...formData, id_subcontratista_ft: e.target.value})}>
-                    <option value="">Ninguna...</option>
-                    {cuadrillasFiltradas.map(cuadrilla => (<option key={cuadrilla.id_subcontratista_ft} value={cuadrilla.id_subcontratista_ft}>{cuadrilla.nombre}</option>))}
+                <div className={`md:col-span-1 p-3 rounded border ${!formData.id_subcontratista_principal ? 'bg-gray-100 dark:bg-slate-700/50 border-gray-200 dark:border-slate-700/50' : 'bg-white dark:bg-transparent border-gray-300 dark:border-slate-600'}`}>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Cuadrilla (Opcional)</label>
+                  <select disabled={!formData.id_subcontratista_principal} className={`mt-1 w-full bg-transparent rounded-md p-2 outline-none ${!formData.id_subcontratista_principal ? 'cursor-not-allowed text-gray-400 dark:text-gray-500 border-none' : 'border border-gray-300 dark:border-slate-600 dark:text-white focus:ring-[var(--recal-blue)]'}`} value={formData.id_subcontratista_ft} onChange={e => setFormData({...formData, id_subcontratista_ft: e.target.value})}>
+                    <option value="" className="dark:bg-slate-800">Ninguna...</option>
+                    {cuadrillasFiltradas.map(cuadrilla => (<option key={cuadrilla.id_subcontratista_ft} value={cuadrilla.id_subcontratista_ft} className="dark:bg-slate-800">{cuadrilla.nombre}</option>))}
                   </select>
                 </div>
               </div>
-              <div className="pt-4 flex justify-end space-x-3 border-t mt-6">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>
+              <div className="pt-4 flex justify-end space-x-3 border-t border-gray-200 dark:border-slate-700 mt-6">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">Cancelar</button>
                 <button type="submit" disabled={saving} className="px-4 py-2 bg-[var(--recal-blue)] text-white rounded-md hover:bg-[var(--recal-blue-hover)] transition-colors">
                   {saving ? 'Guardando...' : (isEditing ? 'Actualizar Datos' : 'Guardar Trabajador')}
                 </button>
@@ -540,18 +540,18 @@ export default function FuerzaTrabajoPage() {
 
       {/* MODAL 2: CONFIRMACIÓN DE BAJA */}
       {isBajaModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-sm w-full">
-            <div className="px-6 py-4 border-b border-gray-200 bg-red-50 rounded-t-lg">
-              <h3 className="text-lg font-bold text-red-700">Confirmar Baja</h3>
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-sm w-full border dark:border-slate-700">
+            <div className="px-6 py-4 border-b border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-900/20 rounded-t-lg">
+              <h3 className="text-lg font-bold text-red-700 dark:text-red-400">Confirmar Baja</h3>
             </div>
             <form onSubmit={handleBajaSubmit} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">Fecha de salida de la obra *</label>
-                <input required type="date" className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-red-500 outline-none" value={bajaFecha} onChange={e => setBajaFecha(e.target.value)} />
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Fecha de salida de la obra *</label>
+                <input required type="date" className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 focus:ring-red-500 outline-none" value={bajaFecha} onChange={e => setBajaFecha(e.target.value)} />
               </div>
-              <div className="pt-4 flex justify-end space-x-3 border-t mt-6">
-                <button type="button" onClick={() => setIsBajaModalOpen(false)} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>
+              <div className="pt-4 flex justify-end space-x-3 border-t border-gray-200 dark:border-slate-700 mt-6">
+                <button type="button" onClick={() => setIsBajaModalOpen(false)} className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">Cancelar</button>
                 <button type="submit" disabled={saving} className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors font-medium">{saving ? 'Procesando...' : 'Confirmar Baja'}</button>
               </div>
             </form>
@@ -562,22 +562,22 @@ export default function FuerzaTrabajoPage() {
       {/* --- MODAL 3: IMPORTACIÓN DE EXCEL (Carga Masiva) --- */}
       {isImportModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[95vh] overflow-hidden flex flex-col">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-4xl w-full max-h-[95vh] overflow-hidden flex flex-col border dark:border-slate-700">
             
             {/* Header del Modal */}
-            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-purple-50">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center bg-purple-50 dark:bg-purple-900/20">
               <div className="flex items-center">
-                <FileSpreadsheet className="w-6 h-6 text-purple-600 mr-2" />
-                <h3 className="text-xl font-bold text-purple-900">Importación Masiva de Personal</h3>
+                <FileSpreadsheet className="w-6 h-6 text-purple-600 dark:text-purple-400 mr-2" />
+                <h3 className="text-xl font-bold text-purple-900 dark:text-purple-300">Importación Masiva de Personal</h3>
               </div>
-              <button onClick={() => setIsImportModalOpen(false)} className="text-gray-400 hover:text-gray-600 font-bold text-2xl">&times;</button>
+              <button onClick={() => setIsImportModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 font-bold text-2xl">&times;</button>
             </div>
 
             {/* Contenido */}
-            <div className="p-6 overflow-y-auto flex-1 bg-gray-50">
+            <div className="p-6 overflow-y-auto flex-1 bg-gray-50 dark:bg-slate-900">
               
               {importError && (
-                <div className="mb-4 bg-red-50 border-l-4 border-red-500 text-red-700 p-4 text-sm shadow-sm">
+                <div className="mb-4 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 text-red-700 dark:text-red-400 p-4 text-sm shadow-sm">
                   <p className="font-bold">Error de lectura</p>
                   <p>{importError}</p>
                 </div>
@@ -585,30 +585,30 @@ export default function FuerzaTrabajoPage() {
 
               {/* FASE 1: Seleccionar Archivo y Contratista */}
               {importFase === 1 && (
-                <form onSubmit={handleAnalizarExcel} className="space-y-6 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                  <p className="text-sm text-gray-600 mb-4 bg-blue-50 p-3 rounded border border-blue-100">
+                <form onSubmit={handleAnalizarExcel} className="space-y-6 bg-white dark:bg-slate-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 bg-blue-50 dark:bg-blue-900/20 p-3 rounded border border-blue-100 dark:border-blue-800/50">
                     Sube el formato oficial de Fuerza de Trabajo <b>(09_FUERZA_TRABAJO.xlsx)</b>. El sistema extraerá a los trabajadores a partir de la Fila 5, cruzará los datos con tu base instalada mediante el <b>NSS</b> y te mostrará únicamente a las personas que son nuevas en la obra.
                   </p>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">1. Selecciona a la Contratista Empleadora *</label>
-                      <select required className="w-full border border-gray-300 rounded-md p-3 focus:ring-purple-500 focus:border-purple-500 outline-none shadow-sm" value={importSubcontratista} onChange={(e) => setImportSubcontratista(e.target.value)}>
-                        <option value="">-- Elige una opción --</option>
+                      <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">1. Selecciona a la Contratista Empleadora *</label>
+                      <select required className="w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-3 focus:ring-purple-500 focus:border-purple-500 outline-none shadow-sm" value={importSubcontratista} onChange={(e) => setImportSubcontratista(e.target.value)}>
+                        <option value="" className="dark:bg-slate-800">-- Elige una opción --</option>
                         {catPrincipales.map(empresa => (
-                          <option key={empresa.id_subcontratista} value={empresa.id_subcontratista}>{empresa.razon_social}</option>
+                          <option key={empresa.id_subcontratista} value={empresa.id_subcontratista} className="dark:bg-slate-800">{empresa.razon_social}</option>
                         ))}
                       </select>
                     </div>
 
                     <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">2. Sube el archivo Excel *</label>
-                      <input required type="file" accept=".xlsx, .xls" className="w-full border border-gray-300 rounded-md p-2 bg-gray-50 focus:outline-none file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100" onChange={(e) => setImportFile(e.target.files[0])} />
+                      <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">2. Sube el archivo Excel *</label>
+                      <input required type="file" accept=".xlsx, .xls" className="w-full bg-transparent border border-gray-300 dark:border-slate-600 rounded-md p-2 focus:outline-none file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-purple-50 dark:file:bg-purple-900/30 file:text-purple-700 dark:file:text-purple-400 hover:file:bg-purple-100 dark:hover:file:bg-purple-900/50 dark:text-gray-300" onChange={(e) => setImportFile(e.target.files[0])} />
                     </div>
                   </div>
 
                   <div className="flex justify-end pt-4">
-                    <button type="submit" disabled={importing} className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg flex items-center shadow-md transition-colors disabled:bg-gray-400">
+                    <button type="submit" disabled={importing} className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg flex items-center shadow-md transition-colors disabled:bg-gray-400 dark:disabled:bg-slate-600">
                       {importing ? 'Analizando documento...' : 'Cruzar Datos y Analizar'}
                     </button>
                   </div>
@@ -619,44 +619,44 @@ export default function FuerzaTrabajoPage() {
               {importFase === 2 && (
                 <div className="space-y-4">
                   <div className="grid grid-cols-3 gap-4 text-center">
-                    <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                      <p className="text-xs text-gray-500 font-bold uppercase">Total en el Excel</p>
-                      <p className="text-2xl font-bold text-gray-700">{importResumen.totales}</p>
+                    <div className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-gray-200 dark:border-slate-700 shadow-sm">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 font-bold uppercase">Total en el Excel</p>
+                      <p className="text-2xl font-bold text-gray-700 dark:text-gray-200">{importResumen.totales}</p>
                     </div>
-                    <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                      <p className="text-xs text-gray-500 font-bold uppercase">Ya registrados (Omitidos)</p>
-                      <p className="text-2xl font-bold text-blue-600">{importResumen.totales - importResumen.nuevos}</p>
+                    <div className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-gray-200 dark:border-slate-700 shadow-sm">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 font-bold uppercase">Ya registrados (Omitidos)</p>
+                      <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{importResumen.totales - importResumen.nuevos}</p>
                     </div>
-                    <div className="bg-purple-50 p-4 rounded-lg border border-purple-200 shadow-sm">
-                      <p className="text-xs text-purple-700 font-bold uppercase">Nuevos por guardar</p>
-                      <p className="text-3xl font-black text-purple-700">{importResumen.nuevos}</p>
+                    <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg border border-purple-200 dark:border-purple-800/50 shadow-sm">
+                      <p className="text-xs text-purple-700 dark:text-purple-400 font-bold uppercase">Nuevos por guardar</p>
+                      <p className="text-3xl font-black text-purple-700 dark:text-purple-400">{importResumen.nuevos}</p>
                     </div>
                   </div>
 
                   {importPreviewData.length === 0 ? (
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-8 text-center">
-                      <p className="text-green-700 font-bold text-lg mb-2">¡Todo al día!</p>
-                      <p className="text-green-600">Todos los trabajadores de este Excel ya existen actualmente en tu base de datos. No hay nada nuevo que agregar.</p>
+                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/50 rounded-lg p-8 text-center">
+                      <p className="text-green-700 dark:text-green-400 font-bold text-lg mb-2">¡Todo al día!</p>
+                      <p className="text-green-600 dark:text-green-500">Todos los trabajadores de este Excel ya existen actualmente en tu base de datos. No hay nada nuevo que agregar.</p>
                     </div>
                   ) : (
-                    <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+                    <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 shadow-sm overflow-hidden">
                       <div className="max-h-64 overflow-y-auto">
-                        <table className="min-w-full divide-y divide-gray-200 text-sm">
-                          <thead className="bg-gray-100 sticky top-0">
+                        <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700 text-sm">
+                          <thead className="bg-gray-100 dark:bg-slate-900 sticky top-0">
                             <tr>
-                              <th className="px-4 py-3 text-left font-bold text-gray-600">Nombre</th>
-                              <th className="px-4 py-3 text-left font-bold text-gray-600">Categoría</th>
-                              <th className="px-4 py-3 text-left font-bold text-gray-600">NSS</th>
-                              <th className="px-4 py-3 text-left font-bold text-gray-600">Ingreso</th>
+                              <th className="px-4 py-3 text-left font-bold text-gray-600 dark:text-gray-400">Nombre</th>
+                              <th className="px-4 py-3 text-left font-bold text-gray-600 dark:text-gray-400">Categoría</th>
+                              <th className="px-4 py-3 text-left font-bold text-gray-600 dark:text-gray-400">NSS</th>
+                              <th className="px-4 py-3 text-left font-bold text-gray-600 dark:text-gray-400">Ingreso</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-gray-200">
+                          <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
                             {importPreviewData.map((t, idx) => (
-                              <tr key={idx} className="hover:bg-gray-50">
-                                <td className="px-4 py-2 font-medium text-gray-900">{t.nombre_trabajador}</td>
-                                <td className="px-4 py-2 text-gray-600">{t.puesto_categoria}</td>
-                                <td className="px-4 py-2 text-gray-600">{t.nss || 'S/N'}</td>
-                                <td className="px-4 py-2 text-gray-600">{formatDDMMYYYY(t.fecha_ingreso_obra)}</td>
+                              <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-slate-700/50">
+                                <td className="px-4 py-2 font-medium text-gray-900 dark:text-gray-200">{t.nombre_trabajador}</td>
+                                <td className="px-4 py-2 text-gray-600 dark:text-gray-400">{t.puesto_categoria}</td>
+                                <td className="px-4 py-2 text-gray-600 dark:text-gray-400">{t.nss || 'S/N'}</td>
+                                <td className="px-4 py-2 text-gray-600 dark:text-gray-400">{formatDDMMYYYY(t.fecha_ingreso_obra)}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -669,12 +669,12 @@ export default function FuerzaTrabajoPage() {
             </div>
 
             {/* Footer del Modal */}
-            <div className="px-6 py-4 border-t border-gray-200 bg-white flex justify-end space-x-3">
-              <button onClick={() => setIsImportModalOpen(false)} className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 font-medium transition-colors">
+            <div className="px-6 py-4 border-t border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex justify-end space-x-3">
+              <button onClick={() => setIsImportModalOpen(false)} className="px-6 py-2 border border-gray-300 dark:border-slate-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 font-medium transition-colors">
                 Cancelar
               </button>
               {importFase === 2 && importPreviewData.length > 0 && (
-                <button onClick={handleGuardarImportacion} disabled={importing} className="px-6 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 font-bold transition-colors shadow-md flex items-center disabled:bg-gray-400">
+                <button onClick={handleGuardarImportacion} disabled={importing} className="px-6 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 font-bold transition-colors shadow-md flex items-center disabled:bg-gray-400 dark:disabled:bg-slate-600">
                   {importing ? 'Guardando...' : `Guardar ${importResumen.nuevos} Nuevos Registros`}
                 </button>
               )}

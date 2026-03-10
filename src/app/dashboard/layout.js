@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import BotonTema from '@/components/BotonTema';
 
 export default function DashboardLayout({ children }) {
   const router = useRouter();
@@ -58,7 +59,7 @@ useEffect(() => {
   const closeSidebar = () => setIsSidebarOpen(false);
 
   return (
-    <div className="flex h-screen bg-[var(--recal-gray)] relative overflow-hidden">
+    <div className="flex h-screen bg-[var(--recal-gray)] dark:bg-slate-800 relative overflow-hidden">
       
       {/* CAPA OSCURA (Overlay): Aparece en celular cuando el menú está abierto */}
       {isSidebarOpen && (
@@ -70,7 +71,7 @@ useEffect(() => {
 
       {/* MENÚ LATERAL (Sidebar) */}
       <aside className={`
-        fixed inset-y-0 left-0 z-50 w-64 bg-[var(--recal-blue)] text-white flex flex-col shadow-xl 
+        fixed inset-y-0 left-0 z-50 w-64 bg-[var(--recal-blue)] dark:bg-slate-800 text-white flex flex-col shadow-xl 
         transform transition-transform duration-300 ease-in-out
         md:relative md:translate-x-0
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
@@ -86,6 +87,9 @@ useEffect(() => {
         </div>
         
         <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+        <div className='w-full items-center justify-center mb-4 flex'> 
+          <BotonTema className="m-4 w-1.5 h-1.5 ms-auto me-0" /> 
+        </div>
           <Link href="/dashboard" onClick={closeSidebar} className="block px-4 py-3 rounded-md hover:bg-[var(--recal-blue-hover)] transition-colors">
             📊 Resumen (Dashboard)
           </Link>
@@ -114,7 +118,7 @@ useEffect(() => {
       {/* CONTENIDO PRINCIPAL */}
       <div className="flex-1 flex flex-col w-full">
         {/* Barra Superior (Header) */}
-        <header className="bg-white shadow-sm border-b border-gray-200 z-10">
+        <header className="bg-white dark:bg-slate-800 shadow-sm border-b border-gray-200 z-10">
           <div className="flex justify-between items-center px-4 md:px-8 py-4">
             
             <div className="flex items-center">
@@ -128,7 +132,7 @@ useEffect(() => {
                 </svg>
               </button>
               
-              <h1 className="text-lg md:text-xl font-semibold text-gray-700">
+              <h1 className="text-lg md:text-xl font-semibold text-gray-700 dark:text-gray-300">
                 {userName ? `Hola, ${userName.split(' ')[0]}` : 'Panel de Control'}
               </h1>
             </div>
@@ -144,7 +148,7 @@ useEffect(() => {
         </header>
 
         {/* CONTENEDOR DE LAS PÁGINAS */}
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-[var(--recal-gray)] p-4 md:p-8">
+        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-[var(--recal-gray)] dark:bg-slate-700 p-4 md:p-8">
           {children}
         </main>
       </div>
