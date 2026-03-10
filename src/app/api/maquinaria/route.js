@@ -53,9 +53,13 @@ export async function GET(request) {
         m.id_subcontratista,
         s.razon_social AS nombre_subcontratista,
         (SELECT MAX(fecha_mantenimiento) FROM Historial_Mantenimiento WHERE id_maquinaria = m.id_maquinaria) AS ultima_fecha_mantenimiento,
-        (SELECT horometro_mantenimiento FROM Historial_Mantenimiento WHERE id_maquinaria = m.id_maquinaria ORDER BY fecha_mantenimiento DESC, id_mantenimiento DESC LIMIT 1) AS ultimo_horometro_mantenimiento
+        (SELECT horometro_mantenimiento FROM Historial_Mantenimiento WHERE id_maquinaria = m.id_maquinaria ORDER BY fecha_mantenimiento DESC, id_mantenimiento DESC LIMIT 1) AS ultimo_horometro_mantenimiento,
+        u1.nombre AS creador, 
+        u2.nombre AS modificador
       FROM Maquinaria_Equipo m
       LEFT JOIN Subcontratistas s ON m.id_subcontratista = s.id_subcontratista
+      LEFT JOIN Personal_Area u1 ON m.usuario_registro = u1.id_personal
+      LEFT JOIN Personal_Area u2 ON m.usuario_actualizacion = u2.id_personal
       ${whereClause}
       ORDER BY ${ordenPor} ${ordenDireccion}
     `;

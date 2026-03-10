@@ -44,9 +44,13 @@ export async function GET(request) {
     const query = `
       SELECT 
         f.*,
+        u1.nombre AS creador, 
+        u2.nombre AS modificador,
         s.razon_social AS nombre_subcontratista
       FROM Fuerza_Trabajo f
       LEFT JOIN Subcontratistas s ON f.id_subcontratista_principal = s.id_subcontratista
+      LEFT JOIN Personal_Area u1 ON f.usuario_registro = u1.id_personal
+      LEFT JOIN Personal_Area u2 ON f.usuario_actualizacion = u2.id_personal
       ${whereClause}
       ORDER BY ${ordenPor} ${ordenDireccion}
     `;
@@ -91,10 +95,7 @@ export async function PUT(request) {
     const body = await request.json();
     const { id_trabajador, numero_empleado, nombre_trabajador, puesto_categoria, nss, fecha_ingreso_obra, fecha_alta_imss, origen, id_subcontratista_ft, id_subcontratista_principal } = body;
     const id_usuario_actual = request.headers.get('x-user-id');
-
-    if (!id_usuario_actual) {
-      return NextResponse.json({ error: "Usuario no identificado" }, { status: 401 });
-    }
+    if (!id_usuario_actual) return NextResponse.json({ error: "Usuario no identificado" }, { status: 401 });
 
     const query = `
       UPDATE Fuerza_Trabajo 

@@ -6,6 +6,20 @@ import { Pencil, Trash2, Upload, FileSpreadsheet } from 'lucide-react';
 export default function FuerzaTrabajoPage() {
   const topRef = useRef(null); 
 
+  const [userRole, setUserRole] = useState(null);
+
+  useEffect(() => {
+    // NUEVO: Preguntamos quién está logeado
+    fetch('/api/auth/me')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setUserRole(data.user.rol);
+          console.log("Rol:", data.user.rol);
+        }
+      });
+  }, []);
+
   const [trabajadores, setTrabajadores] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -358,6 +372,9 @@ export default function FuerzaTrabajoPage() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100" onClick={() => manejarOrden('nombre_subcontratista')}>Contratista {ordenPor === 'nombre_subcontratista' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estatus</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                {(userRole === 'Admin' || userRole === 'Master') && (
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Trazabilidad</th>
+                )}
               </tr>
             </thead>
             <tbody className="bg-white divide-y md:divide-y-0 md:divide-gray-200 block md:table-row-group">
@@ -399,6 +416,27 @@ export default function FuerzaTrabajoPage() {
                         ) : (<span className="text-gray-400 italic text-xs px-2 flex items-center h-full">Retirado</span>)}
                       </div>
                     </td>
+                      {(userRole === 'Admin' || userRole === 'Master') && (
+                        <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 border-b md:border-none">
+                          <span className="md:hidden font-bold text-gray-500 text-sm">Trazabilidad:</span>
+                          <div className="flex flex-col items-end md:items-start gap-1">
+                            {t.creador ? (
+                              <span className="bg-green-100 text-gray-500 px-2 py-0.5 rounded text-[10px] font-bold border border-gray-200 w-max" title="Registrado por">
+                                Agregó: {t.creador}
+                              </span>
+                            ) : (
+                              <span className="bg-gray-100 text-gray-500 px-2 py-0.5 rounded text-[10px] font-bold border border-gray-200 w-max" title="Registrado por Master">
+                                Agregó: Master
+                              </span>
+                            )}
+                            {t.modificador && (
+                              <span className="bg-yellow-100 text-gray-500 px-2 py-0.5 rounded text-[10px] font-bold border border-gray-200 w-max" title="Modificado por">
+                                Modificó: {t.modificador}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                      )}
                   </tr>
                 ))
               }

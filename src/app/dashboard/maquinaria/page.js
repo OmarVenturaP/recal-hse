@@ -6,6 +6,20 @@ import { ClipboardList, Pencil, Trash2, Upload, Tractor } from 'lucide-react';
 export default function MaquinariaPage() {
   const topRef = useRef(null); 
 
+  const [userRole, setUserRole] = useState(null);
+
+  useEffect(() => {
+    // NUEVO: Preguntamos quién está logeado
+    fetch('/api/auth/me')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setUserRole(data.user.rol);
+          console.log("Rol:", data.user.rol);
+        }
+      });
+  }, []);
+
   // Estados de Paginación
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
@@ -386,6 +400,7 @@ export default function MaquinariaPage() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => manejarOrden('nombre_subcontratista')}>
                   Contratista {ordenPor === 'nombre_subcontratista' && (ordenDireccion === 'ASC' ? '↑' : '↓')}
                 </th>
+                
                 {/* --- NUEVA COLUMNA: Ingreso --- */}
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => manejarOrden('fecha_ingreso_obra')}>
                   Ingreso {ordenPor === 'fecha_ingreso_obra' && (ordenDireccion === 'ASC' ? '↑' : '↓')}
@@ -393,6 +408,9 @@ export default function MaquinariaPage() {
                 <th className="px-4 py-3 text-center text-xs font-medium text-blue-800 uppercase">Último Servicio</th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Estatus</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                {(userRole === 'Admin' || userRole === 'Master') && (
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Trazabilidad</th>
+                )}
               </tr>
             </thead>
             
@@ -474,6 +492,28 @@ export default function MaquinariaPage() {
                         )}
                       </div>
                     </td>
+
+                    {(userRole === 'Admin' || userRole === 'Master') && (
+                        <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 border-b md:border-none">
+                          <span className="md:hidden font-bold text-gray-500 text-sm">Trazabilidad:</span>
+                          <div className="flex flex-col items-end md:items-start gap-1">
+                            {m.creador ? (
+                              <span className="bg-green-100 text-gray-500 px-2 py-0.5 rounded text-[10px] font-bold border border-gray-200 w-max" title="Registrado por">
+                                Agregó: {m.creador}
+                              </span>
+                            ) : (
+                              <span className="bg-gray-100 text-gray-500 px-2 py-0.5 rounded text-[10px] font-bold border border-gray-200 w-max" title="Registrado por Master">
+                                Agregó: Master
+                              </span>
+                            )}
+                            {m.modificador && (
+                              <span className="bg-yellow-100 text-gray-500 px-2 py-0.5 rounded text-[10px] font-bold border border-gray-200 w-max" title="Modificado por">
+                                Modificó: {m.modificador}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                      )}
                   </tr>
                 ))
               }
