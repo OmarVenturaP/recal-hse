@@ -381,7 +381,7 @@ export default function MaquinariaPage() {
                   Tipo {ordenPor === 'tipo' && (ordenDireccion === 'ASC' ? '↑' : '↓')}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => manejarOrden('marca')}>
-                  Marca / Modelo {ordenPor === 'marca' && (ordenDireccion === 'ASC' ? '↑' : '↓')}
+                  Equipo {ordenPor === 'marca' && (ordenDireccion === 'ASC' ? '↑' : '↓')}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => manejarOrden('nombre_subcontratista')}>
                   Contratista {ordenPor === 'nombre_subcontratista' && (ordenDireccion === 'ASC' ? '↑' : '↓')}
@@ -425,11 +425,13 @@ export default function MaquinariaPage() {
                       <span>{m.tipo}</span>
                     </td>
                     
-                    <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 text-sm border-b md:border-none">
-                      <span className="md:hidden font-bold text-gray-500">Equipo:</span>
-                      <div className="text-right md:text-left">
-                        <div className="text-sm text-gray-900">{m.marca} / {m.modelo}</div>
-                        <div className="text-xs font-bold text-gray-500 bg-gray-100 inline-block px-1 mt-1 rounded">Num. Eco: {m.num_economico || 'S/N'}</div>
+                    <td className="flex justify-between items-start md:table-cell px-2 md:px-4 py-2 md:py-4 text-sm border-b md:border-none">
+                      <span className="md:hidden font-bold text-gray-500 mt-1">Equipo:</span>
+                      <div className="flex flex-col sm:items-start items-end  gap-1">
+                        <span className="text-sm font-bold text-gray-900 bg-gray-100 px-1.5 py-0.5 rounded w-fit">Marca: {m.marca || 'S/N'}</span>
+                        <span className="text-sm font-bold text-gray-900 bg-gray-100 px-1.5 py-0.5 rounded w-fit">Modelo: {m.modelo || 'S/N'}</span>
+                        <span className="text-xs font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded w-fit">Num. Eco: {m.num_economico || 'S/N'}</span>
+                        <span className="text-xs font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded w-fit">Serie: {m.serie || 'S/N'}</span>
                       </div>
                     </td>
                     
