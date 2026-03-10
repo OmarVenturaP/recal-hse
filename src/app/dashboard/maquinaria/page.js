@@ -467,7 +467,7 @@ export default function MaquinariaPage() {
                     <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 border-b md:border-none">
                       <span className="md:hidden font-bold text-gray-500 text-sm">Último Servicio:</span>
                       <div className="text-right md:text-center">
-                        <div className="text-sm font-semibold text-blue-900">{m.ultima_fecha_mantenimiento ? formatDDMMYYYY(m.ultima_fecha_mantenimiento) : 'Sin Registro'}</div>
+                        <div className="text-sm font-semibold text-blue-900">{m.ultima_fecha_mantenimiento && m.ultima_fecha_mantenimiento != m.fecha_ingreso_obra ? formatDDMMYYYY(m.ultima_fecha_mantenimiento) : 'Sin Registro'}</div>
                         <div className="text-xs text-gray-500">{m.horometro_actual ? `${m.horometro_actual} hrs` : ''}</div>
                       </div>
                     </td>

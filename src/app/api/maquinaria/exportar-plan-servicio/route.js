@@ -66,7 +66,7 @@ export async function GET(request) {
       row.getCell('I').value = maquina.horometro ? `TOTAL DE H: ${maquina.horometro}` : 'N/A';
       row.getCell('J').value = toUpper(maquina.ultimo_tipo_mantenimiento);
 
-      if (maquina.ultima_fecha_mantenimiento && maquina.ultima_fecha_mantenimiento > maquina.fecha_ingreso_obra) {
+      if (maquina.ultima_fecha_mantenimiento && maquina.ultima_fecha_mantenimiento > maquina.fecha_ingreso_obra && maquina.ultima_fecha_mantenimiento != maquina.fecha_ingreso_obra) {
         const date = new Date(maquina.ultima_fecha_mantenimiento);
         const dia = String(date.getUTCDate()).padStart(2, '0');
         const mes = String(date.getUTCMonth() + 1).padStart(2, '0');
