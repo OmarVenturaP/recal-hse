@@ -302,6 +302,11 @@ export default function MaquinariaPage() {
     );
   };
 
+  const limpiarFiltros = () => { 
+    setFiltroSub(''); 
+    setBusqueda('');
+  };
+
   return (
     <div className="space-y-6 relative" ref={topRef}>
       
@@ -342,8 +347,8 @@ export default function MaquinariaPage() {
       </div>
 
       {/* PANEL DE FILTROS Y BÚSQUEDA */}
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="w-full">
+      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="md:col-span-2">
           <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Buscar Equipo</label>
           <div className="relative">
             <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">🔍</span>
@@ -352,13 +357,16 @@ export default function MaquinariaPage() {
               value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
           </div>
         </div>
-        <div className="w-full">
+        <div className="md:col-span-1">
           <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Filtrar por Contratista</label>
           <select className="w-full border border-gray-300 rounded-md p-2 shadow-sm focus:ring-[var(--recal-blue)] outline-none sm:text-sm" 
             value={filtroSub} onChange={(e) => setFiltroSub(e.target.value)}>
             <option value="">Todo el equipo en obra...</option>
             {catPrincipales.map(empresa => <option key={empresa.id_subcontratista} value={empresa.id_subcontratista}>{empresa.razon_social}</option>)}
           </select>
+        </div>
+        <div className="md:col-span-1 flex items-end">
+          <button onClick={limpiarFiltros} className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-md font-medium sm:text-sm transition-colors border border-gray-300">Limpiar Todo</button>
         </div>
       </div>
 
