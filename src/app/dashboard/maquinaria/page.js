@@ -97,7 +97,7 @@ export default function MaquinariaPage() {
   const fetchMaquinaria = async () => {
     setLoading(true);
     try {
-      // --- NUEVO: Inyectamos los parámetros de ordenamiento a la URL ---
+      // Inyectamos los parámetros de ordenamiento a la URL
       let url = `/api/maquinaria?mes=${exportMes}&anio=${exportAnio}&ordenPor=${ordenPor}&ordenDireccion=${ordenDireccion}&`;
       if (filtroSub) url += `subcontratista=${filtroSub}&`;
       if (busqueda) url += `busqueda=${encodeURIComponent(busqueda)}&`; 
@@ -111,7 +111,7 @@ export default function MaquinariaPage() {
     }
   };
 
-  // --- NUEVO: Agregamos ordenPor y ordenDireccion al array de dependencias ---
+  // Agregamos ordenPor y ordenDireccion al array de dependencias
   useEffect(() => { fetchMaquinaria(); }, [filtroSub, exportMes, exportAnio, busqueda, ordenPor, ordenDireccion]);
   useEffect(() => { setCurrentPage(1); }, [busqueda, filtroSub, exportMes, exportAnio, ordenPor, ordenDireccion]);
 
@@ -140,7 +140,7 @@ export default function MaquinariaPage() {
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const maquinariaPaginada = maquinaria.slice(indexOfFirstItem, indexOfLastItem);
 
-  // --- NUEVA FUNCIÓN: MANEJO DE CLICS EN LOS TÍTULOS DE LA TABLA ---
+  // --- MANEJO DE CLICS EN LOS TÍTULOS DE LA TABLA ---
   const manejarOrden = (columna) => {
     if (ordenPor === columna) {
       setOrdenDireccion(ordenDireccion === 'ASC' ? 'DESC' : 'ASC');
@@ -377,7 +377,6 @@ export default function MaquinariaPage() {
             <thead className="bg-gray-50 hidden md:table-header-group">
               <tr>
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Imagen</th>
-                {/* --- NUEVO: Títulos de Tabla con Eventos onClick --- */}
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => manejarOrden('tipo')}>
                   Tipo {ordenPor === 'tipo' && (ordenDireccion === 'ASC' ? '↑' : '↓')}
                 </th>
@@ -387,6 +386,10 @@ export default function MaquinariaPage() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => manejarOrden('nombre_subcontratista')}>
                   Contratista {ordenPor === 'nombre_subcontratista' && (ordenDireccion === 'ASC' ? '↑' : '↓')}
                 </th>
+                {/* --- NUEVA COLUMNA: Ingreso --- */}
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => manejarOrden('fecha_ingreso_obra')}>
+                  Ingreso {ordenPor === 'fecha_ingreso_obra' && (ordenDireccion === 'ASC' ? '↑' : '↓')}
+                </th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-blue-800 uppercase">Último Servicio</th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Estatus</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
@@ -395,10 +398,10 @@ export default function MaquinariaPage() {
             
             <tbody className="bg-white divide-y md:divide-y-0 md:divide-gray-200 block md:table-row-group">
               {loading ? (
-                <tr className="block md:table-row"><td colSpan="7" className="px-6 py-8 text-center text-sm text-gray-500 block md:table-cell">Cargando inventario...</td></tr>
+                <tr className="block md:table-row"><td colSpan="8" className="px-6 py-8 text-center text-sm text-gray-500 block md:table-cell">Cargando inventario...</td></tr>
               ) : maquinaria.length === 0 ? (
                 <tr className="block md:table-row">
-                  <td colSpan="7" className="px-6 py-12 text-center block md:table-cell">
+                  <td colSpan="8" className="px-6 py-12 text-center block md:table-cell">
                     <div className="text-gray-400 text-4xl mb-2">🔍</div>
                     <p className="text-sm font-medium text-gray-900">No se han encontrado resultados</p>
                   </td>
@@ -433,6 +436,12 @@ export default function MaquinariaPage() {
                     <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 text-sm text-gray-500 border-b md:border-none">
                       <span className="md:hidden font-bold text-gray-500">Contratista:</span>
                       <span>{m.nombre_subcontratista || '-'}</span>
+                    </td>
+
+                    {/* --- NUEVA CELDA: Ingreso --- */}
+                    <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 text-sm text-gray-500 border-b md:border-none">
+                      <span className="md:hidden font-bold text-gray-500">Ingreso:</span>
+                      <span>{formatDDMMYYYY(m.fecha_ingreso_obra)}</span>
                     </td>
                     
                     <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 border-b md:border-none">
