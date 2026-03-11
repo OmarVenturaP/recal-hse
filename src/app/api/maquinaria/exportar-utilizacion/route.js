@@ -62,7 +62,8 @@ export async function GET(request) {
       }
 
       const row = worksheet.getRow(currentRow);
-      row.height = 180; 
+      // Nuevo alto de fila ajustado a 157
+      row.height = 157; 
 
       const toUpper = (val) => val ? String(val).toUpperCase() : 'N/A';
 
@@ -85,15 +86,19 @@ export async function GET(request) {
 
       if (maquina.imagen_url) {
         try {
-          const urlOptimizada = maquina.imagen_url.replace('/upload/', '/upload/c_fill,w_200,h_200,q_auto/');
+          // Ajustamos la imagen a 190x190px para que encaje con un pequeño margen dentro de los 157pt de alto
+          const urlOptimizada = maquina.imagen_url.replace('/upload/', '/upload/c_fill,w_190,h_190,q_auto/');
           const imageResponse = await fetch(urlOptimizada);
           const arrayBuffer = await imageResponse.arrayBuffer();
           const buffer = Buffer.from(arrayBuffer);
           
           const imageId = workbook.addImage({ buffer: buffer, extension: 'jpeg' });
           worksheet.addImage(imageId, {
-            tl: { col: 6.35, row: currentRow - 0.9 }, 
-            ext: { width: 200, height: 200 }, 
+            // Posicionamiento fraccionario para centrar:
+            // col 6 = Columna G. col: 6.10 da un margen izquierdo.
+            // row = (currentRow - 1) es el índice base. Le sumamos 0.05 (currentRow - 0.95) para un margen superior.
+            tl: { col: 6.10, row: currentRow - 0.95 }, 
+            ext: { width: 190, height: 190 }, 
             editAs: 'oneCell' 
           });
         } catch (imgError) {
@@ -105,11 +110,36 @@ export async function GET(request) {
 
       if (i > 0) {
         const filaBase = worksheet.getRow(5);
+        let detenerCopia = false;
+
         filaBase.eachCell({ includeEmpty: true }, (baseCell, colNumber) => {
+          if (detenerCopia) return; 
+          
+          let val = baseCell.value;
+          if (val && typeof val === 'object' && val.richText) val = val.richText.map(rt => rt.text).join('');
+          if (val && typeof val === 'object' && val.result) val = val.result;
+          
+          if (val && String(val).toUpperCase().includes('OBSERVACION')) {
+            detenerCopia = true;
+            return; 
+          }
+
           row.getCell(colNumber).style = baseCell.style;
         });
       } else {
+        let detenerCopia = false;
         row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+          if (detenerCopia) return;
+          
+          let val = cell.value;
+          if (val && typeof val === 'object' && val.richText) val = val.richText.map(rt => rt.text).join('');
+          if (val && typeof val === 'object' && val.result) val = val.result;
+
+          if (val && String(val).toUpperCase().includes('OBSERVACION')) {
+            detenerCopia = true;
+            return;
+          }
+
           if(colNumber !== 7) cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
         });
       }

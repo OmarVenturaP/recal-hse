@@ -11,6 +11,15 @@ cloudinary.config({
 // --- GET: Listar Maquinaria ---
 export async function GET(request) {
   try {
+    const id_usuario_actual = request.headers.get('x-user-id');
+    if (!id_usuario_actual) {
+      return NextResponse.json({ error: "Usuario no identificado" }, { status: 401 });
+    }
+
+    // 1. Obtener el área del usuario logueado
+    const [userRows] = await pool.query('SELECT area FROM Personal_Area WHERE id_personal = ?', [id_usuario_actual]);
+    const areaUsuario = userRows.length > 0 ? userRows[0].area : 'Ambas';
+
     const { searchParams } = new URL(request.url);
     const idSubcontratista = searchParams.get('subcontratista');
     const mes = searchParams.get('mes');
@@ -21,6 +30,14 @@ export async function GET(request) {
 
     let whereClause = "WHERE 1=1";
     const queryParams = [];
+
+    // 2. FILTRO AUTOMÁTICO DE ÁREA
+    if (areaUsuario === 'Seguridad') {
+      whereClause += ` AND m.area = 'seguridad'`;
+    } else if (areaUsuario === 'Medio Ambiente') {
+      whereClause += ` AND m.area = 'ambiental'`;
+    }
+    // Si es 'Ambas', simplemente no agregamos filtro y se mostrará toda la maquinaria.
 
     // Filtro de periodo
     if (mes && anio) {
@@ -46,9 +63,10 @@ export async function GET(request) {
       queryParams.push(textoBuscado, textoBuscado, textoBuscado, textoBuscado, textoBuscado, textoBuscado);
     }
 
+    // Agregamos m.area a la selección para que el frontend pueda leerlo si lo necesitas
     const query = `
       SELECT 
-        m.id_maquinaria, m.num_economico, m.tipo, m.marca, m.anio, m.modelo, m.color, m.serie, m.placa,
+        m.id_maquinaria, m.num_economico, m.tipo, m.marca, m.anio, m.modelo, m.color, m.serie, m.placa, m.area,
         m.horometro AS horometro_actual, m.intervalo_mantenimiento, m.fecha_ingreso_obra, m.fecha_baja, m.imagen_url,
         m.id_subcontratista,
         s.razon_social AS nombre_subcontratista,
@@ -96,7 +114,6 @@ export async function POST(request) {
   try {
     const formData = await request.formData();
     
-    // Extracción segura: Si viene vacío o dice "null", lo volvemos un null real de JavaScript
     const extractField = (key) => {
       const val = formData.get(key);
       return (!val || val.trim() === '' || val === 'null') ? null : val.trim();
@@ -114,13 +131,13 @@ export async function POST(request) {
     const intervalo_mantenimiento = extractField('intervalo_mantenimiento');
     const fecha_ingreso_obra = extractField('fecha_ingreso_obra'); 
     const id_subcontratista = extractField('id_subcontratista');
+    const area = extractField('area'); // <--- NUEVO CAMPO CAPTURADO
 
-    // Validaciones de obligatoriedad (Tipo, Marca, Año, Fecha, Contratista)
-    if (!tipo || !marca || !anio || !fecha_ingreso_obra || !id_subcontratista) {
-      return NextResponse.json({ success: false, error: "Los campos Tipo, Marca, Año, Fecha de Ingreso y Contratista son obligatorios." }, { status: 400 });
+    // Validaciones de obligatoriedad (Tipo, Marca, Año, Fecha, Contratista y Área)
+    if (!tipo || !marca || !anio || !fecha_ingreso_obra || !id_subcontratista || !area) {
+      return NextResponse.json({ success: false, error: "Los campos Tipo, Marca, Año, Fecha de Ingreso, Área y Contratista son obligatorios." }, { status: 400 });
     }
 
-    // Validación de Serie duplicada (Solo si escribieron una serie)
     if (serie) {
       const queryBusqueda = `SELECT marca, modelo FROM Maquinaria_Equipo WHERE serie = ? LIMIT 1`;
       const [existeSerie] = await pool.query(queryBusqueda, [serie]);
@@ -145,34 +162,22 @@ export async function POST(request) {
         imagen_url = uploadResponse.secure_url; 
       } catch (imgError) {
         console.error("Error subiendo imagen:", imgError);
-        // Continuamos sin imagen si Cloudinary falla
       }
     }
 
     const id_usuario_actual = request.headers.get('x-user-id');
     if (!id_usuario_actual) return NextResponse.json({ error: "Usuario no identificado" }, { status: 401 });
 
+    // Inyectamos el campo 'area' en el INSERT
     const query = `
       INSERT INTO Maquinaria_Equipo 
-      (num_economico, tipo, marca, anio, modelo, color, serie, placa, horometro, intervalo_mantenimiento, fecha_ingreso_obra, id_subcontratista, imagen_url, usuario_registro) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (num_economico, tipo, marca, anio, modelo, color, serie, placa, horometro, intervalo_mantenimiento, fecha_ingreso_obra, id_subcontratista, area, imagen_url, usuario_registro) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     
     const [result] = await pool.query(query, [
-      num_economico, 
-      tipo, 
-      marca, 
-      anio, 
-      modelo, 
-      color, 
-      serie, 
-      placa, 
-      horometro, 
-      intervalo_mantenimiento, 
-      fecha_ingreso_obra, 
-      id_subcontratista, 
-      imagen_url, 
-      id_usuario_actual
+      num_economico, tipo, marca, anio, modelo, color, serie, placa, horometro, 
+      intervalo_mantenimiento, fecha_ingreso_obra, id_subcontratista, area, imagen_url, id_usuario_actual
     ]);
 
     return NextResponse.json({ success: true, id: result.insertId, imagen_url });
@@ -207,9 +212,10 @@ export async function PUT(request) {
     const intervalo_mantenimiento = extractField('intervalo_mantenimiento');
     const fecha_ingreso_obra = extractField('fecha_ingreso_obra'); 
     const id_subcontratista = extractField('id_subcontratista');
+    const area = extractField('area'); // <--- NUEVO CAMPO CAPTURADO
 
-    if (!tipo || !marca || !anio || !fecha_ingreso_obra || !id_subcontratista) {
-      return NextResponse.json({ success: false, error: "Los campos Tipo, Marca, Año, Fecha de Ingreso y Contratista son obligatorios." }, { status: 400 });
+    if (!tipo || !marca || !anio || !fecha_ingreso_obra || !id_subcontratista || !area) {
+      return NextResponse.json({ success: false, error: "Los campos Tipo, Marca, Año, Fecha de Ingreso, Área y Contratista son obligatorios." }, { status: 400 });
     }
     
     if (serie) {
@@ -244,12 +250,12 @@ export async function PUT(request) {
 
     const query = `
       UPDATE Maquinaria_Equipo 
-      SET num_economico=?, tipo=?, marca=?, anio=?, modelo=?, color=?, serie=?, placa=?, horometro=?, intervalo_mantenimiento=?, fecha_ingreso_obra=?, id_subcontratista=?, imagen_url=?, usuario_actualizacion=?
+      SET num_economico=?, tipo=?, marca=?, anio=?, modelo=?, color=?, serie=?, placa=?, horometro=?, intervalo_mantenimiento=?, fecha_ingreso_obra=?, id_subcontratista=?, area=?, imagen_url=?, usuario_actualizacion=?
       WHERE id_maquinaria=?
     `;
     
     await pool.query(query, [
-      num_economico, tipo, marca, anio, modelo, color, serie, placa, horometro, intervalo_mantenimiento, fecha_ingreso_obra, id_subcontratista, imagen_url, id_usuario_actual, id_maquinaria
+      num_economico, tipo, marca, anio, modelo, color, serie, placa, horometro, intervalo_mantenimiento, fecha_ingreso_obra, id_subcontratista, area, imagen_url, id_usuario_actual, id_maquinaria
     ]);
 
     return NextResponse.json({ success: true, mensaje: "Actualizado correctamente" });

@@ -12,6 +12,7 @@ export default function DashboardLayout({ children }) {
   // NUEVO ESTADO: Controla si el menú lateral está abierto en celulares
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [userRol, setUserRol] = useState(null);
+  const [userArea, setUserArea] = useState(null);
   const [userName, setUserName] = useState('');
 
   // Función para cerrar sesión (manual o por inactividad)
@@ -35,6 +36,7 @@ useEffect(() => {
       .then(data => {
         if (data.success) {
           setUserRol(data.user.rol);
+          setUserArea(data.user.area);
           setUserName(data.user.nombre);
         }
       });
@@ -104,12 +106,16 @@ useEffect(() => {
           <Link href="/dashboard/maquinaria" onClick={closeSidebar} className="block px-4 py-3 rounded-md hover:bg-[var(--recal-blue-hover)] transition-colors">
             🚜 Maquinaria y Equipo
           </Link>
+          {(userArea === 'Seguridad' || userArea === 'Ambas') && (
           <Link href="/dashboard/fuerza-trabajo" onClick={closeSidebar} className="block px-4 py-3 rounded-md hover:bg-[var(--recal-blue-hover)] transition-colors">
             👷 Fuerza de Trabajo
           </Link>
+          )}
+          {(userArea === 'Seguridad' || userArea === 'Ambas') && (
           <Link href="/dashboard/actividades" onClick={closeSidebar} className="block px-4 py-3 rounded-md hover:bg-[var(--recal-blue-hover)] transition-colors">
             � Actividades
           </Link>
+          )}
           {userRol === 'Master' && (
             <Link href="/dashboard/usuarios" onClick={closeSidebar} className="block px-4 py-3 rounded-md hover:bg-[var(--recal-blue-hover)] transition-colors font-semibold text-purple-200">
               🛡️ Control de Accesos

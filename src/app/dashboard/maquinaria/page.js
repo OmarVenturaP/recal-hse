@@ -42,10 +42,12 @@ export default function MaquinariaPage() {
   const [editId, setEditId] = useState(null);
   const [imageFile, setImageFile] = useState(null);
   
+  // --- AJUSTE: Agregamos el campo area al estado inicial ---
   const formInicial = {
     num_economico: '', tipo: '', marca: '', anio: '', modelo: '', 
     color: '', serie: '', placa: '', horometro: '', 
     intervalo_mantenimiento: '', fecha_ingreso_obra: '', id_subcontratista: '',
+    area: 'seguridad', 
     imagen_url_actual: ''
   };
   const [formData, setFormData] = useState(formInicial);
@@ -229,7 +231,9 @@ export default function MaquinariaPage() {
       serie: m.serie || '', placa: m.placa || '', horometro: m.horometro_actual || '', 
       intervalo_mantenimiento: m.intervalo_mantenimiento || '', 
       fecha_ingreso_obra: formatForInput(m.fecha_ingreso_obra), 
-      id_subcontratista: m.id_subcontratista || '', imagen_url_actual: m.imagen_url || ''
+      id_subcontratista: m.id_subcontratista || '', 
+      area: m.area || 'seguridad', // --- AJUSTE: Cargar el área en edición ---
+      imagen_url_actual: m.imagen_url || ''
     });
     setImageFile(null); setEditId(m.id_maquinaria); setIsEditing(true); setIsModalOpen(true);
   };
@@ -548,10 +552,20 @@ export default function MaquinariaPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Contratista Propietaria</label>
                   <select className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.id_subcontratista} onChange={e => setFormData({...formData, id_subcontratista: e.target.value})}>
-                    <option value="">RECAL (Equipo Propio)</option>
-                    {catPrincipales.map(empresa => <option key={empresa.id_subcontratista} value={empresa.id_subcontratista}>{empresa.razon_social}</option>)}
+                    <option value="" className="dark:bg-slate-800">RECAL (Equipo Propio)</option>
+                    {catPrincipales.map(empresa => <option key={empresa.id_subcontratista} value={empresa.id_subcontratista} className="dark:bg-slate-800">{empresa.razon_social}</option>)}
                   </select>
                 </div>
+
+                {/* --- NUEVO: SELECTOR DE ÁREA PARA MAQUINARIA --- */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Área Asignada *</label>
+                  <select required className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.area} onChange={e => setFormData({...formData, area: e.target.value})}>
+                    <option value="seguridad" className="dark:bg-slate-800">Seguridad</option>
+                    <option value="ambiental" className="dark:bg-slate-800">Medio Ambiente</option>
+                  </select>
+                </div>
+
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Fotografía</label>
                   <input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files[0])} className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-bold file:bg-[var(--recal-blue)] file:text-white hover:file:bg-[var(--recal-blue-hover)]" />
@@ -616,8 +630,8 @@ export default function MaquinariaPage() {
                     <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo *</label>
                     <select className="w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded p-2 text-sm outline-none focus:border-[var(--recal-blue)]" 
                       value={formMantenimiento.tipo_mantenimiento} onChange={e => setFormMantenimiento({...formMantenimiento, tipo_mantenimiento: e.target.value})}>
-                      <option value="Preventivo">Preventivo</option>
-                      <option value="Correctivo">Correctivo</option>
+                      <option value="Preventivo" className="dark:bg-slate-800">Preventivo</option>
+                      <option value="Correctivo" className="dark:bg-slate-800">Correctivo</option>
                     </select>
                   </div>
                   <div>
@@ -693,9 +707,9 @@ export default function MaquinariaPage() {
                     <div>
                       <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">1. Selecciona la Contratista Propietaria *</label>
                       <select required className="w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-3 focus:ring-purple-500 outline-none shadow-sm" value={importSubcontratista} onChange={(e) => setImportSubcontratista(e.target.value)}>
-                        <option value="">-- Elige una opción --</option>
+                        <option value="" className="dark:bg-slate-800">-- Elige una opción --</option>
                         {catPrincipales.map(empresa => (
-                          <option key={empresa.id_subcontratista} value={empresa.id_subcontratista}>{empresa.razon_social}</option>
+                          <option key={empresa.id_subcontratista} value={empresa.id_subcontratista} className="dark:bg-slate-800">{empresa.razon_social}</option>
                         ))}
                       </select>
                     </div>

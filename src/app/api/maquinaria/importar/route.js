@@ -3,11 +3,9 @@ import pool from '../../../../lib/db';
 import ExcelJS from 'exceljs';
 
 // --- FUNCIÓN EXTRACTORA NIVEL DIOS ---
-// Destruye los [object Object] de Excel cuando las celdas tienen negritas o colores mezclados
 const parseCell = (cell) => {
   if (!cell || cell.value === null || cell.value === undefined) return '';
   
-  // Si es un objeto (Rich Text o Fórmula)
   if (typeof cell.value === 'object') {
     if (cell.value.richText) {
       return cell.value.richText.map(rt => rt.text).join('').trim();
@@ -20,7 +18,6 @@ const parseCell = (cell) => {
     }
   }
   
-  // Si es texto normal o número
   return cell.value.toString().trim();
 };
 
@@ -39,7 +36,11 @@ export async function POST(request) {
 
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(buffer);
-    const worksheet = workbook.getWorksheet(1);
+    const worksheet = workbook.worksheets[0]; 
+
+    if (!worksheet) {
+      return NextResponse.json({ error: "El archivo Excel no tiene hojas legibles." }, { status: 400 });
+    }
 
     const excelMaquinaria = [];
     const seriesList = [];
@@ -47,13 +48,10 @@ export async function POST(request) {
 
     let detenerLectura = false; 
 
-    // Recorremos desde la Fila 7 en adelante
     worksheet.eachRow((row, rowNumber) => {
       if (detenerLectura) return; 
 
       if (rowNumber >= 7) {
-        // --- 1. SENSOR DE PARO AUTOMÁTICO ---
-        // Si la celda B o C están combinadas (típico de las firmas de ELABORÓ/REVISÓ), paramos.
         if (row.getCell(2).isMerged || row.getCell(3).isMerged) {
           detenerLectura = true;
           return;
@@ -61,22 +59,19 @@ export async function POST(request) {
 
         const tipo = parseCell(row.getCell(2)).toUpperCase();
         
-        // Sensor de respaldo por palabras clave (por si no combinaron las celdas)
         if (tipo.includes('ELABORO') || tipo.includes('ELABORÓ') || tipo.includes('REVISO') || tipo.includes('OBSERVACION')) {
           detenerLectura = true;
           return;
         }
 
-        if (!tipo) return; // Saltamos filas totalmente vacías en medio de la tabla
+        if (!tipo) return;
 
-        // --- 2. EXTRACCIÓN DE DATOS ---
         const marca = parseCell(row.getCell(3)) || 'S/N';
         const anio = parseCell(row.getCell(4)) || '';
         const modelo = parseCell(row.getCell(5)) || '';
         const color = parseCell(row.getCell(6)) || '';
         const placa = parseCell(row.getCell(8)) || '';
         
-        // Limpieza EXTREMA del número de serie (Quitamos espacios invisibles y forzamos mayúsculas)
         const serieBruta = parseCell(row.getCell(7));
         const serie = serieBruta.toUpperCase().replace(/\s+/g, '');
 
@@ -108,16 +103,12 @@ export async function POST(request) {
       return NextResponse.json({ error: mensajeError }, { status: 400 });
     }
 
-    // --- 3. CRUCE ANTI-DUPLICADOS BLINDADO ---
     let yaExistentes = [];
     if (seriesList.length > 0) {
-      // Traemos todas las series activas de la BD
       const [filas] = await pool.query(`SELECT serie FROM Maquinaria_Equipo WHERE fecha_baja IS NULL`);
-      // Las limpiamos de igual manera (sin espacios, mayúsculas puras) para comparar manzanas con manzanas
       yaExistentes = filas.map(f => (f.serie || '').toString().toUpperCase().replace(/\s+/g, ''));
     }
 
-    // Filtramos para dejar solo la maquinaria que de verdad es "Nueva"
     const nuevaMaquinaria = excelMaquinaria.filter(excelRow => {
       return !yaExistentes.includes(excelRow.serie);
     });
@@ -137,10 +128,26 @@ export async function POST(request) {
 
 export async function PUT(request) {
   try {
+    const id_usuario_actual = request.headers.get('x-user-id');
+    
+    if (!id_usuario_actual) {
+      return NextResponse.json({ error: "Usuario no identificado" }, { status: 401 });
+    }
+
     const { maquinarias } = await request.json();
 
     if (!maquinarias || maquinarias.length === 0) {
       return NextResponse.json({ error: "No hay maquinaria para guardar" }, { status: 400 });
+    }
+
+    // 1. Consultar el área del usuario
+    const [userRows] = await pool.query('SELECT area FROM Personal_Area WHERE id_personal = ?', [id_usuario_actual]);
+    let areaAsignada = 'seguridad'; // Valor por defecto
+    
+    if (userRows.length > 0) {
+      if (userRows[0].area === 'Medio Ambiente') areaAsignada = 'ambiental';
+      else if (userRows[0].area === 'Seguridad') areaAsignada = 'seguridad';
+      // Si es 'Ambas', lo asignamos a seguridad por defecto en importación masiva (o puedes ajustarlo)
     }
 
     const fechaIngresoActual = new Date().toISOString().split('T')[0]; 
@@ -148,8 +155,8 @@ export async function PUT(request) {
     for (const m of maquinarias) {
       await pool.query(`
         INSERT INTO Maquinaria_Equipo 
-        (tipo, marca, modelo, anio, serie, placa, color, fecha_ingreso_obra, id_subcontratista)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (tipo, marca, modelo, anio, serie, placa, color, fecha_ingreso_obra, id_subcontratista, area, usuario_registro)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         m.tipo, 
         m.marca, 
@@ -159,7 +166,9 @@ export async function PUT(request) {
         m.placa, 
         m.color, 
         fechaIngresoActual, 
-        m.id_subcontratista_principal
+        m.id_subcontratista_principal,
+        areaAsignada,
+        id_usuario_actual
       ]);
     }
 

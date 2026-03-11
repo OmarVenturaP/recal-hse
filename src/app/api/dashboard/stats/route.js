@@ -1,16 +1,36 @@
 import { NextResponse } from 'next/server';
-import pool from '../../../../lib/db'; // Ajusta la ruta a tu db.js si es necesario
+import pool from '../../../../lib/db'; 
 
-export const dynamic = 'force-dynamic'; // Evita que Next.js cachee este número
+export const dynamic = 'force-dynamic'; 
 
-export async function GET() {
+export async function GET(request) {
   try {
-    // 1. Contar Maquinaria Activa
+    // Obtenemos al usuario logueado desde los headers
+    const id_usuario_actual = request.headers.get('x-user-id');
+    
+    if (!id_usuario_actual) {
+      return NextResponse.json({ error: "Usuario no identificado" }, { status: 401 });
+    }
+
+    // 1. Averiguamos a qué área pertenece el usuario
+    const [userRows] = await pool.query('SELECT area FROM Personal_Area WHERE id_personal = ?', [id_usuario_actual]);
+    const areaUsuario = userRows.length > 0 ? userRows[0].area : 'Ambas';
+
+    // 2. Armamos el filtro dinámico para la maquinaria
+    let filtroArea = "";
+    if (areaUsuario === 'Seguridad') {
+      filtroArea = " AND area = 'seguridad'";
+    } else if (areaUsuario === 'Medio Ambiente') {
+      filtroArea = " AND area = 'ambiental'";
+    }
+    // Si es 'Ambas', el filtroArea se queda vacío y cuenta todo.
+
+    // 3. Contar Maquinaria Activa respetando su área
     const [maquinaria] = await pool.query(
-      `SELECT COUNT(*) as total FROM Maquinaria_Equipo WHERE fecha_baja IS NULL`
+      `SELECT COUNT(*) as total FROM Maquinaria_Equipo WHERE fecha_baja IS NULL${filtroArea}`
     );
 
-    // 2. Contar Personal Activo
+    // 4. Contar Personal Activo (Esto se mantiene global o se puede filtrar después si lo requieres)
     const [personal] = await pool.query(
       `SELECT COUNT(*) as total FROM Fuerza_Trabajo WHERE fecha_baja IS NULL`
     );

@@ -101,11 +101,37 @@ export async function GET(request) {
       // Copiar el formato (bordes, fuentes, centrado) de la fila 5 a las nuevas filas
       if (i > 0) {
         const filaBase = worksheet.getRow(7);
+        let detenerCopia = false; // Bandera para frenar al topar OBSERVACIONES
+        
         filaBase.eachCell({ includeEmpty: true }, (baseCell, colNumber) => {
+          if (detenerCopia) return; // Si ya la activamos, ignora las siguientes columnas
+          
+          // Extracción segura del valor de ExcelJS (fórmulas, texto enriquecido o texto plano)
+          let val = baseCell.value;
+          if (val && typeof val === 'object' && val.richText) val = val.richText.map(rt => rt.text).join('');
+          if (val && typeof val === 'object' && val.result) val = val.result;
+          
+          if (val && String(val).toUpperCase().includes('OBSERVACION')) {
+            detenerCopia = true;
+            return; // Se detiene inmediatamente
+          }
+
           row.getCell(colNumber).style = baseCell.style;
         });
       } else {
+        let detenerCopia = false;
         row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+          if (detenerCopia) return;
+          
+          let val = cell.value;
+          if (val && typeof val === 'object' && val.richText) val = val.richText.map(rt => rt.text).join('');
+          if (val && typeof val === 'object' && val.result) val = val.result;
+
+          if (val && String(val).toUpperCase().includes('OBSERVACION')) {
+            detenerCopia = true;
+            return;
+          }
+
           if(colNumber !== 7) cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
         });
       }
