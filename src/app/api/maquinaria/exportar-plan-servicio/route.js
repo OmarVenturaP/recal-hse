@@ -3,11 +3,25 @@ import pool from '../../../../lib/db';
 import ExcelJS from 'exceljs';
 import path from 'path';
 
+const generarTextoPeriodo = (mes, anio) => {
+  const meses = {
+    1: 'ENERO', 2: 'FEBRERO', 3: 'MARZO', 4: 'ABRIL', 5: 'MAYO', 6: 'JUNIO',
+    7: 'JULIO', 8: 'AGOSTO', 9: 'SEPTIEMBRE', 10: 'OCTUBRE', 11: 'NOVIEMBRE', 12: 'DICIEMBRE'
+  };
+  
+  if (mes && anio) {
+    return `PERIODO: ${meses[parseInt(mes)]} ${anio}`;
+  }
+  return 'PERIODO NO ESPECIFICADO';
+}
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const mes = searchParams.get('mes');
     const anio = searchParams.get('anio');
+
+    const periodoTexto = generarTextoPeriodo(mes, anio);
 
     const templatePath = path.join(process.cwd(), 'public', 'plantillas', '12_PLAN_SERVICIO.xlsx');
     const workbook = new ExcelJS.Workbook();
@@ -34,6 +48,8 @@ export async function GET(request) {
       ${whereClause}
       ORDER BY m.fecha_ingreso_obra DESC
     `, queryParams);
+
+    worksheet.getCell('H3').value = periodoTexto;
 
     let currentRow = 7; 
     let index = 1;
@@ -99,10 +115,11 @@ export async function GET(request) {
     }
 
     const buffer = await workbook.xlsx.writeBuffer();
+    const nombreArchivo = `12. PROGRAMA DE MANTENIMIENTO DE MAQUINARIA Y EQUIPO MENOR ${periodoTexto}.xlsx`;
 
     return new NextResponse(buffer, {
       headers: {
-        'Content-Disposition': 'attachment; filename="12_Plan_de_Servicio_Maquinaria.xlsx"',
+        'Content-Disposition': `attachment; filename="${nombreArchivo}"`,
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       }
     });

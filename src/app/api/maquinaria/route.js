@@ -271,7 +271,7 @@ export async function PATCH(request) {
     
     if (!id_maquinaria || !fecha_baja) return NextResponse.json({ error: "Faltan datos" }, { status: 400 });
 
-    await pool.query(`UPDATE Maquinaria_Equipo SET fecha_baja = ?, usuario_actualizacion = ? WHERE id_maquinaria = ?`, [fecha_baja, id_usuario_actual, id_maquinaria]);
+    await pool.query(`UPDATE Maquinaria_Equipo SET fecha_baja = ?, usuario_actualizacion = ?, bActivo = 0 WHERE id_maquinaria = ?`, [fecha_baja, id_usuario_actual, id_maquinaria]);
     return NextResponse.json({ success: true, mensaje: "Equipo dado de baja" });
   } catch (error) {
     console.error("Error en PATCH Maquinaria:", error);

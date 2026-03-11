@@ -148,7 +148,7 @@ export async function PUT(request) {
     for (const m of maquinarias) {
       await pool.query(`
         INSERT INTO Maquinaria_Equipo 
-        (tipo, marca, modelo, anio, serie, placa, color, fecha_ingreso_obra, id_subcontratista_principal)
+        (tipo, marca, modelo, anio, serie, placa, color, fecha_ingreso_obra, id_subcontratista)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         m.tipo, 
