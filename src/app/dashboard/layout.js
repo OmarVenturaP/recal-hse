@@ -107,6 +107,9 @@ useEffect(() => {
           <Link href="/dashboard/fuerza-trabajo" onClick={closeSidebar} className="block px-4 py-3 rounded-md hover:bg-[var(--recal-blue-hover)] transition-colors">
             👷 Fuerza de Trabajo
           </Link>
+          <Link href="/dashboard/actividades" onClick={closeSidebar} className="block px-4 py-3 rounded-md hover:bg-[var(--recal-blue-hover)] transition-colors">
+            � Actividades
+          </Link>
           {userRol === 'Master' && (
             <Link href="/dashboard/usuarios" onClick={closeSidebar} className="block px-4 py-3 rounded-md hover:bg-[var(--recal-blue-hover)] transition-colors font-semibold text-purple-200">
               🛡️ Control de Accesos
