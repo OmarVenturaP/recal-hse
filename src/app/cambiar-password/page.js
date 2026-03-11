@@ -49,22 +49,22 @@ export default function CambiarPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[var(--recal-gray)] p-4">
-      <div className="max-w-md w-full bg-white rounded-xl shadow-xl overflow-hidden border border-gray-200">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--recal-gray)] dark:bg-slate-900 p-4 transition-colors duration-300">
+      <div className="max-w-md w-full bg-white dark:bg-slate-800 rounded-xl shadow-xl overflow-hidden border border-gray-200 dark:border-slate-700">
         
         {/* Cabecera Azul */}
-        <div className="bg-[var(--recal-blue)] p-6 text-center">
-          <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner">
-            <ShieldCheck className="w-8 h-8 text-[var(--recal-blue)]" />
+        <div className="bg-[var(--recal-blue)] dark:bg-slate-900 p-6 text-center border-b dark:border-slate-700">
+          <div className="w-16 h-16 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner">
+            <ShieldCheck className="w-8 h-8 text-[var(--recal-blue)] dark:text-blue-400" />
           </div>
           <h2 className="text-2xl font-bold text-white">Actualiza tu Acceso</h2>
-          <p className="text-blue-200 text-sm mt-1">Por seguridad, debes cambiar tu contraseña inicial</p>
+          <p className="text-blue-200 dark:text-gray-400 text-sm mt-1">Por seguridad, debes cambiar tu contraseña inicial</p>
         </div>
 
         {/* Formulario */}
         <div className="p-8">
           {error && (
-            <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 mb-6 text-sm" role="alert">
+            <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 text-red-700 dark:text-red-400 p-4 mb-6 text-sm" role="alert">
               <p className="font-bold">Error</p>
               <p>{error}</p>
             </div>
@@ -72,15 +72,15 @@ export default function CambiarPasswordPage() {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nueva Contraseña</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nueva Contraseña</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <KeyRound className="h-5 w-5 text-gray-400" />
+                  <KeyRound className="h-5 w-5 text-gray-400 dark:text-gray-500" />
                 </div>
                 <input 
                   type="password" 
                   required 
-                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--recal-blue)] focus:border-transparent transition-all"
+                  className="w-full pl-10 pr-3 py-2 bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--recal-blue)] dark:focus:ring-blue-400 focus:border-transparent transition-all placeholder-gray-400 dark:placeholder-gray-500"
                   placeholder="Mínimo 8 caracteres"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -89,15 +89,15 @@ export default function CambiarPasswordPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Confirmar Contraseña</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Confirmar Contraseña</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <KeyRound className="h-5 w-5 text-gray-400" />
+                  <KeyRound className="h-5 w-5 text-gray-400 dark:text-gray-500" />
                 </div>
                 <input 
                   type="password" 
                   required 
-                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--recal-blue)] focus:border-transparent transition-all"
+                  className="w-full pl-10 pr-3 py-2 bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--recal-blue)] dark:focus:ring-blue-400 focus:border-transparent transition-all placeholder-gray-400 dark:placeholder-gray-500"
                   placeholder="Repite tu contraseña"
                   value={confirmar}
                   onChange={(e) => setConfirmar(e.target.value)}
@@ -108,7 +108,7 @@ export default function CambiarPasswordPage() {
             <button 
               type="submit" 
               disabled={loading}
-              className="w-full bg-[var(--recal-blue)] hover:bg-[var(--recal-blue-hover)] text-white font-bold py-3 px-4 rounded-lg focus:outline-none focus:shadow-outline transition-colors disabled:bg-gray-400"
+              className="w-full bg-[var(--recal-blue)] hover:bg-[var(--recal-blue-hover)] dark:bg-blue-600 dark:hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg focus:outline-none focus:shadow-outline transition-colors disabled:bg-gray-400 dark:disabled:bg-slate-600"
             >
               {loading ? 'Guardando...' : 'Guardar y Entrar al Sistema'}
             </button>
