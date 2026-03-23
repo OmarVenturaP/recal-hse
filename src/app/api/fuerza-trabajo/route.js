@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import pool from '../../../lib/db';
 
-// --- GET: Listar Trabajadores (Para la tabla del Dashboard) ---
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -15,30 +14,22 @@ export async function GET(request) {
     let whereClause = "WHERE 1=1";
     const queryParams = [];
 
-    // 1. Filtro por Contratista
     if (subcontratista) {
       whereClause += ` AND f.id_subcontratista_principal = ?`;
       queryParams.push(subcontratista);
     }
 
-    // 2. Filtro de Fechas (La Regla Matemática Correcta)
     if (fechaInicio && fechaFin) {
-      // Entró a la obra antes o durante la fecha límite
-      // Y (Sigue activo, o su baja fue después de la fecha de inicio)
       whereClause += ` AND DATE(f.fecha_ingreso_obra) <= ? AND (f.fecha_baja IS NULL OR DATE(f.fecha_baja) >= ?)`;
-      
-      // ¡El orden de estos parámetros es vital para que la ecuación funcione!
       queryParams.push(fechaFin, fechaInicio);
     } else {
-      // Si el usuario limpia los filtros, mostramos solo al personal activo actual
       whereClause += ` AND f.fecha_baja IS NULL`;
     }
 
-    // 3. Filtro de Búsqueda de Texto
     if (busqueda) {
-      whereClause += ` AND (f.nombre_trabajador LIKE ? OR f.nss LIKE ? OR f.puesto_categoria LIKE ?)`;
+      whereClause += ` AND (f.nombre_trabajador LIKE ? OR f.apellido_trabajador LIKE ? OR f.nss LIKE ? OR f.puesto_categoria LIKE ?)`;
       const textoBuscado = `%${busqueda}%`;
-      queryParams.push(textoBuscado, textoBuscado, textoBuscado);
+      queryParams.push(textoBuscado, textoBuscado, textoBuscado, textoBuscado);
     }
 
     const query = `
@@ -64,23 +55,45 @@ export async function GET(request) {
   }
 }
 
+// --- POST: Nuevo Trabajador ---
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { numero_empleado, nombre_trabajador, puesto_categoria, nss, fecha_ingreso_obra, fecha_alta_imss, origen, id_subcontratista_ft, id_subcontratista_principal } = body;
+    const { numero_empleado, nombre_trabajador, apellido_trabajador, puesto_categoria, nss, curp, fecha_ingreso_obra, fecha_alta_imss, origen, id_subcontratista_ft, id_subcontratista_principal } = body;
     const id_usuario_actual = request.headers.get('x-user-id');
 
-    if (!id_usuario_actual) {
-      return NextResponse.json({ error: "Usuario no identificado" }, { status: 401 });
+    if (!id_usuario_actual) return NextResponse.json({ error: "Usuario no identificado" }, { status: 401 });
+
+    // --- REGLA DE NEGOCIO: VALIDACIÓN DE NSS ---
+    if (nss) {
+      const [duplicados] = await pool.query(
+        `SELECT id_subcontratista_principal, fecha_baja FROM Fuerza_Trabajo WHERE nss = ?`,
+        [nss]
+      );
+
+      if (duplicados.length > 0) {
+        // 1. ¿Hay algún registro activo con este NSS?
+        const activo = duplicados.some(d => d.fecha_baja === null);
+        if (activo) {
+          return NextResponse.json({ success: false, error: "El NSS ya se encuentra activo en la obra." }, { status: 400 });
+        }
+        
+        // 2. ¿Se está intentando dar de alta con la MISMA empresa de la que se dio de baja?
+        const mismaEmpresa = duplicados.some(d => d.id_subcontratista_principal === parseInt(id_subcontratista_principal));
+        if (mismaEmpresa) {
+          return NextResponse.json({ success: false, error: "Este trabajador ya estuvo en la obra con esta empresa. La única excepción para reingresar un NSS es hacerlo mediante una contratista distinta." }, { status: 400 });
+        }
+      }
     }
+    // -------------------------------------------
 
     const query = `
       INSERT INTO Fuerza_Trabajo 
-      (numero_empleado, nombre_trabajador, puesto_categoria, nss, fecha_ingreso_obra, fecha_alta_imss, origen, id_subcontratista_ft, id_subcontratista_principal, usuario_registro) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (numero_empleado, nombre_trabajador, apellido_trabajador, puesto_categoria, nss, curp, fecha_ingreso_obra, fecha_alta_imss, origen, id_subcontratista_ft, id_subcontratista_principal, usuario_registro) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const [result] = await pool.query(query, [
-      numero_empleado, nombre_trabajador, puesto_categoria, nss, fecha_ingreso_obra, fecha_alta_imss || null, origen, id_subcontratista_ft || null, id_subcontratista_principal || null, id_usuario_actual 
+      numero_empleado, nombre_trabajador, apellido_trabajador || null, puesto_categoria, nss, curp || null, fecha_ingreso_obra, fecha_alta_imss || null, origen, id_subcontratista_ft || null, id_subcontratista_principal || null, id_usuario_actual 
     ]);
 
     return NextResponse.json({ success: true, id: result.insertId });
@@ -90,20 +103,44 @@ export async function POST(request) {
   }
 }
 
+// --- PUT: Actualizar Trabajador ---
 export async function PUT(request) {
   try {
     const body = await request.json();
-    const { id_trabajador, numero_empleado, nombre_trabajador, puesto_categoria, nss, fecha_ingreso_obra, fecha_alta_imss, origen, id_subcontratista_ft, id_subcontratista_principal } = body;
+    const { id_trabajador, numero_empleado, nombre_trabajador, apellido_trabajador, puesto_categoria, nss, curp, fecha_ingreso_obra, fecha_alta_imss, origen, id_subcontratista_ft, id_subcontratista_principal } = body;
     const id_usuario_actual = request.headers.get('x-user-id');
+    
     if (!id_usuario_actual) return NextResponse.json({ error: "Usuario no identificado" }, { status: 401 });
+
+    // --- REGLA DE NEGOCIO: VALIDACIÓN DE NSS AL ACTUALIZAR ---
+    if (nss) {
+      // Excluimos el ID actual para que no marque error consigo mismo
+      const [duplicados] = await pool.query(
+        `SELECT id_subcontratista_principal, fecha_baja FROM Fuerza_Trabajo WHERE nss = ? AND id_trabajador != ?`,
+        [nss, id_trabajador]
+      );
+
+      if (duplicados.length > 0) {
+        const activo = duplicados.some(d => d.fecha_baja === null);
+        if (activo) {
+          return NextResponse.json({ success: false, error: "Este NSS ya se encuentra activo en otro registro de la obra." }, { status: 400 });
+        }
+        
+        const mismaEmpresa = duplicados.some(d => d.id_subcontratista_principal === parseInt(id_subcontratista_principal));
+        if (mismaEmpresa) {
+          return NextResponse.json({ success: false, error: "Este NSS ya estuvo registrado con esta empresa anteriormente. Solo se permite el reingreso con una contratista distinta." }, { status: 400 });
+        }
+      }
+    }
+    // ---------------------------------------------------------
 
     const query = `
       UPDATE Fuerza_Trabajo 
-      SET numero_empleado=?, nombre_trabajador=?, puesto_categoria=?, nss=?, fecha_ingreso_obra=?, fecha_alta_imss=?, origen=?, id_subcontratista_ft=?, id_subcontratista_principal=?, usuario_actualizacion=?
+      SET numero_empleado=?, nombre_trabajador=?, apellido_trabajador=?, puesto_categoria=?, nss=?, curp=?, fecha_ingreso_obra=?, fecha_alta_imss=?, origen=?, id_subcontratista_ft=?, id_subcontratista_principal=?, usuario_actualizacion=?
       WHERE id_trabajador=?
     `;
     await pool.query(query, [
-      numero_empleado, nombre_trabajador, puesto_categoria, nss, fecha_ingreso_obra, fecha_alta_imss || null, origen, id_subcontratista_ft || null, id_subcontratista_principal || null, id_usuario_actual, id_trabajador
+      numero_empleado, nombre_trabajador, apellido_trabajador || null, puesto_categoria, nss, curp || null, fecha_ingreso_obra, fecha_alta_imss || null, origen, id_subcontratista_ft || null, id_subcontratista_principal || null, id_usuario_actual, id_trabajador
     ]);
 
     return NextResponse.json({ success: true, mensaje: "Actualizado correctamente" });
@@ -128,7 +165,6 @@ export async function PATCH(request) {
       return NextResponse.json({ error: "Faltan datos obligatorios" }, { status: 400 });
     }
 
-    // NUEVO: Agregamos usuario_actualizacion = ? para que el Trigger lo detecte y registre en bitácora
     const query = `UPDATE Fuerza_Trabajo SET fecha_baja = ?, usuario_actualizacion = ? WHERE id_trabajador = ?`;
     await pool.query(query, [fecha_baja, id_usuario_actual, id_trabajador]);
 

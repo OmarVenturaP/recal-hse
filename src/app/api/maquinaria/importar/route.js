@@ -23,6 +23,18 @@ const parseCell = (cell) => {
 
 export async function POST(request) {
   try {
+    // 1. Identificar al usuario y su área desde el inicio para validar duplicados
+    const id_usuario_actual = request.headers.get('x-user-id');
+    let areaAsignada = 'seguridad'; // Valor por defecto
+    
+    if (id_usuario_actual) {
+      const [userRows] = await pool.query('SELECT area FROM Personal_Area WHERE id_personal = ?', [id_usuario_actual]);
+      if (userRows.length > 0) {
+        if (userRows[0].area === 'Medio Ambiente') areaAsignada = 'ambiental';
+        else if (userRows[0].area === 'Seguridad') areaAsignada = 'seguridad';
+      }
+    }
+
     const formData = await request.formData();
     const file = formData.get('file');
     const idPrincipal = formData.get('id_subcontratista_principal');
@@ -82,8 +94,8 @@ export async function POST(request) {
         excelMaquinaria.push({
           tipo, 
           marca, 
-          anio, 
           modelo, 
+          anio, 
           color, 
           serie, 
           placa,
@@ -105,7 +117,11 @@ export async function POST(request) {
 
     let yaExistentes = [];
     if (seriesList.length > 0) {
-      const [filas] = await pool.query(`SELECT serie FROM Maquinaria_Equipo WHERE fecha_baja IS NULL`);
+      // 2. Aquí está la magia: Filtramos asegurándonos de que valide SOLO EN EL ÁREA DEL USUARIO ACTUAL
+      const [filas] = await pool.query(
+        `SELECT serie FROM Maquinaria_Equipo WHERE fecha_baja IS NULL AND area = ?`, 
+        [areaAsignada]
+      );
       yaExistentes = filas.map(f => (f.serie || '').toString().toUpperCase().replace(/\s+/g, ''));
     }
 
@@ -140,14 +156,13 @@ export async function PUT(request) {
       return NextResponse.json({ error: "No hay maquinaria para guardar" }, { status: 400 });
     }
 
-    // 1. Consultar el área del usuario
+    // Consultar el área del usuario
     const [userRows] = await pool.query('SELECT area FROM Personal_Area WHERE id_personal = ?', [id_usuario_actual]);
     let areaAsignada = 'seguridad'; // Valor por defecto
     
     if (userRows.length > 0) {
       if (userRows[0].area === 'Medio Ambiente') areaAsignada = 'ambiental';
       else if (userRows[0].area === 'Seguridad') areaAsignada = 'seguridad';
-      // Si es 'Ambas', lo asignamos a seguridad por defecto en importación masiva (o puedes ajustarlo)
     }
 
     const fechaIngresoActual = new Date().toISOString().split('T')[0]; 

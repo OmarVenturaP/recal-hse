@@ -9,7 +9,6 @@ export async function GET(request) {
 
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET);
-    // Le devolvemos al frontend los datos limpios del usuario actual
     return NextResponse.json({ success: true, user: payload });
   } catch (error) {
     return NextResponse.json({ success: false });

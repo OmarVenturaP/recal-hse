@@ -6,19 +6,30 @@ import { Pencil, Trash2, Upload, FileSpreadsheet } from 'lucide-react';
 export default function FuerzaTrabajoPage() {
   const topRef = useRef(null); 
 
-  const [userRole, setUserRole] = useState(null);
+const [userRole, setUserRole] = useState(null);
+  const [userFtPermission, setUserFtPermission] = useState(null);  // Corregido el nombre
+  const [userCertPermission, setUserCertPermission] = useState(null);
 
-  useEffect(() => {
-    // NUEVO: Preguntamos quién está logeado
+useEffect(() => {
+    // Cargamos rol
     fetch('/api/auth/me')
       .then(res => res.json())
       .then(data => {
-        if (data.success) {
-          setUserRole(data.user.rol);
-          console.log("Rol:", data.user.rol);
+        if (data.success) setUserRole(data.user.rol);
+      });
+
+    fetch('/api/usuarios/me')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.data.length > 0) {
+          setUserFtPermission(data.data[0].permisos_ft);
+          setUserCertPermission(data.data[0].permisos_certificados);
         }
       });
   }, []);
+
+  const canManageFt = userFtPermission === 1 || userRole === 'Admin' || userRole === 'Master';
+  const canManageCert = userCertPermission === 1 || userRole === 'Admin' || userRole === 'Master';
 
   const [trabajadores, setTrabajadores] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -76,8 +87,8 @@ export default function FuerzaTrabajoPage() {
   const [importResumen, setImportResumen] = useState({ totales: 0, nuevos: 0 });
 
   const formInicial = {
-    numero_empleado: '', nombre_trabajador: '', puesto_categoria: '', 
-    nss: '', fecha_ingreso_obra: '', fecha_alta_imss: '', 
+    numero_empleado: '', nombre_trabajador: '', apellido_trabajador: '', puesto_categoria: '', 
+    nss: '', curp: '', fecha_ingreso_obra: '', fecha_alta_imss: '', 
     origen: 'Local', id_subcontratista_ft: '', id_subcontratista_principal: ''
   };
   
@@ -111,7 +122,6 @@ export default function FuerzaTrabajoPage() {
           setCatCuadrillas(data.cuadrillas);
         }
 
-        // --- CARGAR PUESTOS DESDE LA API ---
         const resPuestos = await fetch('/api/fuerza-trabajo/puestos');
         const dataPuestos = await resPuestos.json();
         if (dataPuestos.success) {
@@ -188,7 +198,6 @@ export default function FuerzaTrabajoPage() {
     else { setOrdenPor(columna); setOrdenDireccion('ASC'); }
   };
 
-  // --- NUEVA FUNCIÓN DE EXPORTACIÓN CON CONFIRMACIÓN ---
   const handleExportarClick = () => {
     if (!fechaInicio || !fechaFin) {
       alert("Por favor selecciona las fechas de la semana que deseas exportar.");
@@ -245,9 +254,11 @@ export default function FuerzaTrabajoPage() {
   const handleEditClick = (trabajador) => {
     setFormData({
       numero_empleado: trabajador.numero_empleado || '',
-      nombre_trabajador: trabajador.nombre_trabajador,
+      nombre_trabajador: trabajador.nombre_trabajador || '',
+      apellido_trabajador: trabajador.apellido_trabajador || '',
       puesto_categoria: trabajador.puesto_categoria,
       nss: trabajador.nss || '',
+      curp: trabajador.curp || '',
       fecha_ingreso_obra: formatForInput(trabajador.fecha_ingreso_obra),
       fecha_alta_imss: formatForInput(trabajador.fecha_alta_imss),
       origen: trabajador.origen,
@@ -261,6 +272,9 @@ export default function FuerzaTrabajoPage() {
     e.preventDefault();
     if (formData.nss && !/^\d{11}$/.test(formData.nss)) {
       alert("El NSS debe contener exactamente 11 dígitos numéricos."); return;
+    }
+    if (formData.curp && formData.curp.length !== 18) {
+      alert("La CURP debe contener exactamente 18 caracteres."); return;
     }
     if (formData.fecha_alta_imss && formData.fecha_ingreso_obra) {
       const alta = new Date(formData.fecha_alta_imss); const ingreso = new Date(formData.fecha_ingreso_obra);
@@ -305,6 +319,46 @@ export default function FuerzaTrabajoPage() {
 
   const cuadrillasFiltradas = catCuadrillas.filter(c => c.id_subcontratista_principal == formData.id_subcontratista_principal);
 
+  const handleExportarEdades = async () => {
+    if (!fechaInicio || !fechaFin) {
+      alert("Por favor selecciona las fechas del periodo.");
+      return;
+    }
+
+    try {
+      let url = `/api/fuerza-trabajo/exportar-edades?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`;
+      if (filtroSub) {
+        url += `&subcontratista=${filtroSub}`;
+      }
+
+      const res = await fetch(url);
+
+      if (!res.ok) {
+        const data = await res.json();
+        if (data.faltantes && data.faltantes.length > 0) {
+          alert(`No se puede generar el archivo.\n\nFalta capturar la CURP de los siguientes trabajadores (Alta en meses anteriores):\n\n• ${data.faltantes.join('\n• ')}\n\nPor favor, edítalos para agregar su CURP e intenta de nuevo.`);
+        } else {
+          alert(data.error || "Error al procesar la solicitud.");
+        }
+        return;
+      }
+
+      const blob = await res.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      const anio = fechaFin.split('-')[0];
+      a.download = `Edades_Ingresos_${anio}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+
+    } catch (error) {
+      alert("Error de red al intentar generar el reporte.");
+    }
+  };
+
   return (
     <div className="space-y-6 relative" ref={topRef}>
       
@@ -314,11 +368,6 @@ export default function FuerzaTrabajoPage() {
         
         <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full xl:w-auto">
           
-          <button onClick={handleOpenImportModal} className="flex-1 sm:flex-none justify-center bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
-            <Upload className="w-4 h-4 mr-1 sm:mr-2" /> Importar Excel
-          </button>
-
-          {/* CONTROL UNIFICADO DE PERIODO POR RANGOS DE FECHA */}
           <div className="flex items-center justify-between sm:justify-start space-x-1 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 p-1.5 rounded-md shadow-sm w-full sm:w-auto">
             <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase px-2 hidden md:inline">Filtro / Exportación:</span>
             <input type="date" className="text-xs sm:text-sm bg-transparent border-gray-300 dark:border-slate-600 dark:text-gray-200 rounded py-1 px-1 sm:px-2 focus:ring-[var(--recal-blue)] outline-none flex-1 sm:flex-none w-full sm:w-36" 
@@ -331,10 +380,21 @@ export default function FuerzaTrabajoPage() {
           <button onClick={handleExportarClick} className="flex-1 sm:flex-none justify-center bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
             <span className="mr-1 sm:mr-2">📊</span> Exportar
           </button>
-          
-          <button onClick={handleNewClick} className="w-full sm:w-auto bg-[var(--recal-blue)] hover:bg-[var(--recal-blue-hover)] text-white px-4 py-3 sm:py-2 rounded-md font-medium shadow-sm xl:ml-2">
-            + Nuevo
-          </button>
+          {canManageFt && (
+            <button onClick={handleOpenImportModal} className="flex-1 sm:flex-none justify-center bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
+              <Upload className="w-4 h-4 mr-1 sm:mr-2" /> Importar
+            </button>
+          )}
+          {canManageCert && (
+            <button onClick={handleExportarEdades} className="flex-1 sm:flex-none justify-center bg-teal-600 hover:bg-teal-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
+              <span className="mr-1 sm:mr-2">📈</span>Edades
+            </button>
+          )}
+          {canManageFt && (
+            <button onClick={handleNewClick} className="flex-1 sm:flex-none justify-center bg-[var(--recal-blue)] hover:bg-[var(--recal-blue-hover)] text-white px-3 py-2 rounded-md font-medium shadow-sm xl:ml-2">
+              + Nuevo
+            </button>
+          )}
         </div>
       </div>
 
@@ -365,10 +425,11 @@ export default function FuerzaTrabajoPage() {
           <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
             <thead className="bg-gray-50 dark:bg-slate-900 hidden md:table-header-group">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('nombre_trabajador')}>Nombre {ordenPor === 'nombre_trabajador' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('apellido_trabajador')}>Nombre {ordenPor === 'apellido_trabajador' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('puesto_categoria')}>Categoría {ordenPor === 'puesto_categoria' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('nss')}>NSS {ordenPor === 'nss' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--recal-blue)] dark:text-blue-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('fecha_ingreso_obra')}>Ingreso {ordenPor === 'fecha_ingreso_obra' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('fecha_ingreso_obra')}>Ingreso {ordenPor === 'fecha_ingreso_obra' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('fecha_alta_imss')}>Alta {ordenPor === 'fecha_alta_imss' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('nombre_subcontratista')}>Contratista {ordenPor === 'nombre_subcontratista' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Estatus</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Acciones</th>
@@ -390,7 +451,8 @@ export default function FuerzaTrabajoPage() {
               ) : trabajadoresPaginados.map((t) => (
                   <tr key={t.id_trabajador} className="block md:table-row border border-gray-200 dark:border-slate-700 md:border-none mb-4 md:mb-0 rounded-lg shadow-sm md:shadow-none p-4 md:p-0 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
                     <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm font-bold text-[var(--recal-blue)] dark:text-white md:text-gray-900 border-b dark:border-slate-700 md:border-none">
-                      <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Nombre:</span>{t.nombre_trabajador}
+                      <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Nombre:</span>
+                      {`${t.apellido_trabajador || ''} ${t.nombre_trabajador}`.trim()}
                     </td>
                     <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
                       <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Categoría:</span>{t.puesto_categoria}
@@ -399,7 +461,11 @@ export default function FuerzaTrabajoPage() {
                       <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">NSS:</span>{t.nss || 'N/A'}
                     </td>
                     <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
-                      <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Ingreso:</span>{formatDDMMYYYY(t.fecha_ingreso_obra)}
+                      <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Ingreso a obra:</span>{formatDDMMYYYY(t.fecha_ingreso_obra)}
+                    </td>
+                    <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
+                      <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Alta IMSS:</span>
+                      {t.fecha_alta_imss ? formatDDMMYYYY(t.fecha_alta_imss) : 'N/A'}
                     </td>
                     <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
                       <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Contratista:</span>{t.nombre_subcontratista || 'RECAL'}
@@ -476,9 +542,25 @@ export default function FuerzaTrabajoPage() {
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Nombre Completo *</label>
-                  <input required type="text" className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none" value={formData.nombre_trabajador} onChange={e => setFormData({...formData, nombre_trabajador: e.target.value})} />
+                <div className="md:col-span-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Apellidos *</label>
+                  <input 
+                    required 
+                    type="text" 
+                    className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none uppercase" 
+                    value={formData.apellido_trabajador} 
+                    onChange={e => setFormData({...formData, apellido_trabajador: e.target.value.toUpperCase()})} 
+                  />
+                </div>
+                <div className="md:col-span-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Nombres *</label>
+                  <input 
+                    required 
+                    type="text" 
+                    className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none uppercase" 
+                    value={formData.nombre_trabajador} 
+                    onChange={e => setFormData({...formData, nombre_trabajador: e.target.value.toUpperCase()})} 
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Puesto / Categoría *</label>
@@ -495,14 +577,20 @@ export default function FuerzaTrabajoPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Origen *</label>
-                  <select className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none" value={formData.origen} onChange={e => setFormData({...formData, origen: e.target.value})}>
-                    <option value="Local" className="dark:bg-slate-800">Local</option><option value="Foráneo" className="dark:bg-slate-800">Foráneo</option>
-                  </select>
-                </div>
-                <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Número de Seguridad Social (NSS)</label>
                   <input type="text" maxLength={11} className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none placeholder-gray-400 dark:placeholder-gray-500" placeholder="11 dígitos" value={formData.nss} onChange={e => setFormData({...formData, nss: e.target.value})} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">CURP (Opcional)</label>
+                  <input 
+                    type="text" 
+                    maxLength={18} 
+                    style={{ textTransform: 'uppercase' }}
+                    className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none placeholder-gray-400 dark:placeholder-gray-500" 
+                    placeholder="18 caracteres" 
+                    value={formData.curp} 
+                    onChange={e => setFormData({...formData, curp: e.target.value.toUpperCase()})} 
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Fecha Alta IMSS (Opcional)</label>
@@ -511,6 +599,13 @@ export default function FuerzaTrabajoPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Fecha Ingreso a Obra *</label>
                   <input required type="date" className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none" value={formData.fecha_ingreso_obra} onChange={e => setFormData({...formData, fecha_ingreso_obra: e.target.value})} />
+                </div>
+                <div className="md:col-span-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Origen *</label>
+                  <select className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none" value={formData.origen} onChange={e => setFormData({...formData, origen: e.target.value})}>
+                    <option value="Local" className="dark:bg-slate-800">Local</option>
+                    <option value="Foráneo" className="dark:bg-slate-800">Foráneo</option>
+                  </select>
                 </div>
                 <div className="md:col-span-1 bg-blue-50 dark:bg-blue-900/20 p-3 rounded border border-blue-100 dark:border-blue-800/50">
                   <label className="block text-sm font-bold text-blue-900 dark:text-blue-400">Contratista Principal *</label>

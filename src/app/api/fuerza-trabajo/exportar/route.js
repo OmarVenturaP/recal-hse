@@ -37,28 +37,29 @@ export async function GET(request) {
 
     const periodoTexto = generarTextoPeriodo(fechaInicio, fechaFin);
 
-    // --- AJUSTE AQUÍ: USO DE DATE() PARA INCLUIR TODOS LOS ACTIVOS EN EL RANGO ---
     let query = `
       SELECT 
-        f.nombre_trabajador, f.puesto_categoria, f.nss, 
+        f.nombre_trabajador, f.apellido_trabajador, f.puesto_categoria, f.nss, 
         f.fecha_ingreso_obra, f.fecha_alta_imss, f.origen,
         p.razon_social AS empresa_principal,
-        s.nombre AS nombre_cuadrilla
+        s.nombre AS nombre_cuadrilla,
+        (DATE(f.fecha_ingreso_obra) >= ?) AS es_nuevo
       FROM Fuerza_Trabajo f
       LEFT JOIN Subcontratistas p ON f.id_subcontratista_principal = p.id_subcontratista
       LEFT JOIN Subcontratistas_Fuerza_Trabajo s ON f.id_subcontratista_ft = s.id_subcontratista_ft
       WHERE DATE(f.fecha_ingreso_obra) <= ? 
       AND (f.fecha_baja IS NULL OR DATE(f.fecha_baja) >= ?)
     `;
-    // El orden de los parámetros es vital: fechaFin primero, fechaInicio después.
-    const queryParams = [fechaFin, fechaInicio];
+
+    const queryParams = [fechaInicio, fechaFin, fechaInicio];
 
     if (idPrincipal) {
       query += ` AND f.id_subcontratista_principal = ?`;
       queryParams.push(idPrincipal);
     }
 
-    query += ` ORDER BY f.nombre_trabajador ASC`;
+    // --- MODIFICACIÓN 2: Ordenamos primero por "es_nuevo" (0s primero, 1s después) y luego alfabéticamente ---
+    query += ` ORDER BY es_nuevo ASC, f.apellido_trabajador ASC, f.nombre_trabajador ASC`;
 
     const [rows] = await pool.query(query, queryParams);
 
@@ -100,7 +101,11 @@ export async function GET(request) {
       };
 
       row.getCell('A').value = index;
-      row.getCell('B').value = r.nombre_trabajador;
+      
+      // Concatenamos apellidos y nombres para el Excel
+      const nombreCompleto = `${r.apellido_trabajador || ''} ${r.nombre_trabajador || ''}`.trim();
+      row.getCell('B').value = nombreCompleto;
+      
       row.getCell('C').value = r.puesto_categoria;
       row.getCell('D').value = r.nss ? String(r.nss) : '';
       row.getCell('E').value = r.nombre_cuadrilla || 'N/A';
@@ -116,16 +121,10 @@ export async function GET(request) {
           row.getCell(colNumber).style = baseCell.style;
         });
       } else {
-        row.getCell('A').alignment = { vertical: 'middle', horizontal: 'center' };
-        row.getCell('B').alignment = { vertical: 'middle', horizontal: 'center' };
-        row.getCell('C').alignment = { vertical: 'middle', horizontal: 'center' };
-        row.getCell('D').alignment = { vertical: 'middle', horizontal: 'center' };
-        row.getCell('E').alignment = { vertical: 'middle', horizontal: 'center' };
-        row.getCell('F').alignment = { vertical: 'middle', horizontal: 'center' };
-        row.getCell('G').alignment = { vertical: 'middle', horizontal: 'center' };
-        row.getCell('H').alignment = { vertical: 'middle', horizontal: 'center' };
-        row.getCell('I').alignment = { vertical: 'middle', horizontal: 'center' };
-        row.getCell('J').alignment = { vertical: 'middle', horizontal: 'center' };
+        // Centramos las columnas
+        ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'].forEach(col => {
+          row.getCell(col).alignment = { vertical: 'middle', horizontal: 'center' };
+        });
       }
 
       currentRow++;
@@ -139,7 +138,7 @@ export async function GET(request) {
       status: 200,
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': `attachment; filename="Fuerza_Trabajo_${nombreArchivoSeguro}.xlsx"`,
+        'Content-Disposition': `attachment; filename="FT_${nombreContratista}_${nombreArchivoSeguro}.xlsx"`,
       },
     });
 

@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import pool from '../../../../lib/db';
 import ExcelJS from 'exceljs';
 
-// Función auxiliar para leer fechas de Excel de forma segura
 const parseExcelDate = (cellValue) => {
   if (!cellValue) return null;
   if (cellValue instanceof Date) {
@@ -33,10 +32,8 @@ export async function POST(request) {
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(buffer);
     
-    // En lugar de buscar por ID, tomamos la primera hoja del arreglo de hojas
     const worksheet = workbook.worksheets[0];
 
-    // Validación de seguridad por si suben un excel totalmente dañado
     if (!worksheet) {
       return NextResponse.json({ error: "El archivo Excel no tiene hojas legibles." }, { status: 400 });
     }
@@ -46,13 +43,11 @@ export async function POST(request) {
     const nombresList = [];
     const erroresValidacion = [];
 
-    // 1. Cargamos TODAS las cuadrillas de esta contratista principal para cruzarlas al vuelo
     const [cuadrillasDb] = await pool.query(
       `SELECT id_subcontratista_ft, nombre FROM Subcontratistas_Fuerza_Trabajo WHERE id_subcontratista_principal = ?`,
       [parseInt(idPrincipal)]
     );
 
-    // 2. Extraemos y Validamos los datos de la Fila 5 en adelante
     worksheet.eachRow((row, rowNumber) => {
       if (rowNumber >= 5) {
         const nombre = row.getCell(2).value?.toString().trim();
@@ -76,7 +71,6 @@ export async function POST(request) {
           }
         }
 
-        // --- EXTRACCIÓN DE CUADRILLA ---
         const nombreCuadrillaExcel = row.getCell(5).value?.toString().trim() || '';
         let idCuadrilla = null;
         if (nombreCuadrillaExcel) {
@@ -92,7 +86,7 @@ export async function POST(request) {
           nombre_trabajador: nombre,
           puesto_categoria: row.getCell(3).value?.toString().trim() || 'N/A',
           nss: nss,
-          nombre_cuadrilla: nombreCuadrillaExcel, // <--- Guardamos el texto original de la celda
+          nombre_cuadrilla: nombreCuadrillaExcel, 
           id_subcontratista_ft: idCuadrilla, 
           fecha_ingreso_obra: fechaIngreso,
           fecha_alta_imss: fechaAlta,
@@ -114,7 +108,10 @@ export async function POST(request) {
       return NextResponse.json({ error: mensajeError }, { status: 400 });
     }
 
-    let queryExisten = `SELECT nss, nombre_trabajador FROM Fuerza_Trabajo WHERE fecha_baja IS NULL AND (`;
+    let queryExisten = `
+      SELECT nss, nombre_trabajador, apellido_trabajador, id_subcontratista_principal, fecha_baja 
+      FROM Fuerza_Trabajo WHERE (
+    `;
     const conditions = [];
     const queryParams = [];
 
@@ -123,7 +120,7 @@ export async function POST(request) {
       queryParams.push(nssList);
     }
     if (nombresList.length > 0) {
-      conditions.push(`nombre_trabajador IN (?)`);
+      conditions.push(`TRIM(CONCAT(IFNULL(apellido_trabajador, ''), ' ', IFNULL(nombre_trabajador, ''))) IN (?)`);
       queryParams.push(nombresList);
     }
 
@@ -136,9 +133,24 @@ export async function POST(request) {
     }
 
     const nuevosTrabajadores = excelTrabajadores.filter(excelRow => {
-      const existePorNss = excelRow.nss && yaExistentes.some(db => db.nss === excelRow.nss);
-      const existePorNombre = yaExistentes.some(db => db.nombre_trabajador.toLowerCase() === excelRow.nombre_trabajador.toLowerCase());
-      return !existePorNss && !existePorNombre;
+      const existeBloqueante = yaExistentes.some(db => {
+        const matchNss = excelRow.nss && db.nss === excelRow.nss;
+        
+        const nombreCompletoDb = `${db.apellido_trabajador || ''} ${db.nombre_trabajador || ''}`.trim().toLowerCase();
+        const matchNombre = nombreCompletoDb === excelRow.nombre_trabajador.toLowerCase();
+
+        if (matchNss || matchNombre) {
+          
+          if (db.fecha_baja === null) return true;
+          
+          if (db.id_subcontratista_principal === excelRow.id_subcontratista_principal) return true;
+          
+          return false;
+        }
+        return false;
+      });
+
+      return !existeBloqueante; 
     });
 
     return NextResponse.json({ 
@@ -154,10 +166,17 @@ export async function POST(request) {
   }
 }
 
-// 2. PUT: Hace el INSERT masivo e incluye la creación dinámica de cuadrillas
+
+
 export async function PUT(request) {
   try {
     const { trabajadores } = await request.json();
+    
+    const id_usuario_actual = request.headers.get('x-user-id');
+
+    if (!id_usuario_actual) {
+      return NextResponse.json({ error: "Usuario no identificado" }, { status: 401 });
+    }
 
     if (!trabajadores || trabajadores.length === 0) {
       return NextResponse.json({ error: "No hay trabajadores para guardar" }, { status: 400 });
@@ -166,10 +185,8 @@ export async function PUT(request) {
     for (const t of trabajadores) {
       let idCuadrillaFinal = t.id_subcontratista_ft;
 
-      // Si el Excel traía un nombre de cuadrilla, pero NO encontramos su ID (es decir, es nueva)
       if (!idCuadrillaFinal && t.nombre_cuadrilla) {
         
-        // Volvemos a buscar en la BD (Por si la creamos en el ciclo anterior para otro trabajador de la misma lista)
         const [existe] = await pool.query(
           `SELECT id_subcontratista_ft FROM Subcontratistas_Fuerza_Trabajo WHERE nombre = ? AND id_subcontratista_principal = ? LIMIT 1`,
           [t.nombre_cuadrilla, t.id_subcontratista_principal]
@@ -178,7 +195,6 @@ export async function PUT(request) {
         if (existe.length > 0) {
           idCuadrillaFinal = existe[0].id_subcontratista_ft;
         } else {
-          // La creamos y tomamos su nuevo ID
           const [nuevaCuadrilla] = await pool.query(
             `INSERT INTO Subcontratistas_Fuerza_Trabajo (nombre, id_subcontratista_principal) VALUES (?, ?)`,
             [t.nombre_cuadrilla, t.id_subcontratista_principal]
@@ -187,12 +203,12 @@ export async function PUT(request) {
         }
       }
 
-      // Insertamos al trabajador ya con su ID de cuadrilla validado/creado
       await pool.query(`
         INSERT INTO Fuerza_Trabajo 
-        (nombre_trabajador, puesto_categoria, nss, fecha_ingreso_obra, fecha_alta_imss, origen, id_subcontratista_principal, id_subcontratista_ft)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        (nombre_trabajador, apellido_trabajador, puesto_categoria, nss, fecha_ingreso_obra, fecha_alta_imss, origen, id_subcontratista_principal, id_subcontratista_ft, usuario_registro)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
+        '', 
         t.nombre_trabajador, 
         t.puesto_categoria, 
         t.nss || null, 
@@ -200,7 +216,8 @@ export async function PUT(request) {
         t.fecha_alta_imss || null, 
         t.origen, 
         t.id_subcontratista_principal, 
-        idCuadrillaFinal 
+        idCuadrillaFinal,
+        id_usuario_actual 
       ]);
     }
 
