@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { ClipboardList, Pencil, Trash2, Upload, Tractor } from 'lucide-react';
+import { ClipboardList, Pencil, Trash2, Upload, Tractor, FileSpreadsheet, FolderDown } from 'lucide-react';
 
 export default function MaquinariaPage() {
   const topRef = useRef(null); 
 
   const [userRole, setUserRole] = useState(null);
+  const [userArea, setUserArea] = useState(null); // --- NUEVO: Estado para el área del usuario ---
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -14,7 +15,8 @@ export default function MaquinariaPage() {
       .then(data => {
         if (data.success) {
           setUserRole(data.user.rol);
-          console.log("Rol:", data.user.rol);
+          setUserArea(data.user.area); // Extraemos el área (ej. 'ambiental' o 'seguridad')
+          console.log("Rol:", data.user.rol, "Area:", data.user.area);
         }
       });
   }, []);
@@ -31,10 +33,20 @@ export default function MaquinariaPage() {
   const [ordenPor, setOrdenPor] = useState('fecha_ingreso_obra');
   const [ordenDireccion, setOrdenDireccion] = useState('DESC');
 
+  // --- LÓGICA DE FECHAS (MENSUAL Y SEMANAL) ---
   const currentYear = new Date().getFullYear();
   const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0');
   const [exportMes, setExportMes] = useState(currentMonth);
   const [exportAnio, setExportAnio] = useState(String(currentYear));
+
+  const getCurrentWeek = () => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), 0, 1);
+    const days = Math.floor((now - start) / (24 * 60 * 60 * 1000));
+    const week = Math.ceil((days + start.getDay() + 1) / 7);
+    return `${now.getFullYear()}-W${String(week).padStart(2, '0')}`;
+  };
+  const [exportSemana, setExportSemana] = useState(getCurrentWeek()); // --- NUEVO: Filtro semanal ---
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -42,7 +54,6 @@ export default function MaquinariaPage() {
   const [editId, setEditId] = useState(null);
   const [imageFile, setImageFile] = useState(null);
   
-  // --- AJUSTE: Agregamos el campo area al estado inicial ---
   const formInicial = {
     num_economico: '', tipo: '', marca: '', anio: '', modelo: '', 
     color: '', serie: '', placa: '', horometro: '', 
@@ -99,10 +110,19 @@ export default function MaquinariaPage() {
     fetchCatalogos();
   }, []);
 
+  // --- AJUSTE: Fetch condicional dependiendo del área ---
   const fetchMaquinaria = async () => {
     setLoading(true);
     try {
-      let url = `/api/maquinaria?mes=${exportMes}&anio=${exportAnio}&ordenPor=${ordenPor}&ordenDireccion=${ordenDireccion}&`;
+      let url = `/api/maquinaria?ordenPor=${ordenPor}&ordenDireccion=${ordenDireccion}&`;
+      if (userArea) url += `area_usuario=${userArea}&`;
+      
+      if (userArea === 'ambiental') {
+        url += `semana=${exportSemana}&`;
+      } else {
+        url += `mes=${exportMes}&anio=${exportAnio}&`;
+      }
+
       if (filtroSub) url += `subcontratista=${filtroSub}&`;
       if (busqueda) url += `busqueda=${encodeURIComponent(busqueda)}&`; 
       
@@ -115,8 +135,9 @@ export default function MaquinariaPage() {
     }
   };
 
-  useEffect(() => { fetchMaquinaria(); }, [filtroSub, exportMes, exportAnio, busqueda, ordenPor, ordenDireccion]);
-  useEffect(() => { setCurrentPage(1); }, [busqueda, filtroSub, exportMes, exportAnio, ordenPor, ordenDireccion]);
+  // --- AJUSTE: Agregar dependencias del área y semana ---
+  useEffect(() => { fetchMaquinaria(); }, [filtroSub, exportMes, exportAnio, exportSemana, userArea, busqueda, ordenPor, ordenDireccion]);
+  useEffect(() => { setCurrentPage(1); }, [busqueda, filtroSub, exportMes, exportAnio, exportSemana, userArea, ordenPor, ordenDireccion]);
 
   useEffect(() => {
     if (topRef.current) topRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -232,7 +253,7 @@ export default function MaquinariaPage() {
       intervalo_mantenimiento: m.intervalo_mantenimiento || '', 
       fecha_ingreso_obra: formatForInput(m.fecha_ingreso_obra), 
       id_subcontratista: m.id_subcontratista || '', 
-      area: m.area || 'seguridad', // --- AJUSTE: Cargar el área en edición ---
+      area: m.area || 'seguridad',
       imagen_url_actual: m.imagen_url || ''
     });
     setImageFile(null); setEditId(m.id_maquinaria); setIsEditing(true); setIsModalOpen(true);
@@ -309,6 +330,11 @@ export default function MaquinariaPage() {
     setBusqueda('');
   };
 
+const handleGenerarInspeccion = (id_maquina) => {
+    // Agregamos el parámetro semana a la URL
+    window.open(`/api/maquinaria/exportar-inspeccion?id=${id_maquina}&semana=${exportSemana}`, '_blank');
+  };
+
   return (
     <div className="space-y-6 relative" ref={topRef}>
       
@@ -322,22 +348,39 @@ export default function MaquinariaPage() {
             <Upload className="w-4 h-4 mr-1 sm:mr-2" /> Importar Excel
           </button>
 
-          <div className="flex items-center justify-between sm:justify-start space-x-1 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 p-1 rounded-md shadow-sm w-full sm:w-auto">
-            <select className="text-sm bg-transparent border-gray-300 dark:border-slate-600 dark:text-gray-200 rounded py-1 pl-2 pr-6 focus:ring-[var(--recal-blue)] outline-none flex-1 sm:flex-none" value={exportMes} onChange={(e) => setExportMes(e.target.value)}>
-              <option value="01">Ene</option><option value="02">Feb</option><option value="03">Mar</option><option value="04">Abr</option>
-              <option value="05">May</option><option value="06">Jun</option><option value="07">Jul</option><option value="08">Ago</option>
-              <option value="09">Sep</option><option value="10">Oct</option><option value="11">Nov</option><option value="12">Dic</option>
-            </select>
-            <select className="text-sm bg-transparent border-gray-300 dark:border-slate-600 dark:text-gray-200 rounded py-1 pl-2 pr-6 focus:ring-[var(--recal-blue)] outline-none flex-1 sm:flex-none" value={exportAnio} onChange={(e) => setExportAnio(e.target.value)}>
-              <option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option><option value="2027">2027</option>
-            </select>
-          </div>
-
+          {/* --- AJUSTE: MUESTRA SEMANA PARA AMBIENTAL, MES/AÑO PARA LOS DEMÁS --- */}
+          {userArea === 'Medio Ambiente' ? (
+            <div className="flex items-center justify-between sm:justify-start space-x-1 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 p-1 rounded-md shadow-sm w-full sm:w-auto">
+              <input 
+                type="week" 
+                className="text-sm bg-transparent border-none dark:text-gray-200 rounded py-1 px-2 focus:ring-[var(--recal-blue)] outline-none flex-1 sm:flex-none" 
+                value={exportSemana} 
+                onChange={(e) => setExportSemana(e.target.value)} 
+                title="Semana de Inspección"
+              />
+            </div>
+          ) : (
+            <div className="flex items-center justify-between sm:justify-start space-x-1 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 p-1 rounded-md shadow-sm w-full sm:w-auto">
+              <select className="text-sm bg-transparent border-gray-300 dark:border-slate-600 dark:text-gray-200 rounded py-1 pl-2 pr-6 focus:ring-[var(--recal-blue)] outline-none flex-1 sm:flex-none" value={exportMes} onChange={(e) => setExportMes(e.target.value)}>
+                <option value="01">Ene</option><option value="02">Feb</option><option value="03">Mar</option><option value="04">Abr</option>
+                <option value="05">May</option><option value="06">Jun</option><option value="07">Jul</option><option value="08">Ago</option>
+                <option value="09">Sep</option><option value="10">Oct</option><option value="11">Nov</option><option value="12">Dic</option>
+              </select>
+              <select className="text-sm bg-transparent border-gray-300 dark:border-slate-600 dark:text-gray-200 rounded py-1 pl-2 pr-6 focus:ring-[var(--recal-blue)] outline-none flex-1 sm:flex-none" value={exportAnio} onChange={(e) => setExportAnio(e.target.value)}>
+                <option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option><option value="2027">2027</option>
+              </select>
+            </div>
+          )}
+          {(userArea === 'Medio Ambiente' || userRole === 'Master') && (
+            <button onClick={() => window.open(`/api/maquinaria/exportar-inspecciones-masivas?semana=${exportSemana}`, '_blank')} className="flex-1 sm:flex-none justify-center bg-teal-600 hover:bg-teal-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
+              <FolderDown className="w-4 h-4 mr-1 sm:mr-2" /> ZIP Inspecciones
+            </button>
+          )}
           <div className="flex gap-1 w-full sm:w-auto">
-            <a href={`/api/maquinaria/exportar-utilizacion?mes=${exportMes}&anio=${exportAnio}`} target="_blank" className="flex-1 sm:flex-none justify-center bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
+            <a href={`/api/maquinaria/exportar-utilizacion?${userArea === 'ambiental' ? `semana=${exportSemana}` : `mes=${exportMes}&anio=${exportAnio}`}&area_usuario=${userArea}`} target="_blank" className="flex-1 sm:flex-none justify-center bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
               <span className="mr-1">📊</span> <span className="hidden sm:inline">Utilización</span><span className="sm:hidden">Util</span>
             </a>
-            <a href={`/api/maquinaria/exportar-plan-servicio?mes=${exportMes}&anio=${exportAnio}`} target="_blank" className="flex-1 sm:flex-none justify-center bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
+            <a href={`/api/maquinaria/exportar-plan-servicio?${userArea === 'ambiental' ? `semana=${exportSemana}` : `mes=${exportMes}&anio=${exportAnio}`}&area_usuario=${userArea}`} target="_blank" className="flex-1 sm:flex-none justify-center bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
               <span className="mr-1">🛠️</span> <span className="hidden sm:inline">Servicio</span><span className="sm:hidden">Serv</span>
             </a>
           </div>
@@ -470,10 +513,50 @@ export default function MaquinariaPage() {
                     
                     <td className="flex justify-end items-center md:table-cell px-2 md:px-4 py-4 md:py-4 text-sm font-medium border-b dark:border-slate-700 md:border-none">
                       <div className="flex justify-end items-center gap-2 md:gap-3">
-                        <button onClick={() => abrirHistorial(m)} title="Historial de Servicio" className="text-[var(--recal-blue)] dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 p-2 rounded-md border border-blue-200 dark:border-blue-800 transition-colors"><ClipboardList className="w-4 h-4 sm:w-5 sm:h-5" /></button>
-                        <button onClick={() => handleEditClick(m)} title="Editar Equipo" className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 p-2 rounded-md transition-colors"><Pencil className="w-4 h-4 sm:w-5 sm:h-5" /></button>
+                        
+                        {/* Botón: Generar Inspección (Individual) */}
+                        {(userArea === 'Medio Ambiente' || userRole === 'Master') && (
+                          <div className="relative group flex items-center justify-center">
+                            <button onClick={() => handleGenerarInspeccion(m.id_maquinaria)} className="text-green-600 dark:text-green-400 hover:text-green-800 hover:bg-blue-50 dark:hover:bg-blue-50 p-2 rounded-md transition-colors">
+                              <FileSpreadsheet className="w-4 h-4 sm:w-5 sm:h-5" />
+                            </button>
+                            <div className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
+                              Generar Inspección
+                              <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-gray-800"></div>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="relative group flex items-center justify-center">
+                          <button onClick={() => abrirHistorial(m)} className="text-[var(--recal-blue)] dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 p-2 rounded-md transition-colors">
+                            <ClipboardList className="w-4 h-4 sm:w-5 sm:h-5" />
+                          </button>
+                          <div className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
+                            Historial de Servicio
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-gray-800"></div>
+                          </div>
+                        </div>
+
+                        <div className="relative group flex items-center justify-center">
+                          <button onClick={() => handleEditClick(m)} className="text-blue-600 dark:text-blue-400 hover:text-blue-800 hover:bg-blue-50 p-2 rounded-md transition-colors">
+                            <Pencil className="w-4 h-4 sm:w-5 sm:h-5" />
+                          </button>
+                          <div className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
+                            Editar Equipo
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-gray-800"></div>
+                          </div>
+                        </div>
+
                         {!m.fecha_baja && (
-                          <button onClick={() => handleBajaClick(m.id_maquinaria)} title="Dar de Baja" className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 p-2 rounded-md transition-colors"><Trash2 className="w-4 h-4 sm:w-5 sm:h-5" /></button>
+                          <div className="relative group flex items-center justify-center">
+                            <button onClick={() => handleBajaClick(m.id_maquinaria)} className="text-red-500 dark:text-red-400 hover:text-red-700 hover:bg-red-50 p-2 rounded-md transition-colors">
+                              <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                            </button>
+                            <div className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
+                              Dar de Baja
+                              <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-gray-800"></div>
+                            </div>
+                          </div>
                         )}
                       </div>
                     </td>
@@ -557,7 +640,6 @@ export default function MaquinariaPage() {
                   </select>
                 </div>
 
-                {/* --- NUEVO: SELECTOR DE ÁREA PARA MAQUINARIA --- */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Área Asignada *</label>
                   <select required className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.area} onChange={e => setFormData({...formData, area: e.target.value})}>
