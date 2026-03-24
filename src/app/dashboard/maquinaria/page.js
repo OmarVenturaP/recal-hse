@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { ClipboardList, Pencil, Trash2, Upload, Tractor, FileSpreadsheet, FolderDown } from 'lucide-react';
+import Swal from 'sweetalert2';
 
 export default function MaquinariaPage() {
   const topRef = useRef(null); 
 
   const [userRole, setUserRole] = useState(null);
-  const [userArea, setUserArea] = useState(null); // --- NUEVO: Estado para el área del usuario ---
+  const [userArea, setUserArea] = useState(null); 
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -15,7 +16,7 @@ export default function MaquinariaPage() {
       .then(data => {
         if (data.success) {
           setUserRole(data.user.rol);
-          setUserArea(data.user.area); // Extraemos el área (ej. 'ambiental' o 'seguridad')
+          setUserArea(data.user.area); 
           console.log("Rol:", data.user.rol, "Area:", data.user.area);
         }
       });
@@ -33,7 +34,6 @@ export default function MaquinariaPage() {
   const [ordenPor, setOrdenPor] = useState('fecha_ingreso_obra');
   const [ordenDireccion, setOrdenDireccion] = useState('DESC');
 
-  // --- LÓGICA DE FECHAS (MENSUAL Y SEMANAL) ---
   const currentYear = new Date().getFullYear();
   const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0');
   const [exportMes, setExportMes] = useState(currentMonth);
@@ -46,7 +46,7 @@ export default function MaquinariaPage() {
     const week = Math.ceil((days + start.getDay() + 1) / 7);
     return `${now.getFullYear()}-W${String(week).padStart(2, '0')}`;
   };
-  const [exportSemana, setExportSemana] = useState(getCurrentWeek()); // --- NUEVO: Filtro semanal ---
+  const [exportSemana, setExportSemana] = useState(getCurrentWeek()); 
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -110,7 +110,6 @@ export default function MaquinariaPage() {
     fetchCatalogos();
   }, []);
 
-  // --- AJUSTE: Fetch condicional dependiendo del área ---
   const fetchMaquinaria = async () => {
     setLoading(true);
     try {
@@ -135,7 +134,6 @@ export default function MaquinariaPage() {
     }
   };
 
-  // --- AJUSTE: Agregar dependencias del área y semana ---
   useEffect(() => { fetchMaquinaria(); }, [filtroSub, exportMes, exportAnio, exportSemana, userArea, busqueda, ordenPor, ordenDireccion]);
   useEffect(() => { setCurrentPage(1); }, [busqueda, filtroSub, exportMes, exportAnio, exportSemana, userArea, ordenPor, ordenDireccion]);
 
@@ -230,7 +228,7 @@ export default function MaquinariaPage() {
       if (res.ok && data.success) {
         setIsImportModalOpen(false);
         fetchMaquinaria(); 
-        alert(data.mensaje); 
+        Swal.fire('¡Éxito!', data.mensaje, 'success'); 
       } else {
         setImportError(data.error || "Error al guardar en base de datos.");
       }
@@ -270,8 +268,11 @@ export default function MaquinariaPage() {
       const method = isEditing ? 'PUT' : 'POST';
       const res = await fetch('/api/maquinaria', { method, body: submitData });
       const data = await res.json();
-      if (data.success) { setIsModalOpen(false); setImageFile(null); fetchMaquinaria(); } else alert(data.error);
-    } catch (error) { alert("Error al guardar"); } finally { setSaving(false); }
+      if (data.success) { 
+        setIsModalOpen(false); setImageFile(null); fetchMaquinaria(); 
+        Swal.fire('Guardado', 'Los datos de la maquinaria/equipo se guardaron correctamente.', 'success');
+      } else Swal.fire('Error', data.error, 'error');
+    } catch (error) { Swal.fire('Error', 'Error al guardar los datos de la maquinaria/equipo.', 'error'); } finally { setSaving(false); }
   };
 
   const handleBajaClick = (id) => {
@@ -286,8 +287,11 @@ export default function MaquinariaPage() {
         body: JSON.stringify({ id_maquinaria: bajaId, fecha_baja: bajaFecha })
       });
       const data = await res.json();
-      if (data.success) { setIsBajaModalOpen(false); fetchMaquinaria(); } else alert(data.error);
-    } catch (error) { alert("Error de conexión"); } finally { setSaving(false); }
+      if (data.success) { 
+        setIsBajaModalOpen(false); fetchMaquinaria(); 
+        Swal.fire('Baja Confirmada', 'La maquinaria ha sido dada de baja correctamente.', 'success');
+      } else Swal.fire('Error', data.error, 'error');
+    } catch (error) { Swal.fire('Error', 'Error de conexión al procesar la baja.', 'error'); } finally { setSaving(false); }
   };
 
   const abrirHistorial = async (maquina) => {
@@ -309,8 +313,13 @@ export default function MaquinariaPage() {
         body: JSON.stringify({ ...formMantenimiento, id_maquinaria: maquinaSeleccionada.id_maquinaria })
       });
       const data = await res.json();
-      if (data.success) { abrirHistorial(maquinaSeleccionada); fetchMaquinaria(); }
-    } catch (error) {} finally { setSaving(false); }
+      if (data.success) { 
+        abrirHistorial(maquinaSeleccionada); fetchMaquinaria(); 
+        Swal.fire('Servicio Registrado', 'El mantenimiento se ha guardado exitosamente.', 'success');
+      } else {
+        Swal.fire('Error', data.error || 'No se pudo guardar el servicio', 'error');
+      }
+    } catch (error) { Swal.fire('Error', 'Problema de conexión al guardar el servicio', 'error'); } finally { setSaving(false); }
   };
 
   const renderBadge = (estado, horasRestantes) => {
@@ -331,7 +340,6 @@ export default function MaquinariaPage() {
   };
 
 const handleGenerarInspeccion = (id_maquina) => {
-    // Agregamos el parámetro semana a la URL
     window.open(`/api/maquinaria/exportar-inspeccion?id=${id_maquina}&semana=${exportSemana}`, '_blank');
   };
 

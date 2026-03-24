@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { Pencil, KeyRound, Shield } from 'lucide-react';
+// 1. IMPORTAMOS SWEETALERT
+import Swal from 'sweetalert2';
 
 export default function UsuariosPage() {
   const [usuarios, setUsuarios] = useState([]);
@@ -69,38 +71,48 @@ export default function UsuariosPage() {
       if (data.success) {
         setIsModalOpen(false);
         fetchUsuarios();
+        Swal.fire('Guardado', 'Los datos del usuario se han actualizado correctamente.', 'success');
       } else {
-        alert(data.error);
+        Swal.fire('Error', data.error, 'error');
       }
     } catch (error) {
-      alert("Error de conexión al guardar");
+      Swal.fire('Error', 'Error de conexión al guardar los datos.', 'error');
     } finally {
       setSaving(false);
     }
   };
 
   const handleResetPassword = async (id, nombre) => {
-    const confirmar = window.confirm(`¿Estás seguro de restaurar la contraseña de ${nombre} a "RecalHSE"?\nEl sistema le pedirá cambiarla en su próximo ingreso.`);
-    
-    if (confirmar) {
-      try {
-        const res = await fetch('/api/usuarios', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id_personal: id })
-        });
-        const data = await res.json();
-        
-        if (data.success) {
-          alert(`Contraseña de ${nombre} restaurada con éxito.`);
-          fetchUsuarios();
-        } else {
-          alert(data.error);
+    Swal.fire({
+      title: '¿Restaurar contraseña?',
+      text: `La contraseña de ${nombre} volverá a ser "RecalHSE" y el sistema le pedirá cambiarla en su próximo ingreso.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#3085d6',
+      cancelButtonColor: '#d33',
+      confirmButtonText: 'Sí, restaurar',
+      cancelButtonText: 'Cancelar'
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          const res = await fetch('/api/usuarios', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id_personal: id })
+          });
+          const data = await res.json();
+          
+          if (data.success) {
+            Swal.fire('¡Éxito!', `Contraseña de ${nombre} restaurada correctamente.`, 'success');
+            fetchUsuarios();
+          } else {
+            Swal.fire('Error', data.error, 'error');
+          }
+        } catch (error) {
+          Swal.fire('Error', 'Ocurrió un error al intentar restaurar la contraseña.', 'error');
         }
-      } catch (error) {
-        alert("Error al restaurar contraseña.");
       }
-    }
+    });
   };
 
   return (
@@ -117,7 +129,6 @@ export default function UsuariosPage() {
         </button>
       </div>
 
-      {/* TABLA RESPONSIVA TABLE-TO-CARDS */}
       <div className="bg-white dark:bg-slate-800 shadow-sm rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
@@ -170,20 +181,32 @@ export default function UsuariosPage() {
 
                   <td className="flex justify-end items-center md:table-cell px-2 md:px-6 py-4 md:py-4 text-sm font-medium border-b dark:border-slate-700 md:border-none">
                     <div className="flex justify-end items-center gap-2">
-                      <button 
-                        onClick={() => handleResetPassword(u.id_personal, u.nombre)} 
-                        title="Restaurar Contraseña"
-                        className="text-orange-600 dark:text-orange-400 hover:text-orange-800 dark:hover:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/30 p-2 rounded-md transition-colors border border-orange-200 dark:border-orange-800 md:border-none flex items-center justify-center"
-                      >
-                        <KeyRound className="w-4 h-4 sm:w-5 sm:h-5" />
-                      </button>
-                      <button 
-                        onClick={() => handleEditClick(u)} 
-                        title="Editar Usuario"
-                        className="text-[var(--recal-blue)] dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 p-2 rounded-md transition-colors border border-blue-200 dark:border-blue-800 md:border-none flex items-center justify-center"
-                      >
-                        <Pencil className="w-4 h-4 sm:w-5 sm:h-5" />
-                      </button>
+                      
+                      <div className="relative group flex items-center justify-center">
+                        <button 
+                          onClick={() => handleResetPassword(u.id_personal, u.nombre)} 
+                          className="text-orange-600 dark:text-orange-400 hover:text-orange-800 dark:hover:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/30 p-2 rounded-md transition-colors border border-orange-200 dark:border-orange-800 md:border-none flex items-center justify-center"
+                        >
+                          <KeyRound className="w-4 h-4 sm:w-5 sm:h-5" />
+                        </button>
+                        <div className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
+                          Restaurar Contraseña
+                          <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-gray-800"></div>
+                        </div>
+                      </div>
+                      <div className="relative group flex items-center justify-center">
+                        <button 
+                          onClick={() => handleEditClick(u)} 
+                          className="text-[var(--recal-blue)] dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 p-2 rounded-md transition-colors border border-blue-200 dark:border-blue-800 md:border-none flex items-center justify-center"
+                        >
+                          <Pencil className="w-4 h-4 sm:w-5 sm:h-5" />
+                        </button>
+                        <div className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
+                          Editar Usuario
+                          <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-gray-800"></div>
+                        </div>
+                      </div>
+
                     </div>
                   </td>
 
