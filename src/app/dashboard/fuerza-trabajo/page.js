@@ -2,16 +2,16 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Pencil, Trash2, Upload, FileSpreadsheet } from 'lucide-react';
+import Swal from 'sweetalert2';
 
 export default function FuerzaTrabajoPage() {
   const topRef = useRef(null); 
 
-const [userRole, setUserRole] = useState(null);
-  const [userFtPermission, setUserFtPermission] = useState(null);  // Corregido el nombre
+  const [userRole, setUserRole] = useState(null);
+  const [userFtPermission, setUserFtPermission] = useState(null); 
   const [userCertPermission, setUserCertPermission] = useState(null);
 
-useEffect(() => {
-    // Cargamos rol
+  useEffect(() => {
     fetch('/api/auth/me')
       .then(res => res.json())
       .then(data => {
@@ -28,8 +28,8 @@ useEffect(() => {
       });
   }, []);
 
-  const canManageFt = userFtPermission === 1 || userRole === 'Admin' || userRole === 'Master';
-  const canManageCert = userCertPermission === 1 || userRole === 'Admin' || userRole === 'Master';
+  const canManageFt = userFtPermission === 1 || userRole === 'Master';
+  const canManageCert = userCertPermission === 1 || userRole === 'Master';
 
   const [trabajadores, setTrabajadores] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -39,7 +39,6 @@ useEffect(() => {
   const [catCuadrillas, setCatCuadrillas] = useState([]);
   const [catPuestos, setCatPuestos] = useState([]);
 
-  // --- FECHAS POR DEFECTO (Última Semana) ---
   const getDateString = (date) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -51,32 +50,26 @@ useEffect(() => {
   const haceUnaSemana = new Date();
   haceUnaSemana.setDate(hoy.getDate() - 6);
 
-  // Estados Unificados para Filtros y Exportación
   const [fechaInicio, setFechaInicio] = useState(getDateString(haceUnaSemana));
   const [fechaFin, setFechaFin] = useState(getDateString(hoy));
   const [filtroSub, setFiltroSub] = useState('');
   const [busqueda, setBusqueda] = useState('');
 
-  // Estados para Ordenamiento
   const [ordenPor, setOrdenPor] = useState('fecha_ingreso_obra');
   const [ordenDireccion, setOrdenDireccion] = useState('DESC');
 
-  // Estados de Paginación
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
-  // Estados para el Modal de Edición/Nuevo
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
 
-  // Estados para el Modal de Baja
   const [isBajaModalOpen, setIsBajaModalOpen] = useState(false);
   const [bajaId, setBajaId] = useState(null);
   const [bajaFecha, setBajaFecha] = useState('');
 
-  // Estados de Importación Masiva
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importFile, setImportFile] = useState(null);
   const [importSubcontratista, setImportSubcontratista] = useState('');
@@ -112,7 +105,7 @@ useEffect(() => {
     return `${year}-${month}-${day}`;
   };
 
-    useEffect(() => {
+  useEffect(() => {
     const fetchCatalogos = async () => {
       try {
         const res = await fetch('/api/catalogos/subcontratistas');
@@ -130,20 +123,6 @@ useEffect(() => {
       } catch (error) {
         console.error("Error cargando catálogos", error);
       }
-    };
-    fetchCatalogos();
-  }, []);
-
-  useEffect(() => {
-    const fetchCatalogos = async () => {
-      try {
-        const res = await fetch('/api/catalogos/subcontratistas');
-        const data = await res.json();
-        if (data.success) {
-          setCatPrincipales(data.principales);
-          setCatCuadrillas(data.cuadrillas);
-        }
-      } catch (error) {}
     };
     fetchCatalogos();
   }, []);
@@ -200,14 +179,24 @@ useEffect(() => {
 
   const handleExportarClick = () => {
     if (!fechaInicio || !fechaFin) {
-      alert("Por favor selecciona las fechas de la semana que deseas exportar.");
+      Swal.fire('Atención', 'Por favor selecciona las fechas de la semana que deseas exportar.', 'warning');
       return;
     }
-    const confirmacion = window.confirm(`¿Confirmas que deseas exportar únicamente al personal activo en el periodo del ${formatDDMMYYYY(fechaInicio)} al ${formatDDMMYYYY(fechaFin)}?`);
-    if (confirmacion) {
-      const url = `/api/fuerza-trabajo/exportar?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}&subcontratista=${filtroSub}`;
-      window.open(url, '_blank');
-    }
+    Swal.fire({
+      title: '¿Exportar personal?',
+      text: `Se exportará únicamente al personal activo en el periodo del ${formatDDMMYYYY(fechaInicio)} al ${formatDDMMYYYY(fechaFin)}.`,
+      icon: 'info',
+      showCancelButton: true,
+      confirmButtonColor: '#3085d6',
+      cancelButtonColor: '#d33',
+      confirmButtonText: 'Sí, exportar',
+      cancelButtonText: 'Cancelar'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        const url = `/api/fuerza-trabajo/exportar?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}&subcontratista=${filtroSub}`;
+        window.open(url, '_blank');
+      }
+    });
   };
 
   const handleOpenImportModal = () => {
@@ -242,7 +231,8 @@ useEffect(() => {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setIsImportModalOpen(false); fetchTrabajadores(); alert(data.mensaje); 
+        setIsImportModalOpen(false); fetchTrabajadores(); 
+        Swal.fire('¡Éxito!', data.mensaje, 'success');
       } else setImportError(data.error || "Error al guardar en base de datos.");
     } catch (error) { setImportError("Error de conexión al guardar."); } finally { setImporting(false); }
   };
@@ -271,14 +261,14 @@ useEffect(() => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (formData.nss && !/^\d{11}$/.test(formData.nss)) {
-      alert("El NSS debe contener exactamente 11 dígitos numéricos."); return;
+      Swal.fire('Error', 'El NSS debe contener exactamente 11 dígitos numéricos.', 'error'); return;
     }
     if (formData.curp && formData.curp.length !== 18) {
-      alert("La CURP debe contener exactamente 18 caracteres."); return;
+      Swal.fire('Error', 'La CURP debe contener exactamente 18 caracteres.', 'error'); return;
     }
     if (formData.fecha_alta_imss && formData.fecha_ingreso_obra) {
       const alta = new Date(formData.fecha_alta_imss); const ingreso = new Date(formData.fecha_ingreso_obra);
-      if (alta > ingreso) { alert("Error: La fecha de alta del IMSS no puede ser mayor a la fecha de ingreso."); return; }
+      if (alta > ingreso) { Swal.fire('Error', 'La fecha de alta del IMSS no puede ser mayor a la fecha de ingreso.', 'error'); return; }
     }
     setSaving(true);
     try {
@@ -291,8 +281,11 @@ useEffect(() => {
       });
       const data = await res.json();
       
-      if (data.success) { setIsModalOpen(false); fetchTrabajadores(); } else alert(data.error);
-    } catch (error) { alert("Error de conexión al guardar"); } finally { setSaving(false); }
+      if (data.success) { 
+        setIsModalOpen(false); fetchTrabajadores(); 
+        Swal.fire('Guardado', 'Los datos del trabajador se guardaron correctamente.', 'success');
+      } else Swal.fire('Error', data.error, 'error');
+    } catch (error) { Swal.fire('Error', 'Error de conexión al guardar', 'error'); } finally { setSaving(false); }
   };
 
   const handleBajaClick = (id) => {
@@ -306,8 +299,11 @@ useEffect(() => {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id_trabajador: bajaId, fecha_baja: bajaFecha })
       });
       const data = await res.json();
-      if (data.success) { setIsBajaModalOpen(false); fetchTrabajadores(); } else alert(data.error);
-    } catch (error) { alert("Error de conexión"); } finally { setSaving(false); }
+      if (data.success) { 
+        setIsBajaModalOpen(false); fetchTrabajadores(); 
+        Swal.fire('Baja Confirmada', 'El trabajador ha sido dado de baja.', 'success');
+      } else Swal.fire('Error', data.error, 'error');
+    } catch (error) { Swal.fire('Error', 'Error de conexión', 'error'); } finally { setSaving(false); }
   };
 
   const limpiarFiltros = () => { 
@@ -319,50 +315,95 @@ useEffect(() => {
 
   const cuadrillasFiltradas = catCuadrillas.filter(c => c.id_subcontratista_principal == formData.id_subcontratista_principal);
 
-  const handleExportarEdades = async () => {
+  const esMesAnterior = (fechaAltaStr, fechaInicioPeriodoStr) => {
+    if (!fechaAltaStr) return false;
+    const alta = new Date(fechaAltaStr);
+    const inicioPeriodo = new Date(fechaInicioPeriodoStr);
+    
+    const mesAlta = alta.getUTCMonth();
+    const anioAlta = alta.getUTCFullYear();
+    const mesInicio = inicioPeriodo.getUTCMonth();
+    const anioInicio = inicioPeriodo.getUTCFullYear();
+
+    if (anioAlta === anioInicio && mesAlta === mesInicio - 1) return true;
+    if (anioAlta === anioInicio - 1 && mesAlta === 11 && mesInicio === 0) return true;
+    if (alta < inicioPeriodo) return true; 
+
+    return false;
+  };
+
+  const handleGenerarCertificadosMasivo = async () => {
     if (!fechaInicio || !fechaFin) {
-      alert("Por favor selecciona las fechas del periodo.");
+      Swal.fire('Atención', 'Selecciona el periodo para generar los certificados.', 'warning');
       return;
     }
-
+    
     try {
-      let url = `/api/fuerza-trabajo/exportar-edades?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`;
-      if (filtroSub) {
-        url += `&subcontratista=${filtroSub}`;
+      let valUrl = `/api/fuerza-trabajo/exportar-certificados?validar=true&fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`;
+      if (filtroSub) valUrl += `&subcontratista=${filtroSub}`;
+      
+      const res = await fetch(valUrl);
+      const data = await res.json();
+      
+      if (data.faltantes && data.faltantes.length > 0) {
+          Swal.fire({
+            title: '⚠️ AVISO DE CURP FALTANTES',
+            html: `Hay trabajadores de NUEVO INGRESO cuya alta del IMSS es de un mes anterior y NO tienen CURP:<br><br><b>${data.faltantes.join('<br>')}</b><br><br>Si continúas, el sistema OMITIRÁ a estas personas.`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#3085d6',
+            cancelButtonColor: '#d33',
+            confirmButtonText: 'Sí, continuar omitiéndolos',
+            cancelButtonText: 'Cancelar'
+          }).then((result) => {
+            if (result.isConfirmed) {
+              abrirRutaExportacionMasiva(true);
+            }
+          });
+      } else {
+          Swal.fire({
+            title: '⚠️ EXPORTACIÓN MASIVA',
+            text: `Se generarán los certificados ÚNICAMENTE para el personal de NUEVO INGRESO dado de alta entre el ${formatDDMMYYYY(fechaInicio)} y el ${formatDDMMYYYY(fechaFin)}.`,
+            icon: 'info',
+            showCancelButton: true,
+            confirmButtonColor: '#3085d6',
+            cancelButtonColor: '#d33',
+            confirmButtonText: 'Generar Certificados',
+            cancelButtonText: 'Cancelar'
+          }).then((result) => {
+            if (result.isConfirmed) {
+              abrirRutaExportacionMasiva(false);
+            }
+          });
       }
-
-      const res = await fetch(url);
-
-      if (!res.ok) {
-        const data = await res.json();
-        if (data.faltantes && data.faltantes.length > 0) {
-          alert(`No se puede generar el archivo.\n\nFalta capturar la CURP de los siguientes trabajadores (Alta en meses anteriores):\n\n• ${data.faltantes.join('\n• ')}\n\nPor favor, edítalos para agregar su CURP e intenta de nuevo.`);
-        } else {
-          alert(data.error || "Error al procesar la solicitud.");
-        }
-        return;
-      }
-
-      const blob = await res.blob();
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = downloadUrl;
-      const anio = fechaFin.split('-')[0];
-      a.download = `Edades_Ingresos_${anio}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(downloadUrl);
-
     } catch (error) {
-      alert("Error de red al intentar generar el reporte.");
+      Swal.fire('Error', 'Error verificando los datos de los certificados.', 'error');
     }
+  };
+
+  const abrirRutaExportacionMasiva = (omitirFaltantes) => {
+    let url = `/api/fuerza-trabajo/exportar-certificados?omitirFaltantes=${omitirFaltantes}&fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`;
+    if (filtroSub) url += `&subcontratista=${filtroSub}`;
+    window.open(url, '_blank');
+  }
+
+  const handleGenerarCertificadoIndividual = (trabajador) => {
+    const requiereCurpEstricto = esMesAnterior(trabajador.fecha_alta_imss, fechaInicio);
+    
+    if (requiereCurpEstricto && (!trabajador.curp || trabajador.curp.length !== 18)) {
+      Swal.fire({
+        title: '⚠️ CURP FALTANTE',
+        html: `No se puede generar el certificado individual de <b>${trabajador.nombre_trabajador}</b>.<br><br>Su fecha de alta en el IMSS es anterior al periodo filtrado, por lo que es OBLIGATORIO que tenga su CURP registrada.<br><br>Por favor, edita su perfil primero.`,
+        icon: 'error'
+      });
+      return;
+    }
+    window.open(`/api/fuerza-trabajo/exportar-certificados?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}&id_trabajador=${trabajador.id_trabajador}`, '_blank');
   };
 
   return (
     <div className="space-y-6 relative" ref={topRef}>
       
-      {/* HEADER Y BOTONES RESPONSIVOS */}
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center space-y-4 xl:space-y-0">
         <h2 className="text-xl sm:text-2xl font-bold text-[var(--recal-blue)] dark:text-white">Control de Fuerza de Trabajo</h2>
         
@@ -380,14 +421,10 @@ useEffect(() => {
           <button onClick={handleExportarClick} className="flex-1 sm:flex-none justify-center bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
             <span className="mr-1 sm:mr-2">📊</span> Exportar
           </button>
+          
           {canManageFt && (
             <button onClick={handleOpenImportModal} className="flex-1 sm:flex-none justify-center bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
               <Upload className="w-4 h-4 mr-1 sm:mr-2" /> Importar
-            </button>
-          )}
-          {canManageCert && (
-            <button onClick={handleExportarEdades} className="flex-1 sm:flex-none justify-center bg-teal-600 hover:bg-teal-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
-              <span className="mr-1 sm:mr-2">📈</span>Edades
             </button>
           )}
           {canManageFt && (
@@ -395,10 +432,15 @@ useEffect(() => {
               + Nuevo
             </button>
           )}
+
+          {canManageCert && (
+            <button onClick={handleGenerarCertificadosMasivo} className="flex-1 sm:flex-none justify-center bg-indigo-100 hover:bg-indigo-200 text-indigo-700 hover:text-indigo-800 px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
+              <span className="mr-1 sm:mr-2">🩺</span>Certificados
+            </button>
+          )}
         </div>
       </div>
 
-      {/* PANEL DE FILTROS REDUCIDO */}
       <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="md:col-span-2">
           <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Buscar Trabajador</label>
@@ -419,7 +461,6 @@ useEffect(() => {
         </div>
       </div>
 
-      {/* TABLA PRINCIPAL */}
       <div className="bg-white dark:bg-slate-800 shadow-sm rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
@@ -431,6 +472,7 @@ useEffect(() => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('fecha_ingreso_obra')}>Ingreso {ordenPor === 'fecha_ingreso_obra' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('fecha_alta_imss')}>Alta {ordenPor === 'fecha_alta_imss' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('nombre_subcontratista')}>Contratista {ordenPor === 'nombre_subcontratista' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Info</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Estatus</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Acciones</th>
                 {(userRole === 'Admin' || userRole === 'Master') && (
@@ -440,71 +482,130 @@ useEffect(() => {
             </thead>
             <tbody className="bg-white dark:bg-slate-800 divide-y md:divide-y-0 md:divide-gray-200 dark:md:divide-slate-700 block md:table-row-group">
               {loading ? (
-                <tr className="block md:table-row"><td colSpan="8" className="px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400 block md:table-cell">Cargando personal...</td></tr>
+                <tr className="block md:table-row"><td colSpan="10" className="px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400 block md:table-cell">Cargando personal...</td></tr>
               ) : trabajadores.length === 0 ? (
                 <tr className="block md:table-row">
-                  <td colSpan="8" className="px-6 py-12 text-center block md:table-cell">
+                  <td colSpan="10" className="px-6 py-12 text-center block md:table-cell">
                     <div className="text-gray-400 dark:text-gray-500 text-4xl mb-2">🔍</div>
                     <p className="text-sm font-medium text-gray-900 dark:text-gray-200">No se encontraron resultados en esta semana</p>
                   </td>
                 </tr>
-              ) : trabajadoresPaginados.map((t) => (
-                  <tr key={t.id_trabajador} className="block md:table-row border border-gray-200 dark:border-slate-700 md:border-none mb-4 md:mb-0 rounded-lg shadow-sm md:shadow-none p-4 md:p-0 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
-                    <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm font-bold text-[var(--recal-blue)] dark:text-white md:text-gray-900 border-b dark:border-slate-700 md:border-none">
-                      <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Nombre:</span>
-                      {`${t.apellido_trabajador || ''} ${t.nombre_trabajador}`.trim()}
-                    </td>
-                    <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
-                      <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Categoría:</span>{t.puesto_categoria}
-                    </td>
-                    <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
-                      <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">NSS:</span>{t.nss || 'N/A'}
-                    </td>
-                    <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
-                      <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Ingreso a obra:</span>{formatDDMMYYYY(t.fecha_ingreso_obra)}
-                    </td>
-                    <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
-                      <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Alta IMSS:</span>
-                      {t.fecha_alta_imss ? formatDDMMYYYY(t.fecha_alta_imss) : 'N/A'}
-                    </td>
-                    <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
-                      <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Contratista:</span>{t.nombre_subcontratista || 'RECAL'}
-                    </td>
-                    <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm border-b dark:border-slate-700 md:border-none">
-                      <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Estatus:</span>
-                      {t.fecha_baja ? (<span className="px-2 inline-flex text-xs font-semibold rounded-full bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300">Baja: {formatDDMMYYYY(t.fecha_baja)}</span>) : (<span className="px-2 inline-flex text-xs font-semibold rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">Activo</span>)}
-                    </td>
-                    <td className="flex justify-end items-center md:table-cell px-2 md:px-6 py-4 md:py-4 text-sm font-medium border-b dark:border-slate-700 md:border-none">
-                      <div className="flex justify-end items-center gap-2 md:gap-3">
-                        <button onClick={() => handleEditClick(t)} title="Editar" className="text-[var(--recal-blue)] dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 p-2 rounded-md transition-colors"><Pencil className="w-4 h-4 sm:w-5 sm:h-5" /></button>
-                        {!t.fecha_baja ? (
-                          <button onClick={() => handleBajaClick(t.id_trabajador)} title="Dar Baja" className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 p-2 rounded-md transition-colors"><Trash2 className="w-4 h-4 sm:w-5 sm:h-5" /></button>
-                        ) : (<span className="text-gray-400 dark:text-gray-500 italic text-xs px-2 flex items-center h-full">Retirado</span>)}
-                      </div>
-                    </td>
-                      {(userRole === 'Admin' || userRole === 'Master') && (
-                        <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 border-b dark:border-slate-700 md:border-none">
-                          <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 text-sm">Trazabilidad:</span>
-                          <div className="flex flex-col items-end md:items-start gap-1">
-                            {t.creador ? (
-                              <span className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 px-2 py-0.5 rounded text-[10px] font-bold border border-green-200 dark:border-green-800 w-max" title="Registrado por">
-                                Agregó: {t.creador}
-                              </span>
-                            ) : (
-                              <span className="bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-400 px-2 py-0.5 rounded text-[10px] font-bold border border-gray-200 dark:border-slate-600 w-max" title="Registrado por Master">
-                                Agregó: Master
-                              </span>
-                            )}
-                            {t.modificador && (
-                              <span className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 px-2 py-0.5 rounded text-[10px] font-bold border border-yellow-200 dark:border-yellow-800 w-max" title="Modificado por">
-                                Modificó: {t.modificador}
-                              </span>
-                            )}
+              ) : trabajadoresPaginados.map((t) => {
+                  const fechaIngresoStr = formatForInput(t.fecha_ingreso_obra);
+                  const isAlta = fechaIngresoStr >= fechaInicio && fechaIngresoStr <= fechaFin;
+                  
+                  const categoriasCriticas = ["SUPERVISOR DE SEGURIDAD", "OPERADOR DE MAQUINARIA", "SOLDADOR"];
+                  const requiereCurp = t.puesto_categoria && categoriasCriticas.some(cat => t.puesto_categoria.toUpperCase().includes(cat));
+                  const faltaCurp = isAlta && requiereCurp && !t.curp;
+
+                  return (
+                    <tr key={t.id_trabajador} className="block md:table-row border border-gray-200 dark:border-slate-700 md:border-none mb-4 md:mb-0 rounded-lg shadow-sm md:shadow-none p-4 md:p-0 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
+                      <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm font-bold text-[var(--recal-blue)] dark:text-white md:text-gray-900 border-b dark:border-slate-700 md:border-none">
+                        <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Nombre:</span>
+                        {`${t.apellido_trabajador || ''} ${t.nombre_trabajador}`.trim()}
+                      </td>
+                      <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
+                        <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Categoría:</span>{t.puesto_categoria}
+                      </td>
+                      <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
+                        <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">NSS:</span>{t.nss || 'N/A'}
+                      </td>
+                      <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
+                        <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Ingreso a obra:</span>{formatDDMMYYYY(t.fecha_ingreso_obra)}
+                      </td>
+                      <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
+                        <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Alta IMSS:</span>
+                        {t.fecha_alta_imss ? formatDDMMYYYY(t.fecha_alta_imss) : 'N/A'}
+                      </td>
+                      <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
+                        <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Contratista:</span>{t.nombre_subcontratista || 'RECAL'}
+                      </td>
+                      
+                      <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 text-sm border-b dark:border-slate-700 md:border-none">
+                        <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Info:</span>
+                        <div className="flex flex-wrap gap-1 justify-end md:justify-start">
+                          {isAlta && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                              ALTA
+                            </span>
+                          )}
+                          {faltaCurp && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-600 text-white dark:bg-red-900/30 dark:text-white">
+                              FALTA CURP
+                            </span>
+                          )}
+                          {!isAlta && !faltaCurp && <span className="text-gray-400 dark:text-gray-600">-</span>}
+                        </div>
+                      </td>
+
+                      <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm border-b dark:border-slate-700 md:border-none">
+                        <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Estatus:</span>
+                        {t.fecha_baja ? (<span className="px-2 inline-flex text-xs font-semibold rounded-full bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300">Baja: {formatDDMMYYYY(t.fecha_baja)}</span>) : (<span className="px-2 inline-flex text-xs font-semibold rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">Activo</span>)}
+                      </td>
+                      <td className="flex justify-end items-center md:table-cell px-2 md:px-6 py-4 md:py-4 text-sm font-medium border-b dark:border-slate-700 md:border-none">
+                        <div className="flex justify-end items-center gap-2 md:gap-3">
+                          
+                          {canManageCert && (
+                            <div className="relative group flex items-center justify-center">
+                              <button onClick={() => handleGenerarCertificadoIndividual(t)} className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 p-2 rounded-md transition-colors">
+                                <span className="w-4 h-4 sm:w-5 sm:h-5 block text-center">🩺</span>
+                              </button>
+                              <div className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
+                                Generar Certificado
+                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-gray-800"></div>
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="relative group flex items-center justify-center">
+                            <button onClick={() => handleEditClick(t)} className="text-[var(--recal-blue)] dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 p-2 rounded-md transition-colors">
+                              <Pencil className="w-4 h-4 sm:w-5 sm:h-5" />
+                            </button>
+                            <div className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
+                              Editar
+                              <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-gray-800"></div>
+                            </div>
                           </div>
-                        </td>
-                      )}
-                  </tr>
-                ))
+
+                          {!t.fecha_baja ? (
+                            <div className="relative group flex items-center justify-center">
+                              <button onClick={() => handleBajaClick(t.id_trabajador)} className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 p-2 rounded-md transition-colors">
+                                <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                              </button>
+                              <div className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
+                                Dar Baja
+                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-gray-800"></div>
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 dark:text-gray-500 italic text-xs px-2 flex items-center h-full">Retirado</span>
+                          )}
+                        </div>
+                      </td>
+                        {(userRole === 'Admin' || userRole === 'Master') && (
+                          <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 border-b dark:border-slate-700 md:border-none">
+                            <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 text-sm">Trazabilidad:</span>
+                            <div className="flex flex-col items-end md:items-start gap-1">
+                              {t.creador ? (
+                                <span className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 px-2 py-0.5 rounded text-[10px] font-bold border border-green-200 dark:border-green-800 w-max" title="Registrado por">
+                                  Agregó: {t.creador}
+                                </span>
+                              ) : (
+                                <span className="bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-400 px-2 py-0.5 rounded text-[10px] font-bold border border-gray-200 dark:border-slate-600 w-max" title="Registrado por Master">
+                                  Agregó: Master
+                                </span>
+                              )}
+                              {t.modificador && (
+                                <span className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 px-2 py-0.5 rounded text-[10px] font-bold border border-yellow-200 dark:border-yellow-800 w-max" title="Modificado por">
+                                  Modificó: {t.modificador}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        )}
+                    </tr>
+                  );
+                })
               }
             </tbody>
           </table>
@@ -678,7 +779,6 @@ useEffect(() => {
                 </div>
               )}
 
-              {/* FASE 1: Seleccionar Archivo y Contratista */}
               {importFase === 1 && (
                 <form onSubmit={handleAnalizarExcel} className="space-y-6 bg-white dark:bg-slate-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 bg-blue-50 dark:bg-blue-900/20 p-3 rounded border border-blue-100 dark:border-blue-800/50">
@@ -710,7 +810,6 @@ useEffect(() => {
                 </form>
               )}
 
-              {/* FASE 2: Previsualización de Datos Nuevos */}
               {importFase === 2 && (
                 <div className="space-y-4">
                   <div className="grid grid-cols-3 gap-4 text-center">
