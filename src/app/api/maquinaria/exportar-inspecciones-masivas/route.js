@@ -43,7 +43,7 @@ export async function GET(request) {
 
     // 3. Iterar sobre cada equipo y armar su Excel
     for (const equipo of equipos) {
-      const tiposVehiculos = ['CAMIONETA', 'VEHICULO', 'PICK UP', 'SEDAN', 'SUV', 'CAMION', 'TRACTOCAMION', 'UNIDAD'];
+      const tiposVehiculos = ['CAMIONETA', 'VEHICULO', 'PICK UP'];
       
       // Ajuste clave: Validar únicamente si el tipo incluye alguna de las palabras del arreglo
       const esVehiculo = equipo.tipo && tiposVehiculos.some(t => equipo.tipo.toUpperCase().includes(t));

@@ -26,9 +26,9 @@ export async function GET(request) {
     
     const equipo = rows[0];
 
-    const tiposVehiculos = ['CAMIONETA', 'VEHICULO', 'PICK UP', 'SEDAN', 'SUV', 'CAMION', 'TRACTOCAMION', 'UNIDAD'];
+    const tiposVehiculos = ['CAMIONETA', 'VEHICULO', 'PICK UP'];
       
-      const esVehiculo = equipo.tipo && tiposVehiculos.some(t => equipo.tipo.toUpperCase().includes(t));
+    const esVehiculo = equipo.tipo && tiposVehiculos.some(t => equipo.tipo.toUpperCase().includes(t));
 
     const templatePath = path.join(process.cwd(), 'public', 'plantillas', '22_INSPECCION_SEMANAL.xlsx');
     
