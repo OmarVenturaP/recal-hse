@@ -83,7 +83,8 @@ export async function POST(request) {
         const origen = origenLocal ? 'Local' : (origenForaneo ? 'Foráneo' : 'Local');
 
         excelTrabajadores.push({
-          nombre_trabajador: nombre,
+          nombre_trabajador: '', // CAMBIO AQUÍ: Lo dejamos vacío
+          apellido_trabajador: nombre, // CAMBIO AQUÍ: Asignamos el nombre extraído a apellido_trabajador
           puesto_categoria: row.getCell(3).value?.toString().trim() || 'N/A',
           nss: nss,
           nombre_cuadrilla: nombreCuadrillaExcel, 
@@ -137,14 +138,12 @@ export async function POST(request) {
         const matchNss = excelRow.nss && db.nss === excelRow.nss;
         
         const nombreCompletoDb = `${db.apellido_trabajador || ''} ${db.nombre_trabajador || ''}`.trim().toLowerCase();
-        const matchNombre = nombreCompletoDb === excelRow.nombre_trabajador.toLowerCase();
+        // CAMBIO AQUÍ: Comparamos contra apellido_trabajador en lugar de nombre_trabajador
+        const matchNombre = nombreCompletoDb === excelRow.apellido_trabajador.toLowerCase();
 
         if (matchNss || matchNombre) {
-          
           if (db.fecha_baja === null) return true;
-          
           if (db.id_subcontratista_principal === excelRow.id_subcontratista_principal) return true;
-          
           return false;
         }
         return false;
@@ -165,8 +164,6 @@ export async function POST(request) {
     return NextResponse.json({ error: "Error interno al procesar el archivo" }, { status: 500 });
   }
 }
-
-
 
 export async function PUT(request) {
   try {
@@ -208,8 +205,8 @@ export async function PUT(request) {
         (nombre_trabajador, apellido_trabajador, puesto_categoria, nss, fecha_ingreso_obra, fecha_alta_imss, origen, id_subcontratista_principal, id_subcontratista_ft, usuario_registro)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
-        '', 
-        t.nombre_trabajador, 
+        t.nombre_trabajador || '', 
+        t.apellido_trabajador,     
         t.puesto_categoria, 
         t.nss || null, 
         t.fecha_ingreso_obra, 

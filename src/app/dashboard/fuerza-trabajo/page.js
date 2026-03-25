@@ -839,6 +839,7 @@ export default function FuerzaTrabajoPage() {
                           <thead className="bg-gray-100 dark:bg-slate-900 sticky top-0">
                             <tr>
                               <th className="px-4 py-3 text-left font-bold text-gray-600 dark:text-gray-400">Nombre</th>
+                              <th className="px-4 py-3 text-left font-bold text-gray-600 dark:text-gray-400">Apellidos</th>
                               <th className="px-4 py-3 text-left font-bold text-gray-600 dark:text-gray-400">Categoría</th>
                               <th className="px-4 py-3 text-left font-bold text-gray-600 dark:text-gray-400">NSS</th>
                               <th className="px-4 py-3 text-left font-bold text-gray-600 dark:text-gray-400">Ingreso</th>
@@ -848,6 +849,7 @@ export default function FuerzaTrabajoPage() {
                             {importPreviewData.map((t, idx) => (
                               <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-slate-700/50">
                                 <td className="px-4 py-2 font-medium text-gray-900 dark:text-gray-200">{t.nombre_trabajador}</td>
+                                <td className="px-4 py-2 font-medium text-gray-900 dark:text-gray-200">{t.apellido_trabajador}</td>
                                 <td className="px-4 py-2 text-gray-600 dark:text-gray-400">{t.puesto_categoria}</td>
                                 <td className="px-4 py-2 text-gray-600 dark:text-gray-400">{t.nss || 'S/N'}</td>
                                 <td className="px-4 py-2 text-gray-600 dark:text-gray-400">{formatDDMMYYYY(t.fecha_ingreso_obra)}</td>
