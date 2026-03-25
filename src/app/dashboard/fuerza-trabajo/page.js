@@ -494,9 +494,10 @@ export default function FuerzaTrabajoPage() {
                   const fechaIngresoStr = formatForInput(t.fecha_ingreso_obra);
                   const isAlta = fechaIngresoStr >= fechaInicio && fechaIngresoStr <= fechaFin;
                   
-                  const categoriasCriticas = ["SUPERVISOR DE SEGURIDAD", "OPERADOR DE MAQUINARIA", "SOLDADOR"];
+                  const categoriasCriticas = ["SUPERVISOR DE SEGURIDAD", "OPERADOR DE MAQUINARIA", "SOLDADOR", "PINTOR", "ANDAMIERO", "ANDAMIERO A", "SANDBLASTERO", "SANDBLASTERO A"];
                   const requiereCurp = t.puesto_categoria && categoriasCriticas.some(cat => t.puesto_categoria.toUpperCase().includes(cat));
                   const faltaCurp = isAlta && requiereCurp && !t.curp;
+                  const hayCurp = t.curp && t.curp.length === 18;
 
                   return (
                     <tr key={t.id_trabajador} className="block md:table-row border border-gray-200 dark:border-slate-700 md:border-none mb-4 md:mb-0 rounded-lg shadow-sm md:shadow-none p-4 md:p-0 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
@@ -534,7 +535,12 @@ export default function FuerzaTrabajoPage() {
                               FALTA CURP
                             </span>
                           )}
-                          {!isAlta && !faltaCurp && <span className="text-gray-400 dark:text-gray-600">-</span>}
+                          {hayCurp && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-green-600 text-white dark:bg-green-900/30 dark:text-white">
+                              CURP
+                            </span>
+                          )}
+                          {!isAlta && !faltaCurp && !hayCurp && <span className="text-gray-400 dark:text-gray-600">-</span>}
                         </div>
                       </td>
 
