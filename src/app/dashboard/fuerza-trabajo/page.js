@@ -10,6 +10,7 @@ export default function FuerzaTrabajoPage() {
   const [userRole, setUserRole] = useState(null);
   const [userFtPermission, setUserFtPermission] = useState(null); 
   const [userCertPermission, setUserCertPermission] = useState(null);
+  const [userDcPermission, setUserDcPermission] = useState(null);
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -24,12 +25,14 @@ export default function FuerzaTrabajoPage() {
         if (data.success && data.data.length > 0) {
           setUserFtPermission(data.data[0].permisos_ft);
           setUserCertPermission(data.data[0].permisos_certificados);
+          setUserDcPermission(data.data[0].permisos_dc3);
         }
       });
   }, []);
 
   const canManageFt = userFtPermission === 1 || userRole === 'Master';
   const canManageCert = userCertPermission === 1 || userRole === 'Master';
+  const canManageDc3 = userDcPermission === 1 || userRole === 'Master';
 
   const [trabajadores, setTrabajadores] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -82,7 +85,9 @@ export default function FuerzaTrabajoPage() {
   const formInicial = {
     numero_empleado: '', nombre_trabajador: '', apellido_trabajador: '', puesto_categoria: '', 
     nss: '', curp: '', fecha_ingreso_obra: '', fecha_alta_imss: '', 
-    origen: 'Local', id_subcontratista_ft: '', id_subcontratista_principal: ''
+    origen: 'Local', id_subcontratista_ft: '', id_subcontratista_principal: '',
+    fecha_baja: '', // 
+    tiene_baja: false // 
   };
   
   const [formData, setFormData] = useState(formInicial);
@@ -253,7 +258,9 @@ export default function FuerzaTrabajoPage() {
       fecha_alta_imss: formatForInput(trabajador.fecha_alta_imss),
       origen: trabajador.origen,
       id_subcontratista_ft: trabajador.id_subcontratista_ft || '',
-      id_subcontratista_principal: trabajador.id_subcontratista_principal || ''
+      id_subcontratista_principal: trabajador.id_subcontratista_principal || '',
+      fecha_baja: trabajador.fecha_baja ? formatForInput(trabajador.fecha_baja) : '',
+      tiene_baja: !!trabajador.fecha_baja
     });
     setEditId(trabajador.id_trabajador); setIsEditing(true); setIsModalOpen(true);
   };
@@ -401,6 +408,31 @@ export default function FuerzaTrabajoPage() {
     window.open(`/api/fuerza-trabajo/exportar-certificados?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}&id_trabajador=${trabajador.id_trabajador}`, '_blank');
   };
 
+  const handleGenerarCartaAsignacion = (trabajador) => {
+    window.open(`/api/fuerza-trabajo/generar-carta-asignacion?id_trabajador=${trabajador.id_trabajador}`, '_blank');
+  };
+
+  const handleToggleActivo = async (id, currentStatus) => {
+    const newStatus = currentStatus === 0 ? 1 : 0; 
+    
+    try {
+      const res = await fetch('/api/fuerza-trabajo', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id_trabajador: id, bActivo: newStatus })
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        fetchTrabajadores(); // Refresca la tabla
+      } else {
+        Swal.fire('Error', data.error, 'error');
+      }
+    } catch (error) {
+      Swal.fire('Error', 'Error al actualizar el estado', 'error');
+    }
+  };
+
   return (
     <div className="space-y-6 relative" ref={topRef}>
       
@@ -494,7 +526,7 @@ export default function FuerzaTrabajoPage() {
                   const fechaIngresoStr = formatForInput(t.fecha_ingreso_obra);
                   const isAlta = fechaIngresoStr >= fechaInicio && fechaIngresoStr <= fechaFin;
                   
-                  const categoriasCriticas = ["SUPERVISOR DE SEGURIDAD", "OPERADOR DE MAQUINARIA", "SOLDADOR", "PINTOR", "ANDAMIERO", "ANDAMIERO A", "SANDBLASTERO", "SANDBLASTERO A"];
+                  const categoriasCriticas = ["SUPERVISOR DE SEGURIDAD", "OPERADOR DE MAQUINARIA", "SOLDADOR", "PINTOR", "ANDAMIERO", "ANDAMIERO A", "SANDBLASTERO", "SANDBLASTERO A", "MANIOBRISTA"];
                   const requiereCurp = t.puesto_categoria && categoriasCriticas.some(cat => t.puesto_categoria.toUpperCase().includes(cat));
                   const faltaCurp = isAlta && requiereCurp && !t.curp;
                   const hayCurp = t.curp && t.curp.length === 18;
@@ -525,24 +557,28 @@ export default function FuerzaTrabajoPage() {
                       <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 text-sm border-b dark:border-slate-700 md:border-none">
                         <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Info:</span>
                         <div className="flex flex-wrap gap-1 justify-end md:justify-start">
-                          {isAlta && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
-                              ALTA
-                            </span>
-                          )}
-                          {faltaCurp && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-600 text-white dark:bg-red-900/30 dark:text-white">
-                              FALTA CURP
-                            </span>
-                          )}
-                          {hayCurp && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-green-600 text-white dark:bg-green-900/30 dark:text-white">
-                              CURP
-                            </span>
-                          )}
+                          {isAlta && <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">ALTA</span>}
+                          {faltaCurp && <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-600 text-white dark:bg-red-900/30 dark:text-white">FALTA CURP</span>}
+                          {hayCurp && <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-green-600 text-white dark:bg-green-900/30 dark:text-white">CURP</span>}
                           {!isAlta && !faltaCurp && !hayCurp && <span className="text-gray-400 dark:text-gray-600">-</span>}
                         </div>
+                        
+                        {canManageFt && (
+                        <label className="relative inline-flex items-center cursor-pointer mt-1">
+                          <input 
+                            type="checkbox" 
+                            className="sr-only peer" 
+                            checked={t.bActivo !== 0}
+                            onChange={() => handleToggleActivo(t.id_trabajador, t.bActivo)} 
+                          />
+                          <div className="w-7 h-4 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all dark:border-gray-500 peer-checked:bg-[var(--recal-blue)]"></div>
+                          <span className="ml-2 text-[10px] font-bold text-gray-600 dark:text-gray-400">
+                            {t.bActivo !== 0 ? 'ON' : 'OFF'}
+                          </span>
+                        </label>
+                        )}
                       </td>
+
 
                       <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm border-b dark:border-slate-700 md:border-none">
                         <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Estatus:</span>
@@ -550,10 +586,37 @@ export default function FuerzaTrabajoPage() {
                       </td>
                       <td className="flex justify-end items-center md:table-cell px-2 md:px-6 py-4 md:py-4 text-sm font-medium border-b dark:border-slate-700 md:border-none">
                         <div className="flex justify-end items-center gap-2 md:gap-3">
-                          
+
+                        {canManageCert && t.puesto_categoria && ['SUPERVISOR', 'RESIDENTE'].some(rol => t.puesto_categoria.toUpperCase().includes(rol)) && (
+                            <div className="relative group flex items-center justify-center">
+                              <button 
+                                onClick={() => handleGenerarCartaAsignacion(t)} 
+                                className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 p-2 rounded-md transition-colors"
+                              >
+                                <span className="w-4 h-4 sm:w-5 sm:h-5 block text-center">📄</span>
+                              </button>
+                              <div className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
+                                Carta de Asignación
+                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-gray-800"></div>
+                              </div>
+                            </div>
+                        )}
+
+                          {canManageDc3 && t.curp && t.curp.length === 18 && (
+                            <div className="relative group flex items-center justify-center">
+                              <button onClick={() => handleGenerarDc3Individual(t)} className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 hover:bg-indigo-50 dark:hover:bg-gray-600 p-2 rounded-md transition-colors" disabled={!t.curp || t.curp.length !== 18}>
+                                <span className="w-4 h-4 sm:w-5 sm:h-5 block text-center">⛑️</span>
+                              </button>
+                              <div className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
+                                Generar DC3
+                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-gray-800"></div>
+                              </div>
+                            </div>
+                          )}
+
                           {canManageCert && (
                             <div className="relative group flex items-center justify-center">
-                              <button onClick={() => handleGenerarCertificadoIndividual(t)} className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 p-2 rounded-md transition-colors">
+                              <button onClick={() => handleGenerarCertificadoIndividual(t)} className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-200 hover:bg-indigo-50 dark:hover:bg-indigo-300/30 p-2 rounded-md transition-colors">
                                 <span className="w-4 h-4 sm:w-5 sm:h-5 block text-center">🩺</span>
                               </button>
                               <div className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
@@ -723,11 +786,22 @@ export default function FuerzaTrabajoPage() {
                 </div>
                 <div className={`md:col-span-1 p-3 rounded border ${!formData.id_subcontratista_principal ? 'bg-gray-100 dark:bg-slate-700/50 border-gray-200 dark:border-slate-700/50' : 'bg-white dark:bg-transparent border-gray-300 dark:border-slate-600'}`}>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Cuadrilla (Opcional)</label>
-                  <select disabled={!formData.id_subcontratista_principal} className={`mt-1 w-full bg-transparent rounded-md p-2 outline-none ${!formData.id_subcontratista_principal ? 'cursor-not-allowed text-gray-400 dark:text-gray-500 border-none' : 'border border-gray-300 dark:border-slate-600 dark:text-white focus:ring-[var(--recal-blue)]'}`} value={formData.id_subcontratista_ft} onChange={e => setFormData({...formData, id_subcontratista_ft: e.target.value})}>
+                  <select required disabled={!formData.id_subcontratista_principal} className={`mt-1 w-full bg-transparent rounded-md p-2 outline-none ${!formData.id_subcontratista_principal ? 'cursor-not-allowed text-gray-400 dark:text-gray-500 border-none' : 'border border-gray-300 dark:border-slate-600 dark:text-white focus:ring-[var(--recal-blue)]'}`} value={formData.id_subcontratista_ft} onChange={e => setFormData({...formData, id_subcontratista_ft: e.target.value})}>
                     <option value="" className="dark:bg-slate-800">Ninguna...</option>
                     {cuadrillasFiltradas.map(cuadrilla => (<option key={cuadrilla.id_subcontratista_ft} value={cuadrilla.id_subcontratista_ft} className="dark:bg-slate-800">{cuadrilla.nombre}</option>))}
                   </select>
                 </div>
+                {formData.tiene_baja && (
+                  <div className="md:col-span-1 bg-red-50 dark:bg-red-900/20 p-3 rounded border border-red-100 dark:border-red-800/50">
+                    <label className="block text-sm font-bold text-red-900 dark:text-red-400">Fecha de Baja (Edición)</label>
+                    <input 
+                      type="date" 
+                      className="mt-1 w-full bg-white dark:bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 focus:ring-red-500 outline-none" 
+                      value={formData.fecha_baja} 
+                      onChange={e => setFormData({...formData, fecha_baja: e.target.value})} 
+                    />
+                  </div>
+                )}
               </div>
               <div className="pt-4 flex justify-end space-x-3 border-t border-gray-200 dark:border-slate-700 mt-6">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">Cancelar</button>

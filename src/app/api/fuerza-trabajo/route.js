@@ -132,16 +132,19 @@ export async function PUT(request) {
         }
       }
     }
-    // ---------------------------------------------------------
 
-    const query = `
-      UPDATE Fuerza_Trabajo 
-      SET numero_empleado=?, nombre_trabajador=?, apellido_trabajador=?, puesto_categoria=?, nss=?, curp=?, fecha_ingreso_obra=?, fecha_alta_imss=?, origen=?, id_subcontratista_ft=?, id_subcontratista_principal=?, usuario_actualizacion=?
-      WHERE id_trabajador=?
-    `;
-    await pool.query(query, [
-      numero_empleado, nombre_trabajador, apellido_trabajador || null, puesto_categoria, nss, curp || null, fecha_ingreso_obra, fecha_alta_imss || null, origen, id_subcontratista_ft || null, id_subcontratista_principal || null, id_usuario_actual, id_trabajador
-    ]);
+    let updateFields = `numero_empleado=?, nombre_trabajador=?, apellido_trabajador=?, puesto_categoria=?, nss=?, curp=?, fecha_ingreso_obra=?, fecha_alta_imss=?, origen=?, id_subcontratista_ft=?, id_subcontratista_principal=?, usuario_actualizacion=?`;
+    let queryParams = [numero_empleado, nombre_trabajador, apellido_trabajador || null, puesto_categoria, nss, curp || null, fecha_ingreso_obra, fecha_alta_imss || null, origen, id_subcontratista_ft || null, id_subcontratista_principal || null, id_usuario_actual];
+
+    if (body.tiene_baja) {
+      updateFields += `, fecha_baja=?`;
+      queryParams.push(body.fecha_baja || null);
+    }
+
+    const query = `UPDATE Fuerza_Trabajo SET ${updateFields} WHERE id_trabajador=?`;
+    queryParams.push(id_trabajador);
+    
+    await pool.query(query, queryParams);
 
     return NextResponse.json({ success: true, mensaje: "Actualizado correctamente" });
   } catch (error) {
@@ -150,27 +153,35 @@ export async function PUT(request) {
   }
 }
 
-// --- PATCH: Dar de Baja a un trabajador ---
 export async function PATCH(request) {
   try {
     const body = await request.json();
-    const { id_trabajador, fecha_baja } = body;
+    const { id_trabajador, fecha_baja, bActivo } = body; // Añadido bActivo
     const id_usuario_actual = request.headers.get('x-user-id');
 
     if (!id_usuario_actual) {
       return NextResponse.json({ error: "Usuario no identificado" }, { status: 401 });
     }
-
-    if (!id_trabajador || !fecha_baja) {
-      return NextResponse.json({ error: "Faltan datos obligatorios" }, { status: 400 });
+    if (!id_trabajador) {
+      return NextResponse.json({ error: "Falta ID de trabajador" }, { status: 400 });
     }
 
-    const query = `UPDATE Fuerza_Trabajo SET fecha_baja = ?, usuario_actualizacion = ? WHERE id_trabajador = ?`;
-    await pool.query(query, [fecha_baja, id_usuario_actual, id_trabajador]);
+    if (bActivo !== undefined) {
+      const query = `UPDATE Fuerza_Trabajo SET bActivo = ?, usuario_actualizacion = ? WHERE id_trabajador = ?`;
+      await pool.query(query, [bActivo, id_usuario_actual, id_trabajador]);
+      return NextResponse.json({ success: true, mensaje: "Estado actualizado" });
+    } 
+    // Lógica original de Baja
+    else if (fecha_baja) {
+      const query = `UPDATE Fuerza_Trabajo SET fecha_baja = ?, usuario_actualizacion = ? WHERE id_trabajador = ?`;
+      await pool.query(query, [fecha_baja, id_usuario_actual, id_trabajador]);
+      return NextResponse.json({ success: true, mensaje: "Trabajador dado de baja correctamente" });
+    } else {
+      return NextResponse.json({ error: "No se envió acción válida" }, { status: 400 });
+    }
 
-    return NextResponse.json({ success: true, mensaje: "Trabajador dado de baja correctamente" });
   } catch (error) {
-    console.error("Error al dar de baja:", error);
+    console.error("Error en PATCH:", error);
     return NextResponse.json({ success: false, error: "Error interno en BD" }, { status: 500 });
   }
 }

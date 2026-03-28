@@ -49,6 +49,7 @@ export async function GET(request) {
       LEFT JOIN Subcontratistas_Fuerza_Trabajo s ON f.id_subcontratista_ft = s.id_subcontratista_ft
       WHERE DATE(f.fecha_ingreso_obra) <= ? 
       AND (f.fecha_baja IS NULL OR DATE(f.fecha_baja) >= ?)
+      AND f.bActivo != 0
     `;
 
     const queryParams = [fechaInicio, fechaFin, fechaInicio];
