@@ -6,7 +6,6 @@ import Swal from 'sweetalert2';
 
 export default function FuerzaTrabajoPage() {
   const topRef = useRef(null); 
-
   const [userRole, setUserRole] = useState(null);
   const [userFtPermission, setUserFtPermission] = useState(null); 
   const [userCertPermission, setUserCertPermission] = useState(null);
@@ -37,7 +36,6 @@ export default function FuerzaTrabajoPage() {
   const [trabajadores, setTrabajadores] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Catálogos
   const [catPrincipales, setCatPrincipales] = useState([]);
   const [catCuadrillas, setCatCuadrillas] = useState([]);
   const [catPuestos, setCatPuestos] = useState([]);
@@ -82,10 +80,12 @@ export default function FuerzaTrabajoPage() {
   const [importFase, setImportFase] = useState(1); 
   const [importResumen, setImportResumen] = useState({ totales: 0, nuevos: 0 });
 
-  // --- ESTADOS PARA EL DC-3 ---
   const [isDc3ModalOpen, setIsDc3ModalOpen] = useState(false);
   const [dc3Trabajador, setDc3Trabajador] = useState(null);
   const [catCursos, setCatCursos] = useState([]);
+  const [catAgentes, setCatAgentes] = useState([]);
+  const [selectedAgente, setSelectedAgente] = useState('');
+  
   const [dc3FormData, setDc3FormData] = useState({
     id_curso: '',
     fecha_inicio_curso: getDateString(hoy),
@@ -137,13 +137,16 @@ export default function FuerzaTrabajoPage() {
           setCatPuestos(dataPuestos.puestos);
         }
 
-        // Carga del catálogo de cursos
         const resCursos = await fetch('/api/catalogos/cursos');
         if (resCursos.ok) {
           const dataCursos = await resCursos.json();
-          if (dataCursos.success) setCatCursos(dataCursos.data);
-        } else {
-          console.error("Error cargando catálogos", error);
+          setCatCursos(Array.isArray(dataCursos) ? dataCursos : (dataCursos.data || []));
+        }
+
+        const resAgentes = await fetch('/api/catalogos/agentes');
+        if (resAgentes.ok) {
+          const dataAgentes = await resAgentes.json();
+          setCatAgentes(Array.isArray(dataAgentes) ? dataAgentes : (dataAgentes.data || []));
         }
 
       } catch (error) {
@@ -433,9 +436,9 @@ export default function FuerzaTrabajoPage() {
     window.open(`/api/fuerza-trabajo/generar-carta-asignacion?id_trabajador=${trabajador.id_trabajador}`, '_blank');
   };
 
-  // --- NUEVAS FUNCIONES PARA DC-3 ---
   const handleGenerarDc3Individual = (trabajador) => {
     setDc3Trabajador(trabajador);
+    setSelectedAgente(''); 
     setDc3FormData({
       id_curso: '',
       fecha_inicio_curso: getDateString(hoy),
@@ -444,7 +447,7 @@ export default function FuerzaTrabajoPage() {
     setIsDc3ModalOpen(true);
   };
 
-  const handleDc3Submit = (e) => {
+const handleDc3Submit = async (e) => {
     e.preventDefault();
     if (!dc3FormData.id_curso || !dc3FormData.fecha_inicio_curso || !dc3FormData.fecha_fin_curso) {
       Swal.fire('Atención', 'Selecciona un curso y las fechas.', 'warning');
@@ -458,10 +461,48 @@ export default function FuerzaTrabajoPage() {
 
     setGeneratingDc3(true);
     const url = `/api/fuerza-trabajo/generar-dc3?id_trabajador=${dc3Trabajador.id_trabajador}&id_curso=${dc3FormData.id_curso}&fechaInicio=${dc3FormData.fecha_inicio_curso}&fechaFin=${dc3FormData.fecha_fin_curso}`;
-    window.open(url, '_blank');
     
-    setGeneratingDc3(false);
-    setIsDc3ModalOpen(false);
+    try {
+      const response = await fetch(url);
+      
+      if (response.ok) {
+        // 1. Intentamos extraer el nombre del archivo desde los headers del backend
+        const disposition = response.headers.get('Content-Disposition');
+        let fileName = `DC3_${dc3Trabajador.nombre_trabajador}.docx`;
+        if (disposition && disposition.indexOf('filename="') !== -1) {
+          fileName = disposition.split('filename="')[1].split('"')[0];
+        }
+
+        // 2. Convertimos la respuesta a un archivo binario (Blob)
+        const blob = await response.blob();
+        const downloadUrl = window.URL.createObjectURL(blob);
+        
+        // 3. Forzamos la descarga con un enlace invisible
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        
+        // Limpiamos memoria y cerramos modal
+        window.URL.revokeObjectURL(downloadUrl);
+        setIsDc3ModalOpen(false);
+      } else {
+        // El servidor respondió con un error (400, 404, 500)
+        const errorData = await response.json();
+        Swal.fire({
+          title: 'Atención',
+          html: errorData.error, // Usamos html por si hay saltos de línea
+          icon: 'warning'
+        });
+      }
+    } catch (error) {
+      console.error("Error al generar DC-3:", error);
+      Swal.fire('Error', 'Hubo un problema de red al intentar conectar con el servidor.', 'error');
+    } finally {
+      setGeneratingDc3(false);
+    }
   };
 
   const handleToggleActivo = async (id, currentStatus) => {
@@ -483,6 +524,12 @@ export default function FuerzaTrabajoPage() {
       Swal.fire('Error', 'Error al actualizar el estado', 'error');
     }
   };
+
+  const filteredCursos = selectedAgente 
+    ? catCursos.filter(c => c.id_agente.toString() === selectedAgente.toString()) 
+    : [];
+
+  const selectedCursoObj = catCursos.find(c => c.id_curso.toString() === dc3FormData.id_curso.toString());
 
   return (
     <div className="space-y-6 relative" ref={topRef}>
@@ -1027,7 +1074,6 @@ export default function FuerzaTrabajoPage() {
             
             <form onSubmit={handleDc3Submit} className="p-6 space-y-4">
               
-              {/* Tarjeta de Resumen del Trabajador */}
               <div className="bg-gray-50 dark:bg-slate-700/50 p-4 rounded-md border border-gray-200 dark:border-slate-600 mb-4">
                 <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-bold mb-1">Trabajador Seleccionado</p>
                 <p className="font-bold text-gray-800 dark:text-gray-200 text-lg">
@@ -1041,25 +1087,50 @@ export default function FuerzaTrabajoPage() {
                 </p>
               </div>
 
-              {/* Selector de Curso */}
               <div>
-                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Seleccionar Curso de Capacitación *</label>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Agente Capacitador *</label>
                 <select 
                   required 
                   className="w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-3 focus:ring-indigo-500 outline-none shadow-sm" 
-                  value={dc3FormData.id_curso} 
-                  onChange={e => setDc3FormData({...dc3FormData, id_curso: e.target.value})}
+                  value={selectedAgente} 
+                  onChange={e => {
+                    setSelectedAgente(e.target.value);
+                    setDc3FormData({...dc3FormData, id_curso: ''}); // Resetea el curso al cambiar de agente
+                  }}
                 >
-                  <option value="" className="dark:bg-slate-800">-- Elija un curso del catálogo --</option>
-                  {catCursos.map(curso => (
-                    <option key={curso.id_curso} value={curso.id_curso} className="dark:bg-slate-800">
-                      {curso.nombre_curso} ({curso.duracion_horas} hrs)
+                  <option value="" className="dark:bg-slate-800">-- Seleccione un Agente --</option>
+                  {catAgentes.map(agente => (
+                    <option key={agente.id_agente} value={agente.id_agente} className="dark:bg-slate-800">
+                      {agente.nombre_agente}
                     </option>
                   ))}
                 </select>
               </div>
 
-              {/* Fechas del Curso */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Seleccionar Curso de Capacitación *</label>
+                <select 
+                  required 
+                  disabled={!selectedAgente}
+                  className={`w-full bg-transparent rounded-md p-3 outline-none shadow-sm ${!selectedAgente ? 'border border-gray-200 text-gray-400 cursor-not-allowed dark:border-slate-700 dark:text-gray-500' : 'border border-gray-300 dark:border-slate-600 dark:text-white focus:ring-indigo-500'}`} 
+                  value={dc3FormData.id_curso} 
+                  onChange={e => setDc3FormData({...dc3FormData, id_curso: e.target.value})}
+                >
+                  <option value="" className="dark:bg-slate-800">-- Elija un curso --</option>
+                  {filteredCursos.map(curso => (
+                    <option key={curso.id_curso} value={curso.id_curso} className="dark:bg-slate-800">
+                      {curso.nombre_curso}
+                    </option>
+                  ))}
+                </select>
+                
+                {selectedCursoObj && (
+                  <p className="mt-2 text-sm text-indigo-600 dark:text-indigo-400 font-medium flex items-center">
+                    <span className="mr-1">⏱️</span> Duración del curso: {selectedCursoObj.duracion_horas} horas
+                  </p>
+                )}
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Fecha de Inicio *</label>
@@ -1083,7 +1154,6 @@ export default function FuerzaTrabajoPage() {
                 </div>
               </div>
 
-              {/* Botones de acción */}
               <div className="pt-4 flex justify-end space-x-3 border-t border-gray-200 dark:border-slate-700 mt-6">
                 <button type="button" onClick={() => setIsDc3ModalOpen(false)} className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors font-medium">
                   Cancelar
@@ -1096,7 +1166,6 @@ export default function FuerzaTrabajoPage() {
           </div>
         </div>
       )}
-
     </div>
   );
 }

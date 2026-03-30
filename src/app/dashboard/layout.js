@@ -13,6 +13,7 @@ export default function DashboardLayout({ children }) {
   const [userRol, setUserRol] = useState(null);
   const [userArea, setUserArea] = useState(null);
   const [userName, setUserName] = useState('');
+  const [userDcPermission, setUserDcPermission] = useState(0);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -37,6 +38,14 @@ export default function DashboardLayout({ children }) {
         }
       });
 
+      fetch('/api/usuarios/me')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setUserDcPermission(data.data[0].permisos_dc3);
+        }
+      });
+
     let timeoutId;
     const resetTimer = () => {
       clearTimeout(timeoutId);
@@ -52,6 +61,9 @@ export default function DashboardLayout({ children }) {
       events.forEach(event => document.removeEventListener(event, resetTimer));
     };
   }, []);
+
+  const isAdmin = userRol === 'Admin' || userRol === 'Master';
+  const hasDc3Permission = userDcPermission === 1 || isAdmin;
 
   const closeSidebar = () => setIsSidebarOpen(false);
 
@@ -100,6 +112,11 @@ export default function DashboardLayout({ children }) {
           <Link href="/dashboard/actividades" onClick={closeSidebar} className="block px-4 py-3 rounded-md hover:bg-[var(--recal-blue-hover)] transition-colors">
             📋 Actividades
           </Link>
+          )}
+          {hasDc3Permission && (
+            <Link href="/dashboard/catalogos" onClick={closeSidebar} className="block px-4 py-3 rounded-md hover:bg-[var(--recal-blue-hover)] transition-colors">
+              📑 Catálogos
+            </Link>
           )}
           <Link href="/dashboard/citas" onClick={closeSidebar} className="block px-4 py-3 rounded-md hover:bg-[var(--recal-blue-hover)] transition-colors">
             📅 Citas Dossier

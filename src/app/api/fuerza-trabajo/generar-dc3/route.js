@@ -6,10 +6,8 @@ import ImageModule from 'docxtemplater-image-module-free';
 import path from 'path';
 import fs from 'fs';
 
-// Imagen transparente de 1x1 pixel en formato Base64 (Texto seguro)
 const transparentImgBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
 
-// Descarga la imagen y la convierte a Base64 (Texto seguro) en lugar de Buffer
 const fetchImageBase64 = async (url) => {
   if (!url || typeof url !== 'string' || url.trim() === '') return transparentImgBase64;
   try {
@@ -38,11 +36,10 @@ export async function GET(request) {
       return NextResponse.json({ error: "Faltan parámetros obligatorios" }, { status: 400 });
     }
 
-    // 1. Consultar Datos Completos de la Base de Datos
     const queryTrabajador = `
       SELECT 
         f.nombre_trabajador, f.apellido_trabajador, f.curp, f.puesto_categoria,
-        s.razon_social AS empresa_nombre, 
+        s.nombre_fiscal AS empresa_nombre, 
         s.representante_legal, 
         s.representante_trabajadores,
         s.rfc AS empresa_rfc,
@@ -79,7 +76,6 @@ export async function GET(request) {
     if (rowsCurso.length === 0) return NextResponse.json({ error: "Curso no encontrado" }, { status: 404 });
     const curso = rowsCurso[0];
 
-    // 2. Descargar TODOS LOS RECURSOS (5 imágenes) como strings en Base64 en paralelo
     const [b64Instructor, b64Patron, b64Trabajador, b64LogoAgente, b64LogoEmpresa] = await Promise.all([
       fetchImageBase64(curso.firma_agente),
       fetchImageBase64(trabajador.firma_representante_legal),
@@ -88,31 +84,24 @@ export async function GET(request) {
       fetchImageBase64(trabajador.logo_empresa)
     ]);
 
-    // 3. Cargar Plantilla de Word
     const templatePath = path.join(process.cwd(), 'public', 'plantillas', 'FORMATO_DC3.docx');
     if (!fs.existsSync(templatePath)) return NextResponse.json({ error: "No se encontró la plantilla FORMATO_DC3.docx" }, { status: 404 });
 
     const content = fs.readFileSync(templatePath, 'binary');
     const zip = new PizZip(content);
 
-    // =========================================================
-    // CONFIGURACIÓN INTELIGENTE DEL MÓDULO DE IMÁGENES
-    // =========================================================
     const imageOptions = {
       centered: false,
       getImage: function (tagValue) {
-        // Convierte el Base64 a Buffer solo en el momento que se necesita
         return Buffer.from(tagValue, 'base64');
       },
       getSize: function (img, tagValue, tagName) {
-        // img es el Buffer. Si es muy chico, es la imagen transparente (oculta)
-        if (img.byteLength < 100) return [1, 1]; // Imagen transparente
+        if (img.byteLength < 100) return [1, 1]; 
 
-        // Tamaño específico por etiqueta
-        if (tagName === 'logo_agente') return [100, 100]; // Logos rectangulares/cuadrados
+        if (tagName === 'logo_agente') return [100, 100]; 
         if (tagName === 'logo_empresa') return [120, 80];
         
-        return [150, 60]; // Tamaño de las firmas real (ancho, alto)
+        return [150, 60]; 
       }
     };
 
@@ -124,7 +113,6 @@ export async function GET(request) {
       modules: [imageModule]
     });
 
-    // --- FUNCIONES AUXILIARES PARA LOS CUADRITOS ---
     const desbaratar = (texto, prefijo, longitud) => {
       const limpio = (texto || '').toString().toUpperCase().replace(/[-\s]/g, '');
       const obj = {};
@@ -136,7 +124,6 @@ export async function GET(request) {
     const [fY, fM, fD] = fechaFin.split('-');
     const nombreCompleto = `${trabajador.apellido_trabajador || ''} ${trabajador.nombre_trabajador}`.trim();
 
-    // 4. MAPEO TOTAL DE DATOS Y RECURSOS
     doc.render({
       nombre_completo: nombreCompleto,
       puesto: trabajador.puesto_categoria,
@@ -150,7 +137,6 @@ export async function GET(request) {
       nombre_patron: trabajador.representante_legal || 'REPRESENTANTE LEGAL',
       nombre_trabajador: trabajador.representante_trabajadores || 'REPRESENTANTE TRABAJADORES',
 
-      // Pasamos las 5 imágenes como texto Base64
       firma_instructor: b64Instructor,
       firma_patron: b64Patron,
       firma_trabajador: b64Trabajador,
@@ -163,7 +149,6 @@ export async function GET(request) {
       ...desbaratar(fY, 'fy', 4), ...desbaratar(fM, 'fm', 2), ...desbaratar(fD, 'fd', 2),
     });
 
-    // 5. EXPORTACIÓN
     const buffer = doc.getZip().generate({
       type: 'nodebuffer',
       compression: 'DEFLATE',
