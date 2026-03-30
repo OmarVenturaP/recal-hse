@@ -82,12 +82,23 @@ export default function FuerzaTrabajoPage() {
   const [importFase, setImportFase] = useState(1); 
   const [importResumen, setImportResumen] = useState({ totales: 0, nuevos: 0 });
 
+  // --- ESTADOS PARA EL DC-3 ---
+  const [isDc3ModalOpen, setIsDc3ModalOpen] = useState(false);
+  const [dc3Trabajador, setDc3Trabajador] = useState(null);
+  const [catCursos, setCatCursos] = useState([]);
+  const [dc3FormData, setDc3FormData] = useState({
+    id_curso: '',
+    fecha_inicio_curso: getDateString(hoy),
+    fecha_fin_curso: getDateString(hoy)
+  });
+  const [generatingDc3, setGeneratingDc3] = useState(false);
+
   const formInicial = {
     numero_empleado: '', nombre_trabajador: '', apellido_trabajador: '', puesto_categoria: '', 
     nss: '', curp: '', fecha_ingreso_obra: '', fecha_alta_imss: '', 
     origen: 'Local', id_subcontratista_ft: '', id_subcontratista_principal: '',
-    fecha_baja: '', // 
-    tiene_baja: false // 
+    fecha_baja: '', 
+    tiene_baja: false 
   };
   
   const [formData, setFormData] = useState(formInicial);
@@ -125,6 +136,16 @@ export default function FuerzaTrabajoPage() {
         if (dataPuestos.success) {
           setCatPuestos(dataPuestos.puestos);
         }
+
+        // Carga del catálogo de cursos
+        const resCursos = await fetch('/api/catalogos/cursos');
+        if (resCursos.ok) {
+          const dataCursos = await resCursos.json();
+          if (dataCursos.success) setCatCursos(dataCursos.data);
+        } else {
+          console.error("Error cargando catálogos", error);
+        }
+
       } catch (error) {
         console.error("Error cargando catálogos", error);
       }
@@ -412,9 +433,39 @@ export default function FuerzaTrabajoPage() {
     window.open(`/api/fuerza-trabajo/generar-carta-asignacion?id_trabajador=${trabajador.id_trabajador}`, '_blank');
   };
 
+  // --- NUEVAS FUNCIONES PARA DC-3 ---
+  const handleGenerarDc3Individual = (trabajador) => {
+    setDc3Trabajador(trabajador);
+    setDc3FormData({
+      id_curso: '',
+      fecha_inicio_curso: getDateString(hoy),
+      fecha_fin_curso: getDateString(hoy)
+    });
+    setIsDc3ModalOpen(true);
+  };
+
+  const handleDc3Submit = (e) => {
+    e.preventDefault();
+    if (!dc3FormData.id_curso || !dc3FormData.fecha_inicio_curso || !dc3FormData.fecha_fin_curso) {
+      Swal.fire('Atención', 'Selecciona un curso y las fechas.', 'warning');
+      return;
+    }
+    
+    if (new Date(dc3FormData.fecha_inicio_curso) > new Date(dc3FormData.fecha_fin_curso)) {
+      Swal.fire('Error', 'La fecha de inicio no puede ser posterior a la fecha final.', 'error');
+      return;
+    }
+
+    setGeneratingDc3(true);
+    const url = `/api/fuerza-trabajo/generar-dc3?id_trabajador=${dc3Trabajador.id_trabajador}&id_curso=${dc3FormData.id_curso}&fechaInicio=${dc3FormData.fecha_inicio_curso}&fechaFin=${dc3FormData.fecha_fin_curso}`;
+    window.open(url, '_blank');
+    
+    setGeneratingDc3(false);
+    setIsDc3ModalOpen(false);
+  };
+
   const handleToggleActivo = async (id, currentStatus) => {
     const newStatus = currentStatus === 0 ? 1 : 0; 
-    
     try {
       const res = await fetch('/api/fuerza-trabajo', {
         method: 'PATCH',
@@ -424,7 +475,7 @@ export default function FuerzaTrabajoPage() {
       const data = await res.json();
       
       if (data.success) {
-        fetchTrabajadores(); // Refresca la tabla
+        fetchTrabajadores(); 
       } else {
         Swal.fire('Error', data.error, 'error');
       }
@@ -556,27 +607,29 @@ export default function FuerzaTrabajoPage() {
                       
                       <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 text-sm border-b dark:border-slate-700 md:border-none">
                         <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Info:</span>
-                        <div className="flex flex-wrap gap-1 justify-end md:justify-start">
-                          {isAlta && <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">ALTA</span>}
-                          {faltaCurp && <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-600 text-white dark:bg-red-900/30 dark:text-white">FALTA CURP</span>}
-                          {hayCurp && <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-green-600 text-white dark:bg-green-900/30 dark:text-white">CURP</span>}
-                          {!isAlta && !faltaCurp && !hayCurp && <span className="text-gray-400 dark:text-gray-600">-</span>}
+                        <div className="flex flex-col items-end md:items-start gap-2">
+                          <div className="flex flex-wrap gap-1 justify-end md:justify-start">
+                            {isAlta && <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">ALTA</span>}
+                            {faltaCurp && <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-600 text-white dark:bg-red-900/30 dark:text-white">FALTA CURP</span>}
+                            {hayCurp && <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-green-600 text-white dark:bg-green-900/30 dark:text-white">CURP</span>}
+                            {!isAlta && !faltaCurp && !hayCurp && <span className="text-gray-400 dark:text-gray-600">-</span>}
+                          </div>
+                          
+                          {canManageFt && (
+                          <label className="relative inline-flex items-center cursor-pointer mt-1">
+                            <input 
+                              type="checkbox" 
+                              className="sr-only peer" 
+                              checked={t.bActivo !== 0}
+                              onChange={() => handleToggleActivo(t.id_trabajador, t.bActivo)} 
+                            />
+                            <div className="w-7 h-4 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all dark:border-gray-500 peer-checked:bg-[var(--recal-blue)]"></div>
+                            <span className="ml-2 text-[10px] font-bold text-gray-600 dark:text-gray-400">
+                              {t.bActivo !== 0 ? 'ON' : 'OFF'}
+                            </span>
+                          </label>
+                          )}
                         </div>
-                        
-                        {canManageFt && (
-                        <label className="relative inline-flex items-center cursor-pointer mt-1">
-                          <input 
-                            type="checkbox" 
-                            className="sr-only peer" 
-                            checked={t.bActivo !== 0}
-                            onChange={() => handleToggleActivo(t.id_trabajador, t.bActivo)} 
-                          />
-                          <div className="w-7 h-4 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all dark:border-gray-500 peer-checked:bg-[var(--recal-blue)]"></div>
-                          <span className="ml-2 text-[10px] font-bold text-gray-600 dark:text-gray-400">
-                            {t.bActivo !== 0 ? 'ON' : 'OFF'}
-                          </span>
-                        </label>
-                        )}
                       </td>
 
 
@@ -956,6 +1009,90 @@ export default function FuerzaTrabajoPage() {
               )}
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: GENERACIÓN DE DC-3 */}
+      {isDc3ModalOpen && dc3Trabajador && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-md w-full border dark:border-slate-700 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center bg-indigo-50 dark:bg-indigo-900/20">
+              <div className="flex items-center">
+                <span className="text-xl mr-2">⛑️</span>
+                <h3 className="text-lg font-bold text-indigo-900 dark:text-indigo-300">Generar Constancia DC-3</h3>
+              </div>
+              <button onClick={() => setIsDc3ModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 font-bold text-xl">&times;</button>
+            </div>
+            
+            <form onSubmit={handleDc3Submit} className="p-6 space-y-4">
+              
+              {/* Tarjeta de Resumen del Trabajador */}
+              <div className="bg-gray-50 dark:bg-slate-700/50 p-4 rounded-md border border-gray-200 dark:border-slate-600 mb-4">
+                <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-bold mb-1">Trabajador Seleccionado</p>
+                <p className="font-bold text-gray-800 dark:text-gray-200 text-lg">
+                  {`${dc3Trabajador.apellido_trabajador || ''} ${dc3Trabajador.nombre_trabajador}`.trim()}
+                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                  <span className="font-semibold">CURP:</span> {dc3Trabajador.curp}
+                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  <span className="font-semibold">Puesto:</span> {dc3Trabajador.puesto_categoria}
+                </p>
+              </div>
+
+              {/* Selector de Curso */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Seleccionar Curso de Capacitación *</label>
+                <select 
+                  required 
+                  className="w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-3 focus:ring-indigo-500 outline-none shadow-sm" 
+                  value={dc3FormData.id_curso} 
+                  onChange={e => setDc3FormData({...dc3FormData, id_curso: e.target.value})}
+                >
+                  <option value="" className="dark:bg-slate-800">-- Elija un curso del catálogo --</option>
+                  {catCursos.map(curso => (
+                    <option key={curso.id_curso} value={curso.id_curso} className="dark:bg-slate-800">
+                      {curso.nombre_curso} ({curso.duracion_horas} hrs)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Fechas del Curso */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Fecha de Inicio *</label>
+                  <input 
+                    required 
+                    type="date" 
+                    className="w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 focus:ring-indigo-500 outline-none" 
+                    value={dc3FormData.fecha_inicio_curso} 
+                    onChange={e => setDc3FormData({...dc3FormData, fecha_inicio_curso: e.target.value})} 
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Fecha de Término *</label>
+                  <input 
+                    required 
+                    type="date" 
+                    className="w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 focus:ring-indigo-500 outline-none" 
+                    value={dc3FormData.fecha_fin_curso} 
+                    onChange={e => setDc3FormData({...dc3FormData, fecha_fin_curso: e.target.value})} 
+                  />
+                </div>
+              </div>
+
+              {/* Botones de acción */}
+              <div className="pt-4 flex justify-end space-x-3 border-t border-gray-200 dark:border-slate-700 mt-6">
+                <button type="button" onClick={() => setIsDc3ModalOpen(false)} className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors font-medium">
+                  Cancelar
+                </button>
+                <button type="submit" disabled={generatingDc3} className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors font-bold shadow-md flex items-center disabled:bg-indigo-400">
+                  <span className="mr-2">📥</span> {generatingDc3 ? 'Procesando...' : 'Generar DC-3'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
