@@ -44,7 +44,7 @@ export async function GET(request) {
       const lastDay = new Date(anio, mes, 0).getDate();
       const startDate = `${anio}-${mes}-01`;
       const endDate = `${anio}-${mes}-${lastDay}`;
-      whereClause += ` AND DATE(m.fecha_ingreso_obra) <= ? AND (m.fecha_baja IS NULL OR DATE(m.fecha_baja) >= ?)`;
+      whereClause += ` AND DATE(m.fecha_ingreso_obra) <= ? AND (m.fecha_baja IS NULL OR DATE(m.fecha_baja) > ?)`;
       queryParams.push(endDate, startDate);
     } else {
       whereClause += ` AND m.fecha_baja IS NULL`;

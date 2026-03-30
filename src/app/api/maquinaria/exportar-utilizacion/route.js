@@ -78,10 +78,28 @@ export async function GET(request) {
         const date = new Date(maquina.fecha_ingreso_obra);
         const dia = String(date.getUTCDate()).padStart(2, '0');
         const mesStr = String(date.getUTCMonth() + 1).padStart(2, '0');
+        const meses = {
+            1: 'ENERO', 2: 'FEBRERO', 3: 'MARZO', 4: 'ABRIL', 5: 'MAYO', 6: 'JUNIO',
+            7: 'JULIO', 8: 'AGOSTO', 9: 'SEPTIEMBRE', 10: 'OCTUBRE', 11: 'NOVIEMBRE', 12: 'DICIEMBRE'
+          };
         const anioStr = date.getUTCFullYear();
-        row.getCell('F').value = `${dia}/${mesStr}/${anioStr}`;
+        row.getCell('F').value = `${meses[parseInt(mesStr)]} / ${anioStr}`;
       } else {
         row.getCell('F').value = '-';
+      }
+
+      if (maquina.fecha_baja) {
+        const date = new Date(maquina.fecha_baja);
+        const dia = String(date.getUTCDate()).padStart(2, '0');
+        const mesStr = String(date.getUTCMonth() + 1).padStart(2, '0');
+        const meses = {
+            1: 'ENERO', 2: 'FEBRERO', 3: 'MARZO', 4: 'ABRIL', 5: 'MAYO', 6: 'JUNIO',
+            7: 'JULIO', 8: 'AGOSTO', 9: 'SEPTIEMBRE', 10: 'OCTUBRE', 11: 'NOVIEMBRE', 12: 'DICIEMBRE'
+          };
+        const anioStr = date.getUTCFullYear();
+        row.getCell('G').value = `${meses[parseInt(mesStr)]} / ${anioStr}`;
+      } else {
+        row.getCell('G').value = 'N/A';
       }
 
       if (maquina.imagen_url) {
@@ -94,18 +112,15 @@ export async function GET(request) {
           
           const imageId = workbook.addImage({ buffer: buffer, extension: 'jpeg' });
           worksheet.addImage(imageId, {
-            // Posicionamiento fraccionario para centrar:
-            // col 6 = Columna G. col: 6.10 da un margen izquierdo.
-            // row = (currentRow - 1) es el índice base. Le sumamos 0.05 (currentRow - 0.95) para un margen superior.
-            tl: { col: 6.10, row: currentRow - 0.95 }, 
+            tl: { col: 7.80, row: currentRow - 0.95 }, 
             ext: { width: 190, height: 190 }, 
             editAs: 'oneCell' 
           });
         } catch (imgError) {
-          row.getCell('G').value = 'Error al cargar imagen';
+          row.getCell('H').value = 'Error al cargar imagen';
         }
       } else {
-        row.getCell('G').value = 'Sin evidencia';
+        row.getCell('H').value = 'Sin evidencia';
       }
 
       if (i > 0) {

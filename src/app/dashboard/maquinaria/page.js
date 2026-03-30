@@ -340,7 +340,7 @@ export default function MaquinariaPage() {
   };
 
 const handleGenerarInspeccion = (id_maquina) => {
-    window.open(`/api/maquinaria/exportar-inspeccion?id=${id_maquina}&semana=${exportSemana}`, '_blank');
+    window.open(`/api/maquinaria/exportar-inspeccion?id=${id_maquina}&mes=${exportMes}&anio=${exportAnio}`, '_blank');
   };
 
   return (
@@ -380,15 +380,15 @@ const handleGenerarInspeccion = (id_maquina) => {
             </div>
           )}
           {(userArea === 'Medio Ambiente' || userRole === 'Master') && (
-            <button onClick={() => window.open(`/api/maquinaria/exportar-inspecciones-masivas?semana=${exportSemana}`, '_blank')} className="flex-1 sm:flex-none justify-center bg-teal-600 hover:bg-teal-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
+            <button onClick={() => window.open(`/api/maquinaria/exportar-inspecciones-masivas?mes=${exportMes}&anio=${exportAnio}`, '_blank')} className="flex-1 sm:flex-none justify-center bg-teal-600 hover:bg-teal-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
               <FolderDown className="w-4 h-4 mr-1 sm:mr-2" /> ZIP Inspecciones
             </button>
           )}
           <div className="flex gap-1 w-full sm:w-auto">
-            <a href={`/api/maquinaria/exportar-utilizacion?${userArea === 'ambiental' ? `semana=${exportSemana}` : `mes=${exportMes}&anio=${exportAnio}`}&area_usuario=${userArea}`} target="_blank" className="flex-1 sm:flex-none justify-center bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
+            <a href={`/api/maquinaria/exportar-utilizacion?${userArea === 'ambiental' ? `mes=${exportMes}&anio=${exportAnio}` : `mes=${exportMes}&anio=${exportAnio}`}&area_usuario=${userArea}`} target="_blank" className="flex-1 sm:flex-none justify-center bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
               <span className="mr-1">📊</span> <span className="hidden sm:inline">Utilización</span><span className="sm:hidden">Util</span>
             </a>
-            <a href={`/api/maquinaria/exportar-plan-servicio?${userArea === 'ambiental' ? `semana=${exportSemana}` : `mes=${exportMes}&anio=${exportAnio}`}&area_usuario=${userArea}`} target="_blank" className="flex-1 sm:flex-none justify-center bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
+            <a href={`/api/maquinaria/exportar-plan-servicio?${userArea === 'ambiental' ? `mes=${exportMes}&anio=${exportAnio}` : `mes=${exportMes}&anio=${exportAnio}`}&area_usuario=${userArea}`} target="_blank" className="flex-1 sm:flex-none justify-center bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
               <span className="mr-1">🛠️</span> <span className="hidden sm:inline">Servicio</span><span className="sm:hidden">Serv</span>
             </a>
           </div>
@@ -441,6 +441,9 @@ const handleGenerarInspeccion = (id_maquina) => {
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('fecha_ingreso_obra')}>
                   Ingreso {ordenPor === 'fecha_ingreso_obra' && (ordenDireccion === 'ASC' ? '↑' : '↓')}
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('fecha_baja')}>
+                  Baja {ordenPor === 'fecha_baja' && (ordenDireccion === 'ASC' ? '↑' : '↓')}
                 </th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-[var(--recal-blue)] dark:text-blue-400 uppercase">Último Servicio</th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Estatus</th>
@@ -498,6 +501,11 @@ const handleGenerarInspeccion = (id_maquina) => {
                     <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
                       <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Ingreso:</span>
                       <span>{formatDDMMYYYY(m.fecha_ingreso_obra)}</span>
+                    </td>
+
+                    <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
+                      <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Baja:</span>
+                      <span>{m.fecha_baja ? formatDDMMYYYY(m.fecha_baja) : '-'}</span>
                     </td>
                     
                     <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 border-b dark:border-slate-700 md:border-none">

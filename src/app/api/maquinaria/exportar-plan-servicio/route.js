@@ -35,7 +35,7 @@ export async function GET(request) {
       const lastDay = new Date(anio, mes, 0).getDate();
       const startDate = `${anio}-${mes}-01`;
       const endDate = `${anio}-${mes}-${lastDay}`;
-      whereClause = `WHERE DATE(m.fecha_ingreso_obra) <= ? AND (m.fecha_baja IS NULL OR DATE(m.fecha_baja) >= ?)`;
+      whereClause = `WHERE DATE(m.fecha_ingreso_obra) <= ? AND (m.fecha_baja IS NULL OR DATE(m.fecha_baja) > ?)`;
       queryParams.push(endDate, startDate);
     }
 
@@ -54,22 +54,17 @@ export async function GET(request) {
     let currentRow = 7; 
     let index = 1;
 
-    // AQUI COMIENZA EL CICLO MODIFICADO
     for (let i = 0; i < rows.length; i++) {
       const maquina = rows[i];
-
-      // A partir de la segunda máquina, insertamos una fila vacía.
-      // Esto EMPUJA todas las firmas (que originalmente estaban en la fila 6, 7, etc.) hacia abajo.
       if (i > 0) {
         worksheet.spliceRows(currentRow, 0, []); 
       }
 
       const row = worksheet.getRow(currentRow);
-      row.height = 100; // El alto de tu formato 12
+      row.height = 100; 
 
       const toUpper = (val) => val ? String(val).toUpperCase() : 'N/A';
 
-      // Llenado de celdas
       row.getCell('A').value = index;
       row.getCell('B').value = toUpper(maquina.tipo);
       row.getCell('C').value = toUpper(maquina.marca);
@@ -78,7 +73,6 @@ export async function GET(request) {
       row.getCell('F').value = toUpper(maquina.color);
       row.getCell('G').value = toUpper(maquina.serie);
       row.getCell('H').value = maquina.placa || 'N/A';
-      
       row.getCell('I').value = maquina.horometro ? `TOTAL DE H: ${maquina.horometro}` : 'N/A';
       row.getCell('J').value = toUpper(maquina.ultimo_tipo_mantenimiento);
 
@@ -92,28 +86,27 @@ export async function GET(request) {
         row.getCell('K').value = 'N/A';
       }
 
-      if (maquina.intervalo_mantenimiento) {
+      if (maquina.fecha_baja) {
+        row.getCell('L').value = 'N/A POR BAJA';
+      } else if (maquina.intervalo_mantenimiento) {
         row.getCell('L').value = `CADA ${maquina.intervalo_mantenimiento} HORAS DE TRABAJO`;
       } else {
         row.getCell('L').value = 'CADA QUE SE REQUIERA';
-      }
+      } 
 
-      // Copiar el formato (bordes, fuentes, centrado) de la fila 5 a las nuevas filas
       if (i > 0) {
         const filaBase = worksheet.getRow(7);
-        let detenerCopia = false; // Bandera para frenar al topar OBSERVACIONES
+        let detenerCopia = false; 
         
         filaBase.eachCell({ includeEmpty: true }, (baseCell, colNumber) => {
-          if (detenerCopia) return; // Si ya la activamos, ignora las siguientes columnas
-          
-          // Extracción segura del valor de ExcelJS (fórmulas, texto enriquecido o texto plano)
+          if (detenerCopia) return;
           let val = baseCell.value;
           if (val && typeof val === 'object' && val.richText) val = val.richText.map(rt => rt.text).join('');
           if (val && typeof val === 'object' && val.result) val = val.result;
           
           if (val && String(val).toUpperCase().includes('OBSERVACION')) {
             detenerCopia = true;
-            return; // Se detiene inmediatamente
+            return; 
           }
 
           row.getCell(colNumber).style = baseCell.style;
