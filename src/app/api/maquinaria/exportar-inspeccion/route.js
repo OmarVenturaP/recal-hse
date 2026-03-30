@@ -3,20 +3,24 @@ import pool from '../../../../lib/db';
 import ExcelJS from 'exceljs';
 import path from 'path';
 
-const getLunesDeSemana = (semanaStr) => {
-  if (!semanaStr) return new Date();
-  const [year, week] = semanaStr.split('-W');
-  const d = new Date(year, 0, 1);
-  const dayNum = d.getDay() || 7;
-  d.setDate(d.getDate() + (4 - dayNum) + (week - 1) * 7);
-  d.setDate(d.getDate() - 3); 
-  return d;
-};
+const generarTextoPeriodo = (mes, anio) => {
+  const meses = {
+    1: 'ENERO', 2: 'FEBRERO', 3: 'MARZO', 4: 'ABRIL', 5: 'MAYO', 6: 'JUNIO',
+    7: 'JULIO', 8: 'AGOSTO', 9: 'SEPTIEMBRE', 10: 'OCTUBRE', 11: 'NOVIEMBRE', 12: 'DICIEMBRE'
+  };
+  
+  if (mes && anio) {
+    return `FECHA: ${meses[parseInt(mes)]} DE ${anio}`;
+  }
+  return 'PERIODO NO ESPECIFICADO';
+}
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
+  const mes = searchParams.get('mes');
+  const anio = searchParams.get('anio');
+  const periodoTexto = generarTextoPeriodo(mes, anio);
   const id = searchParams.get('id');
-  const semanaFiltro = searchParams.get('semana');
 
   if (!id) return NextResponse.json({ success: false, error: 'ID requerido' }, { status: 400 });
 
@@ -45,10 +49,7 @@ export async function GET(request) {
 
     const ws = workbook.getWorksheet(sheetToKeep);
 
-    const fechaReporte = getLunesDeSemana(semanaFiltro);
-    const fechaString = `${fechaReporte.getDate().toString().padStart(2, '0')}/${(fechaReporte.getMonth()+1).toString().padStart(2, '0')}/${fechaReporte.getFullYear()}`;
-
-      ws.getCell('F3').value = `FECHA: ${fechaString}`;
+      ws.getCell('F3').value = periodoTexto;
 
       ws.getCell('A13').value = `Tipo: \n ${equipo.tipo}`;
       ws.getCell('C13').value = `Marca/Modelo: \n ${equipo.marca || ''} / ${equipo.modelo || ''}`;
