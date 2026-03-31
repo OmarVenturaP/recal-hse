@@ -206,26 +206,70 @@ export default function FuerzaTrabajoPage() {
     else { setOrdenPor(columna); setOrdenDireccion('ASC'); }
   };
 
-  const handleExportarClick = () => {
+// NUEVA FUNCIÓN AUXILIAR: Para no repetir el window.open
+  const abrirRutaExportacionExcel = () => {
+    let url = `/api/fuerza-trabajo/exportar?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`;
+    if (filtroSub) url += `&subcontratista=${filtroSub}`;
+    window.open(url, '_blank');
+  };
+
+  // FUNCIÓN ACTUALIZADA
+  const handleExportarClick = async () => {
     if (!fechaInicio || !fechaFin) {
       Swal.fire('Atención', 'Por favor selecciona las fechas de la semana que deseas exportar.', 'warning');
       return;
     }
-    Swal.fire({
-      title: '¿Exportar personal?',
-      text: `Se exportará únicamente al personal activo en el periodo del ${formatDDMMYYYY(fechaInicio)} al ${formatDDMMYYYY(fechaFin)}.`,
-      icon: 'info',
-      showCancelButton: true,
-      confirmButtonColor: '#3085d6',
-      cancelButtonColor: '#d33',
-      confirmButtonText: 'Sí, exportar',
-      cancelButtonText: 'Cancelar'
-    }).then((result) => {
-      if (result.isConfirmed) {
-        const url = `/api/fuerza-trabajo/exportar?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}&subcontratista=${filtroSub}`;
-        window.open(url, '_blank');
+
+    try {
+      // 1. Ejecutamos la validación silenciosa primero
+      let valUrl = `/api/fuerza-trabajo/exportar?validar=true&fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`;
+      if (filtroSub) valUrl += `&subcontratista=${filtroSub}`;
+      
+      const res = await fetch(valUrl);
+      const data = await res.json();
+
+      // 2. Si detecta trabajadores sin cuadrilla, mostramos el Alert
+      if (data.faltantes && data.faltantes.length > 0) {
+        // Limitamos a 10 para no saturar el SweetAlert si son muchos
+        const listaMostrar = data.faltantes.slice(0, 10).join('<br>');
+        const mensajeExtra = data.faltantes.length > 10 ? '<br><i>...y otros más</i>' : '';
+
+        Swal.fire({
+          title: '⚠️ PERSONAL SIN CUADRILLA',
+          html: `Hay trabajadores activos en este periodo que <b>NO tienen cuadrilla asignada</b>:<br><br><b>${listaMostrar}</b>${mensajeExtra}<br><br>Si continúas, aparecerán con "N/A" en el Excel. ¿Deseas exportar de todos modos?`,
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor: '#3085d6',
+          cancelButtonColor: '#d33',
+          confirmButtonText: 'Sí, exportar',
+          cancelButtonText: 'Cancelar y revisar'
+        }).then((result) => {
+          if (result.isConfirmed) {
+            abrirRutaExportacionExcel();
+          }
+        });
+
+      } else {
+        // 3. Flujo normal (si todo está perfecto)
+        Swal.fire({
+          title: '¿Exportar personal?',
+          text: `Se exportará únicamente al personal activo en el periodo del ${formatDDMMYYYY(fechaInicio)} al ${formatDDMMYYYY(fechaFin)}.`,
+          icon: 'info',
+          showCancelButton: true,
+          confirmButtonColor: '#3085d6',
+          cancelButtonColor: '#d33',
+          confirmButtonText: 'Sí, exportar',
+          cancelButtonText: 'Cancelar'
+        }).then((result) => {
+          if (result.isConfirmed) {
+            abrirRutaExportacionExcel();
+          }
+        });
       }
-    });
+
+    } catch (error) {
+      Swal.fire('Error', 'Hubo un problema verificando los datos antes de exportar.', 'error');
+    }
   };
 
   const handleOpenImportModal = () => {

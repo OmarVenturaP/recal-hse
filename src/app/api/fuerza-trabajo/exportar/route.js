@@ -31,6 +31,7 @@ export async function GET(request) {
     const fechaInicio = searchParams.get('fechaInicio'); 
     const fechaFin = searchParams.get('fechaFin'); 
     const idPrincipal = searchParams.get('subcontratista');
+    const esValidacion = searchParams.get('validar') === 'true'; // <- NUEVO PARÁMETRO
 
     if (!fechaInicio || !fechaFin) {
       return NextResponse.json({ error: "Las fechas de inicio y fin son requeridas" }, { status: 400 });
@@ -60,11 +61,20 @@ export async function GET(request) {
       queryParams.push(idPrincipal);
     }
 
-    // --- MODIFICACIÓN 2: Ordenamos primero por "es_nuevo" (0s primero, 1s después) y luego alfabéticamente ---
     query += ` ORDER BY es_nuevo ASC, f.apellido_trabajador ASC, f.nombre_trabajador ASC`;
 
     const [rows] = await pool.query(query, queryParams);
 
+    // --- NUEVO: SI ES MODO VALIDACIÓN, RETORNAMOS LOS FALTANTES ---
+    if (esValidacion) {
+      const faltantes = rows
+        .filter(r => !r.nombre_cuadrilla)
+        .map(r => `${r.apellido_trabajador || ''} ${r.nombre_trabajador || ''}`.trim());
+      
+      return NextResponse.json({ faltantes });
+    }
+
+    // --- FLUJO NORMAL DE EXPORTACIÓN EXCEL ---
     const templatePath = path.join(process.cwd(), 'public', 'plantillas', '09_FUERZA_TRABAJO.xlsx');
     
     if (!fs.existsSync(templatePath)) {
@@ -104,7 +114,6 @@ export async function GET(request) {
 
       row.getCell('A').value = index;
       
-      // Concatenamos apellidos y nombres para el Excel
       const nombreCompleto = `${r.apellido_trabajador || ''} ${r.nombre_trabajador || ''}`.trim();
       row.getCell('B').value = nombreCompleto;
       
@@ -123,7 +132,6 @@ export async function GET(request) {
           row.getCell(colNumber).style = baseCell.style;
         });
       } else {
-        // Centramos las columnas
         ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'].forEach(col => {
           row.getCell(col).alignment = { vertical: 'middle', horizontal: 'center' };
         });
