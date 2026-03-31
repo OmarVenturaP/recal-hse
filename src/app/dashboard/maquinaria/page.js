@@ -3,12 +3,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { ClipboardList, Pencil, Trash2, Upload, Tractor, FileSpreadsheet, FolderDown } from 'lucide-react';
 import Swal from 'sweetalert2';
+import MaquinariaFormModal from '@/components/maquinaria/modals/MaquinariaFormModal';
+import MaquinariaBajaModal from '@/components/maquinaria/modals/MaquinariaBajaModal';
+import MaquinariaHistorialModal from '@/components/maquinaria/modals/MaquinariaHistorialModal';
+import MaquinariaImportModal from '@/components/maquinaria/modals/MaquinariaImportModal';
 
 export default function MaquinariaPage() {
   const topRef = useRef(null); 
 
   const [userRole, setUserRole] = useState(null);
   const [userArea, setUserArea] = useState(null); 
+  const [userMaquinariaPermission, setUserMaquinariaPermission] = useState(null);
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -20,7 +25,17 @@ export default function MaquinariaPage() {
           console.log("Rol:", data.user.rol, "Area:", data.user.area);
         }
       });
+
+    fetch('/api/usuarios/me')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.data.length > 0) {
+          setUserMaquinariaPermission(data.data[0].permisos_maquinaria);
+        }
+      });
   }, []);
+
+  const canManageMaquinaria = userMaquinariaPermission === 1 || userRole === 'Admin' || userRole === 'Master';
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
@@ -339,10 +354,33 @@ export default function MaquinariaPage() {
     setBusqueda('');
   };
 
-const handleGenerarInspeccion = (id_maquina) => {
+  const handleGenerarInspeccion = (id_maquina) => {
     window.open(`/api/maquinaria/exportar-inspeccion?id=${id_maquina}&mes=${exportMes}&anio=${exportAnio}`, '_blank');
   };
 
+  const handleExportarUtilizacion = (e) => {
+    e.preventDefault();
+    const url = `/api/maquinaria/exportar-utilizacion?${userArea === 'ambiental' ? `mes=${exportMes}&anio=${exportAnio}` : `mes=${exportMes}&anio=${exportAnio}`}&area_usuario=${userArea}`;
+    
+    const maquinasActivasSinFoto = maquinaria.filter(m => !m.fecha_baja && !m.imagen_url);
+    
+    if (maquinasActivasSinFoto.length > 0) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Equipos sin fotografía',
+        text: `Tienes ${maquinasActivasSinFoto.length} equipos activos que no cuentan con fotografía. Los recuadros de las imágenes aparecerán vacíos en el Excel. ¿Deseas descargar el reporte de Utilización de todas formas?`,
+        showCancelButton: true,
+        confirmButtonText: 'Sí, descargar',
+        cancelButtonText: 'Cancelar'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          window.open(url, '_blank');
+        }
+      });
+    } else {
+      window.open(url, '_blank');
+    }
+  };
   return (
     <div className="space-y-6 relative" ref={topRef}>
       
@@ -352,9 +390,11 @@ const handleGenerarInspeccion = (id_maquina) => {
         
         <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full lg:w-auto">
           
-          <button onClick={handleOpenImportModal} className="flex-1 sm:flex-none justify-center bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
-            <Upload className="w-4 h-4 mr-1 sm:mr-2" /> Importar Excel
-          </button>
+          {canManageMaquinaria && (
+            <button onClick={handleOpenImportModal} className="flex-1 sm:flex-none justify-center bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
+              <Upload className="w-4 h-4 mr-1 sm:mr-2" /> Importar Excel
+            </button>
+          )}
 
           {/* --- AJUSTE: MUESTRA SEMANA PARA AMBIENTAL, MES/AÑO PARA LOS DEMÁS --- */}
           {userArea === 'Medio Ambiente' ? (
@@ -385,17 +425,19 @@ const handleGenerarInspeccion = (id_maquina) => {
             </button>
           )}
           <div className="flex gap-1 w-full sm:w-auto">
-            <a href={`/api/maquinaria/exportar-utilizacion?${userArea === 'ambiental' ? `mes=${exportMes}&anio=${exportAnio}` : `mes=${exportMes}&anio=${exportAnio}`}&area_usuario=${userArea}`} target="_blank" className="flex-1 sm:flex-none justify-center bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
+            <button onClick={handleExportarUtilizacion} className="flex-1 sm:flex-none justify-center bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
               <span className="mr-1">📊</span> <span className="hidden sm:inline">Utilización</span><span className="sm:hidden">Util</span>
-            </a>
+            </button>
             <a href={`/api/maquinaria/exportar-plan-servicio?${userArea === 'ambiental' ? `mes=${exportMes}&anio=${exportAnio}` : `mes=${exportMes}&anio=${exportAnio}`}&area_usuario=${userArea}`} target="_blank" className="flex-1 sm:flex-none justify-center bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
               <span className="mr-1">🛠️</span> <span className="hidden sm:inline">Servicio</span><span className="sm:hidden">Serv</span>
             </a>
           </div>
           
-          <button onClick={handleNewClick} className="w-full sm:w-auto bg-[var(--recal-blue)] hover:bg-[var(--recal-blue-hover)] text-white px-4 py-3 sm:py-2 rounded-md font-medium shadow-sm lg:ml-2">
-            + Nuevo
-          </button>
+          {canManageMaquinaria && (
+            <button onClick={handleNewClick} className="w-full sm:w-auto bg-[var(--recal-blue)] hover:bg-[var(--recal-blue-hover)] text-white px-4 py-3 sm:py-2 rounded-md font-medium shadow-sm lg:ml-2">
+              + Nuevo
+            </button>
+          )}
         </div>
       </div>
 
@@ -553,17 +595,19 @@ const handleGenerarInspeccion = (id_maquina) => {
                           </div>
                         </div>
 
-                        <div className="relative group flex items-center justify-center">
-                          <button onClick={() => handleEditClick(m)} className="text-blue-600 dark:text-blue-400 hover:text-blue-800 hover:bg-blue-50 p-2 rounded-md transition-colors">
-                            <Pencil className="w-4 h-4 sm:w-5 sm:h-5" />
-                          </button>
-                          <div className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
-                            Editar Equipo
-                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-gray-800"></div>
+                        {canManageMaquinaria && (
+                          <div className="relative group flex items-center justify-center">
+                            <button onClick={() => handleEditClick(m)} className="text-blue-600 dark:text-blue-400 hover:text-blue-800 hover:bg-blue-50 p-2 rounded-md transition-colors">
+                              <Pencil className="w-4 h-4 sm:w-5 sm:h-5" />
+                            </button>
+                            <div className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
+                              Editar Equipo
+                              <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-gray-800"></div>
+                            </div>
                           </div>
-                        </div>
+                        )}
 
-                        {!m.fecha_baja && (
+                        {canManageMaquinaria && !m.fecha_baja && (
                           <div className="relative group flex items-center justify-center">
                             <button onClick={() => handleBajaClick(m.id_maquinaria)} className="text-red-500 dark:text-red-400 hover:text-red-700 hover:bg-red-50 p-2 rounded-md transition-colors">
                               <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -627,266 +671,57 @@ const handleGenerarInspeccion = (id_maquina) => {
         </div>
       )}
 
-      {/* MODAL 1: REGISTRAR / EDITAR MÁQUINA */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border dark:border-slate-700">
-            <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center bg-[var(--recal-gray)] dark:bg-slate-900">
-              <h3 className="text-lg font-bold text-[var(--recal-blue)] dark:text-white">{isEditing ? 'Editar Equipo' : 'Ingreso de Maquinaria'}</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 font-bold text-xl">&times;</button>
-            </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div><label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Num. Económico (opcional)</label><input type="text" className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.num_economico} onChange={e => setFormData({...formData, num_economico: e.target.value.toUpperCase()})} /></div>
-                <div><label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Tipo de Equipo *</label><input required type="text" className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.tipo} onChange={e => setFormData({...formData, tipo: e.target.value.toUpperCase()})} /></div>
-                <div><label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Marca *</label><input required type="text" className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.marca} onChange={e => setFormData({...formData, marca: e.target.value.toUpperCase()})} /></div>
-                <div><label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Modelo (opcional)</label><input type="text" className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.modelo} onChange={e => setFormData({...formData, modelo: e.target.value.toUpperCase()})} /></div>
-                <div><label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Año</label><input type="text" className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.anio} onChange={e => setFormData({...formData, anio: e.target.value})} /></div>
-                <div><label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Color (opcional)</label><input type="text" className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.color} onChange={e => setFormData({...formData, color: e.target.value})} /></div>
-                <div><label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Número de Serie (opcional)</label><input type="text" className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.serie} onChange={e => setFormData({...formData, serie: e.target.value})} /></div>
-                <div><label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Placa (opcional)</label><input type="text" className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.placa} onChange={e => setFormData({...formData, placa: e.target.value})} /></div>
-                <div><label className="block text-sm font-bold text-blue-900 dark:text-blue-400">Horómetro Actual</label><input type="number" step="0.01" className="mt-1 w-full bg-blue-50 dark:bg-blue-900/20 border border-gray-300 dark:border-blue-800 dark:text-white rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.horometro} onChange={e => setFormData({...formData, horometro: e.target.value})} /></div>
-                <div><label className="block text-sm font-bold text-blue-900 dark:text-blue-400">Mantenimiento cada (Hrs)</label><input type="number" className="mt-1 w-full bg-blue-50 dark:bg-blue-900/20 border border-gray-300 dark:border-blue-800 dark:text-white rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.intervalo_mantenimiento} onChange={e => setFormData({...formData, intervalo_mantenimiento: e.target.value})} /></div>
-                <div><label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Fecha Ingreso a Obra *</label><input required type="date" className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.fecha_ingreso_obra} onChange={e => setFormData({...formData, fecha_ingreso_obra: e.target.value})} /></div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Contratista Propietaria</label>
-                  <select className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.id_subcontratista} onChange={e => setFormData({...formData, id_subcontratista: e.target.value})}>
-                    <option value="" className="dark:bg-slate-800">RECAL (Equipo Propio)</option>
-                    {catPrincipales.map(empresa => <option key={empresa.id_subcontratista} value={empresa.id_subcontratista} className="dark:bg-slate-800">{empresa.razon_social}</option>)}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Área Asignada *</label>
-                  <select required className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.area} onChange={e => setFormData({...formData, area: e.target.value})}>
-                    <option value="seguridad" className="dark:bg-slate-800">Seguridad</option>
-                    <option value="ambiental" className="dark:bg-slate-800">Medio Ambiente</option>
-                  </select>
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Fotografía</label>
-                  <input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files[0])} className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-bold file:bg-[var(--recal-blue)] file:text-white hover:file:bg-[var(--recal-blue-hover)]" />
-                  {formData.imagen_url_actual && !imageFile && (
-                    <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">Ya cuenta con una imagen. Sube otra si deseas reemplazarla.</p>
-                  )}
-                </div>
-              </div>
-              <div className="pt-4 flex justify-end space-x-3 border-t border-gray-200 dark:border-slate-700 mt-6">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700">Cancelar</button>
-                <button type="submit" disabled={saving} className="px-4 py-2 bg-[var(--recal-blue)] text-white rounded-md hover:bg-[var(--recal-blue-hover)]">
-                  {saving ? 'Guardando...' : (isEditing ? 'Actualizar' : 'Registrar Equipo')}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 2: CONFIRMAR BAJA */}
-      {isBajaModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-sm w-full border dark:border-slate-700">
-            <div className="px-6 py-4 border-b border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-900/20 rounded-t-lg">
-              <h3 className="text-lg font-bold text-red-700 dark:text-red-400">Confirmar Baja</h3>
-            </div>
-            <form onSubmit={handleBajaSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Fecha de retiro *</label>
-                <input required type="date" className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 focus:ring-red-500 outline-none" value={bajaFecha} onChange={e => setBajaFecha(e.target.value)} />
-                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">La máquina ya no se incluirá en los reportes exportables de Excel.</p>
-              </div>
-              <div className="pt-4 flex justify-end space-x-3 border-t border-gray-200 dark:border-slate-700 mt-6">
-                <button type="button" onClick={() => setIsBajaModalOpen(false)} className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700">Cancelar</button>
-                <button type="submit" disabled={saving} className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 font-medium">
-                  {saving ? 'Procesando...' : 'Dar de Baja'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 3: HISTORIAL DE MANTENIMIENTO */}
-      {isHistorialOpen && maquinaSeleccionada && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-2xl max-w-4xl w-full flex flex-col max-h-[90vh] border dark:border-slate-700">
-            <div className="px-4 md:px-6 py-4 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center bg-[var(--recal-blue)] text-white rounded-t-lg">
-              <h3 className="text-base md:text-lg font-bold truncate pr-4">Servicios: {maquinaSeleccionada.num_economico || 'S/N'}</h3>
-              <button onClick={() => setIsHistorialOpen(false)} className="text-white hover:text-gray-200 font-bold text-xl md:text-2xl">&times;</button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col md:grid md:grid-cols-3 gap-6 bg-gray-50 dark:bg-slate-900">
-              <div className="w-full md:col-span-1 bg-white dark:bg-slate-800 p-4 rounded border border-gray-200 dark:border-slate-700 shadow-sm h-fit">
-                <h4 className="font-bold text-gray-700 dark:text-gray-200 border-b dark:border-slate-700 pb-2 mb-4 text-sm uppercase">Registrar Servicio</h4>
-                <form onSubmit={handleMantenimientoSubmit} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Fecha de Servicio *</label>
-                    <input required type="date" className="w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded p-2 text-sm outline-none focus:border-[var(--recal-blue)]" 
-                      value={formMantenimiento.fecha_mantenimiento} onChange={e => setFormMantenimiento({...formMantenimiento, fecha_mantenimiento: e.target.value})} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo *</label>
-                    <select className="w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded p-2 text-sm outline-none focus:border-[var(--recal-blue)]" 
-                      value={formMantenimiento.tipo_mantenimiento} onChange={e => setFormMantenimiento({...formMantenimiento, tipo_mantenimiento: e.target.value})}>
-                      <option value="Preventivo" className="dark:bg-slate-800">Preventivo</option>
-                      <option value="Correctivo" className="dark:bg-slate-800">Correctivo</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Horómetro al servicio</label>
-                    <input 
-                      type="number" step="0.01" className="w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded p-2 text-sm outline-none focus:border-[var(--recal-blue)]" 
-                      value={formMantenimiento.horometro_mantenimiento} onChange={e => setFormMantenimiento({...formMantenimiento, horometro_mantenimiento: e.target.value})} placeholder='Opcional si es equipo menor'
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Observaciones</label>
-                    <textarea rows="3" className="w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded p-2 text-sm outline-none focus:border-[var(--recal-blue)]" 
-                      value={formMantenimiento.observaciones} onChange={e => setFormMantenimiento({...formMantenimiento, observaciones: e.target.value})}></textarea>
-                  </div>
-                  <button type="submit" disabled={saving} className="w-full bg-green-600 text-white rounded p-3 md:p-2 text-sm font-bold hover:bg-green-700 transition-colors">
-                    Guardar Mantenimiento
-                  </button>
-                </form>
-              </div>
-              <div className="w-full md:col-span-2 bg-white dark:bg-slate-800 rounded border border-gray-200 dark:border-slate-700 shadow-sm overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
-                  <thead className="bg-gray-100 dark:bg-slate-900">
-                    <tr><th className="px-4 py-2 text-left text-xs font-bold text-gray-600 dark:text-gray-400 uppercase">Fecha</th><th className="px-4 py-2 text-left text-xs font-bold text-gray-600 dark:text-gray-400 uppercase">Tipo</th><th className="px-4 py-2 text-center text-xs font-bold text-gray-600 dark:text-gray-400 uppercase">Horómetro</th><th className="px-4 py-2 text-left text-xs font-bold text-gray-600 dark:text-gray-400 uppercase">Detalles</th></tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
-                    {historial.length === 0 ? (
-                      <tr><td colSpan="4" className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400 italic">No hay registros.</td></tr>
-                    ) : (
-                      historial.map((h) => (
-                        <tr key={h.id_mantenimiento} className="hover:bg-gray-50 dark:hover:bg-slate-700/50">
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200 font-medium">{formatDDMMYYYY(h.fecha_mantenimiento)}</td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm"><span className={`px-2 py-1 rounded text-xs font-bold ${h.tipo_mantenimiento === 'Preventivo' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' : 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300'}`}>{h.tipo_mantenimiento}</span></td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-center font-mono text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-slate-900/50">{h.horometro_mantenimiento !== null ? `${h.horometro_mantenimiento} hrs` : 'N/A'}</td>
-                          <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 min-w-[150px] max-w-xs truncate" title={h.observaciones}>{h.observaciones || '-'}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* --- MODAL 4: IMPORTACIÓN MASIVA DE MAQUINARIA --- */}
-      {isImportModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-4xl w-full max-h-[95vh] overflow-hidden flex flex-col border dark:border-slate-700">
-            <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center bg-purple-50 dark:bg-purple-900/20">
-              <div className="flex items-center">
-                <Tractor className="w-6 h-6 text-purple-600 dark:text-purple-400 mr-2" />
-                <h3 className="text-xl font-bold text-purple-900 dark:text-purple-300">Importación Masiva de Equipo</h3>
-              </div>
-              <button onClick={() => setIsImportModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 font-bold text-2xl">&times;</button>
-            </div>
-
-            <div className="p-6 overflow-y-auto flex-1 bg-gray-50 dark:bg-slate-900">
-              {importError && (
-                <div className="mb-4 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 text-red-700 dark:text-red-400 p-4 text-sm shadow-sm">
-                  <p className="font-bold">Aviso de Lectura</p>
-                  <p className="whitespace-pre-line">{importError}</p>
-                </div>
-              )}
-
-              {importFase === 1 && (
-                <form onSubmit={handleAnalizarExcel} className="space-y-6 bg-white dark:bg-slate-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 bg-blue-50 dark:bg-blue-900/20 p-3 rounded border border-blue-100 dark:border-blue-800/50">
-                    Sube el Plan de Servicio Oficial <b>(12_PLAN_SERVICIO.xlsx)</b>. El sistema extraerá los equipos a partir de la Fila 7, cruzará los datos mediante el <b>Número de Serie</b> y te mostrará los equipos nuevos a registrar.
-                  </p>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">1. Selecciona la Contratista Propietaria *</label>
-                      <select required className="w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-3 focus:ring-purple-500 outline-none shadow-sm" value={importSubcontratista} onChange={(e) => setImportSubcontratista(e.target.value)}>
-                        <option value="" className="dark:bg-slate-800">-- Elige una opción --</option>
-                        {catPrincipales.map(empresa => (
-                          <option key={empresa.id_subcontratista} value={empresa.id_subcontratista} className="dark:bg-slate-800">{empresa.razon_social}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">2. Sube el archivo Excel *</label>
-                      <input required type="file" accept=".xlsx, .xls" className="w-full bg-transparent border border-gray-300 dark:border-slate-600 rounded-md p-2 focus:outline-none file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-purple-50 dark:file:bg-purple-900/30 file:text-purple-700 dark:file:text-purple-400 hover:file:bg-purple-100 dark:hover:file:bg-purple-900/50 dark:text-gray-300" onChange={(e) => setImportFile(e.target.files[0])} />
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end pt-4">
-                    <button type="submit" disabled={importing} className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg flex items-center shadow-md transition-colors disabled:bg-gray-400 dark:disabled:bg-slate-600">
-                      {importing ? 'Analizando documento...' : 'Cruzar Datos y Analizar'}
-                    </button>
-                  </div>
-                </form>
-              )}
-
-              {importFase === 2 && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-3 gap-4 text-center">
-                    <div className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-gray-200 dark:border-slate-700 shadow-sm">
-                      <p className="text-xs text-gray-500 dark:text-gray-400 font-bold uppercase">Equipos en el Excel</p>
-                      <p className="text-2xl font-bold text-gray-700 dark:text-gray-200">{importResumen.totales}</p>
-                    </div>
-                    <div className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-gray-200 dark:border-slate-700 shadow-sm">
-                      <p className="text-xs text-gray-500 dark:text-gray-400 font-bold uppercase">Ya registrados</p>
-                      <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{importResumen.totales - importResumen.nuevos}</p>
-                    </div>
-                    <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg border border-purple-200 dark:border-purple-800/50 shadow-sm">
-                      <p className="text-xs text-purple-700 dark:text-purple-400 font-bold uppercase">Nuevos por guardar</p>
-                      <p className="text-3xl font-black text-purple-700 dark:text-purple-400">{importResumen.nuevos}</p>
-                    </div>
-                  </div>
-
-                  {importPreviewData.length === 0 ? (
-                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/50 rounded-lg p-8 text-center">
-                      <p className="text-green-700 dark:text-green-400 font-bold text-lg mb-2">¡Inventario Cuadrado!</p>
-                      <p className="text-green-600 dark:text-green-500">Todos los números de serie detectados en este Excel ya existen activos en tu base de datos.</p>
-                    </div>
-                  ) : (
-                    <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 shadow-sm overflow-hidden">
-                      <div className="max-h-64 overflow-y-auto">
-                        <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700 text-sm">
-                          <thead className="bg-gray-100 dark:bg-slate-900 sticky top-0">
-                            <tr>
-                              <th className="px-4 py-3 text-left font-bold text-gray-600 dark:text-gray-400">Tipo</th>
-                              <th className="px-4 py-3 text-left font-bold text-gray-600 dark:text-gray-400">Marca / Modelo</th>
-                              <th className="px-4 py-3 text-left font-bold text-gray-600 dark:text-gray-400">Número de Serie</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
-                            {importPreviewData.map((m, idx) => (
-                              <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-slate-700/50">
-                                <td className="px-4 py-2 font-medium text-gray-900 dark:text-gray-200">{m.tipo}</td>
-                                <td className="px-4 py-2 text-gray-600 dark:text-gray-400">{m.marca} / {m.modelo || '-'}</td>
-                                <td className="px-4 py-2 text-gray-600 dark:text-gray-400 font-mono">{m.serie}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="px-6 py-4 border-t border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex justify-end space-x-3">
-              <button onClick={() => setIsImportModalOpen(false)} className="px-6 py-2 border border-gray-300 dark:border-slate-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 font-medium transition-colors">Cancelar</button>
-              {importFase === 2 && importPreviewData.length > 0 && (
-                <button onClick={handleGuardarImportacion} disabled={importing} className="px-6 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 font-bold transition-colors shadow-md flex items-center disabled:bg-gray-400 dark:disabled:bg-slate-600">
-                  {importing ? 'Guardando...' : `Guardar ${importResumen.nuevos} Equipos`}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+            {/* MODALES REFACTORIZADOS */}
+      <MaquinariaFormModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        isEditing={isEditing}
+        formData={formData}
+        setFormData={setFormData}
+        handleSubmit={handleSubmit}
+        saving={saving}
+        imageFile={imageFile}
+        setImageFile={setImageFile}
+        catPrincipales={catPrincipales}
+      />
+      
+      <MaquinariaBajaModal
+        isOpen={isBajaModalOpen}
+        onClose={() => setIsBajaModalOpen(false)}
+        bajaFecha={bajaFecha}
+        setBajaFecha={setBajaFecha}
+        handleBajaSubmit={handleBajaSubmit}
+        saving={saving}
+      />
+      
+      <MaquinariaHistorialModal
+        isOpen={isHistorialOpen}
+        onClose={() => setIsHistorialOpen(false)}
+        maquinaSeleccionada={maquinaSeleccionada}
+        formMantenimiento={formMantenimiento}
+        setFormMantenimiento={setFormMantenimiento}
+        handleMantenimientoSubmit={handleMantenimientoSubmit}
+        historial={historial}
+        saving={saving}
+        formatDDMMYYYY={formatDDMMYYYY}
+        canManageMaquinaria={canManageMaquinaria}
+      />
+      
+      <MaquinariaImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        importError={importError}
+        importFase={importFase}
+        handleAnalizarExcel={handleAnalizarExcel}
+        catPrincipales={catPrincipales}
+        importSubcontratista={importSubcontratista}
+        setImportSubcontratista={setImportSubcontratista}
+        setImportFile={setImportFile}
+        importing={importing}
+        importResumen={importResumen}
+        importPreviewData={importPreviewData}
+        handleGuardarImportacion={handleGuardarImportacion}
+      />
 
     </div>
   );

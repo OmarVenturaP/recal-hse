@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import pool from '../../../lib/db';
+import pool from '@/lib/db';
 import bcrypt from 'bcryptjs';
 
 // GET: Obtener todos los usuarios (Solo para Master/Admin)

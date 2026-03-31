@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import pool from '../../../../lib/db';
+import pool from '@/lib/db';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import ImageModule from 'docxtemplater-image-module-free';

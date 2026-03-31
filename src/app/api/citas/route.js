@@ -32,38 +32,51 @@ export async function GET(request) {
   }
 }
 
+async function validateAppointmentTime(hora_cita, fecha_cita, revisor_nombre, id_cita_ignorar = null) {
+  const horaMinima = '08:30';
+  const horaMaxima = '13:00';
+  if (hora_cita < horaMinima || hora_cita > horaMaxima) {
+    return { success: false, error: '🚨 El horario permitido para revisiones es estrictamente de 08:30 am a 01:00 pm, por favor ajusta la cita al horario indicado.' };
+  }
+
+  if (revisor_nombre && revisor_nombre.trim() !== '') {
+    let query = `SELECT id_cita, hora_cita FROM Citas_Dossier WHERE fecha_cita = ? AND revisor_nombre = ? AND estatus != 'No asistió'`;
+    const params = [fecha_cita, revisor_nombre];
+    
+    if (id_cita_ignorar) {
+       query += ` AND id_cita != ?`;
+       params.push(id_cita_ignorar);
+    }
+
+    const [citasDia] = await pool.query(query, params);
+    
+    const [hNueva, mNueva] = hora_cita.split(':').map(Number);
+    const minutosNueva = (hNueva * 60) + mNueva;
+
+    for (let cita of citasDia) {
+      const [hExistente, mExistente] = cita.hora_cita.split(':').map(Number);
+      const minutosExistente = (hExistente * 60) + mExistente;
+
+      if (Math.abs(minutosNueva - minutosExistente) < 240) {
+        const horaChoque = cita.hora_cita.substring(0, 5);
+        return { 
+          success: false, 
+          error: `🚨 Empalme de horario: El revisor ${revisor_nombre} ya tiene otra cita a las ${horaChoque}. Debe haber un desfase de 4 horas.` 
+        };
+      }
+    }
+  }
+  return { success: true };
+}
+
 export async function POST(request) {
   try {
     const data = await request.json();
     const { fecha_cita, hora_cita, id_subcontratista, area, dossiers_entregados, periodo_evaluado, num_revision, revisor_nombre } = data;
 
-    const horaMinima = '08:30';
-    const horaMaxima = '13:00';
-    if (hora_cita < horaMinima || hora_cita > horaMaxima) {
-      return NextResponse.json({ success: false, error: '🚨 El horario permitido para revisiones es estrictamente de 08:30 am a 01:00 pm, por favor ajusta la cita al horario indicado.' }, { status: 400 });
-    }
-
-    if (revisor_nombre && revisor_nombre.trim() !== '') {
-      const [citasDia] = await pool.query(
-        `SELECT hora_cita FROM Citas_Dossier WHERE fecha_cita = ? AND revisor_nombre = ? AND estatus != 'No asistió'`,
-        [fecha_cita, revisor_nombre]
-      );
-      
-      const [hNueva, mNueva] = hora_cita.split(':').map(Number);
-      const minutosNueva = (hNueva * 60) + mNueva;
-
-      for (let cita of citasDia) {
-        const [hExistente, mExistente] = cita.hora_cita.split(':').map(Number);
-        const minutosExistente = (hExistente * 60) + mExistente;
-
-        if (Math.abs(minutosNueva - minutosExistente) < 240) {
-          const horaChoque = cita.hora_cita.substring(0, 5);
-          return NextResponse.json({ 
-            success: false, 
-            error: `🚨 Aviso: El revisor ${revisor_nombre} ya tiene una cita agendada a las ${horaChoque}.` 
-          }, { status: 400 });
-        }
-      }
+    const validation = await validateAppointmentTime(hora_cita, fecha_cita, revisor_nombre);
+    if (!validation.success) {
+      return NextResponse.json({ success: false, error: validation.error }, { status: 400 });
     }
 
     const query = `
@@ -86,33 +99,9 @@ export async function PUT(request) {
     const data = await request.json();
     const { id_cita, fecha_cita, hora_cita, dossiers_entregados, periodo_evaluado, num_revision, estatus, comentarios_revisor, revisor_nombre } = data;
 
-    const horaMinima = '08:30';
-    const horaMaxima = '13:00';
-    if (hora_cita < horaMinima || hora_cita > horaMaxima) {
-      return NextResponse.json({ success: false, error: '🚨 El horario permitido para revisiones es estrictamente de 08:30 am a 01:00 pm, por favor ajusta la cita al horario indicado.' }, { status: 400 });
-    }
-
-    if (revisor_nombre && revisor_nombre.trim() !== '') {
-      const [citasDia] = await pool.query(
-        `SELECT id_cita, hora_cita FROM Citas_Dossier WHERE fecha_cita = ? AND revisor_nombre = ? AND id_cita != ? AND estatus != 'No asistió'`,
-        [fecha_cita, revisor_nombre, id_cita]
-      );
-      
-      const [hNueva, mNueva] = hora_cita.split(':').map(Number);
-      const minutosNueva = (hNueva * 60) + mNueva;
-
-      for (let cita of citasDia) {
-        const [hExistente, mExistente] = cita.hora_cita.split(':').map(Number);
-        const minutosExistente = (hExistente * 60) + mExistente;
-
-        if (Math.abs(minutosNueva - minutosExistente) < 240) {
-          const horaChoque = cita.hora_cita.substring(0, 5);
-          return NextResponse.json({ 
-            success: false, 
-            error: `🚨 Empalme de horario: El revisor ${revisor_nombre} ya tiene otra cita a las ${horaChoque}. Debe haber un desfase de 4 horas.` 
-          }, { status: 400 });
-        }
-      }
+    const validation = await validateAppointmentTime(hora_cita, fecha_cita, revisor_nombre, id_cita);
+    if (!validation.success) {
+      return NextResponse.json({ success: false, error: validation.error }, { status: 400 });
     }
 
     const query = `

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { SignJWT } from 'jose';
-import pool from '../../../../lib/db'; 
+import pool from '@/lib/db'; 
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 

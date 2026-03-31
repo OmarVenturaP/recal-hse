@@ -468,14 +468,14 @@ export default function CatalogosPage() {
                     
                     <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-600 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
                       <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 text-xs uppercase">RFC:</span>
-                      {empresa.rfc || 'N/A'}
+                      {empresa.rfc ? empresa.rfc.toUpperCase() : 'N/A'}
                     </td>
                     
                     <td className="flex flex-col md:table-cell px-2 md:px-6 py-3 md:py-4 text-sm border-b dark:border-slate-700 md:border-none">
                       <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 text-xs uppercase mb-1">Representantes:</span>
                       <div className="flex flex-col text-right md:text-left text-xs md:text-sm">
-                        <div className="text-gray-900 dark:text-gray-200"><span className="font-semibold text-gray-500">Legal:</span> {empresa.representante_legal || 'N/A'}</div>
-                        <div className="text-gray-500 dark:text-gray-400"><span className="font-semibold text-gray-500">Trab:</span> {empresa.representante_trabajadores || 'N/A'}</div>
+                        <div className="text-gray-900 dark:text-gray-200"><span className="font-semibold text-gray-500">Legal:</span> {empresa.representante_legal ? empresa.representante_legal.toUpperCase() : 'N/A'}</div>
+                        <div className="text-gray-500 dark:text-gray-400"><span className="font-semibold text-gray-500">Trab:</span> {empresa.representante_trabajadores ? empresa.representante_trabajadores.toUpperCase() : 'N/A'}</div>
                       </div>
                     </td>
                     

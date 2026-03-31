@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import pool from '../../../../lib/db'; // Aseguramos que la ruta hacia db.js sea correcta (4 niveles arriba)
+import pool from '@/lib/db';
 
 // --- GET: Obtener el historial completo de una máquina ---
 export async function GET(request) {

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import ExcelJS from 'exceljs';
-import pool from '../../../lib/db';
+import pool from '@/lib/db';
 
 export async function POST(request) {
   try {
