@@ -141,6 +141,8 @@ export async function PUT(request) {
       
       const idsActuales = cuadrillas.filter(c => !String(c.id_subcontratista_ft).startsWith('temp_')).map(c => c.id_subcontratista_ft);
       if (idsActuales.length > 0) {
+        console.log("IDs actuales de cuadrillas:", idsActuales);
+        await connection.query('UPDATE Fuerza_Trabajo SET id_subcontratista_ft = NULL WHERE id_subcontratista_ft NOT IN (?)', [idsActuales]);
         await connection.query('DELETE FROM Subcontratistas_Fuerza_Trabajo WHERE id_subcontratista_principal = ? AND id_subcontratista_ft NOT IN (?)', [id_subcontratista, idsActuales]);
       } else {
         await connection.query('DELETE FROM Subcontratistas_Fuerza_Trabajo WHERE id_subcontratista_principal = ?', [id_subcontratista]);

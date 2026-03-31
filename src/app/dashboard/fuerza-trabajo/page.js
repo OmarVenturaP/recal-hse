@@ -438,6 +438,7 @@ export default function FuerzaTrabajoPage() {
 
   const handleGenerarDc3Individual = (trabajador) => {
     setDc3Trabajador(trabajador);
+    console.log(trabajador)
     setSelectedAgente(''); 
     setDc3FormData({
       id_curso: '',
@@ -659,6 +660,7 @@ const handleDc3Submit = async (e) => {
                             {isAlta && <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">ALTA</span>}
                             {faltaCurp && <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-600 text-white dark:bg-red-900/30 dark:text-white">FALTA CURP</span>}
                             {hayCurp && <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-green-600 text-white dark:bg-green-900/30 dark:text-white">CURP</span>}
+                            {!t.id_subcontratista_ft && <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-600 text-white dark:bg-red-900/30 dark:text-white">FALTA CUADRILLA</span>}
                             {!isAlta && !faltaCurp && !hayCurp && <span className="text-gray-400 dark:text-gray-600">-</span>}
                           </div>
                           
@@ -736,11 +738,14 @@ const handleDc3Submit = async (e) => {
                             </div>
                           </div>
 
+                          
                           {!t.fecha_baja ? (
                             <div className="relative group flex items-center justify-center">
-                              <button onClick={() => handleBajaClick(t.id_trabajador)} className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 p-2 rounded-md transition-colors">
-                                <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
-                              </button>
+                              {canManageFt && (
+                                <button onClick={() => handleBajaClick(t.id_trabajador)} className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 p-2 rounded-md transition-colors">
+                                  <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                                </button>
+                              )}
                               <div className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
                                 Dar Baja
                                 <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-gray-800"></div>
@@ -1079,11 +1084,14 @@ const handleDc3Submit = async (e) => {
                 <p className="font-bold text-gray-800 dark:text-gray-200 text-lg">
                   {`${dc3Trabajador.apellido_trabajador || ''} ${dc3Trabajador.nombre_trabajador}`.trim()}
                 </p>
-                <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-                  <span className="font-semibold">CURP:</span> {dc3Trabajador.curp}
+                <p className="text-sm text-yellow-600 dark:text-yellow-400 mt-1 font-semibold">
+                  <span className="text-gray-600 dark:text-gray-300">Fecha de ingreso:</span> {dc3Trabajador.fecha_ingreso_obra}
                 </p>
-                <p className="text-sm text-gray-600 dark:text-gray-300">
-                  <span className="font-semibold">Puesto:</span> {dc3Trabajador.puesto_categoria}
+                <p className="text-sm text-yellow-600 dark:text-yellow-400 mt-1  font-semibold">
+                  <span className="text-gray-600 dark:text-gray-300">Puesto:</span> {dc3Trabajador.puesto_categoria}
+                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                  <span className="text-gray-600 dark:text-gray-300">CURP:</span> {dc3Trabajador.curp}
                 </p>
               </div>
 
@@ -1132,6 +1140,7 @@ const handleDc3Submit = async (e) => {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
+              <span className="col-span-2 text-sm text-red-500 dark:text-red-400">Si el DC-3 es para personal de nuevo ingreso, asegúrate que las fechas del curso sea anterior a la fecha de ingreso.</span>
                 <div>
                   <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Fecha de Inicio *</label>
                   <input 
