@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Pencil, Trash2, Upload, FileSpreadsheet, Users } from 'lucide-react';
 import Swal from 'sweetalert2';
 
@@ -54,6 +54,8 @@ export default function FuerzaTrabajoPage() {
   const [fechaInicio, setFechaInicio] = useState(getDateString(haceUnaSemana));
   const [fechaFin, setFechaFin] = useState(getDateString(hoy));
   const [filtroSub, setFiltroSub] = useState('');
+  const [soloFaltaCurp, setSoloFaltaCurp] = useState(false);
+  const [soloFaltaCuadrilla, setSoloFaltaCuadrilla] = useState(false);
   const [busqueda, setBusqueda] = useState('');
 
   const [ordenPor, setOrdenPor] = useState('fecha_ingreso_obra');
@@ -180,7 +182,33 @@ export default function FuerzaTrabajoPage() {
     if (topRef.current) topRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [currentPage]);
 
-  const totalPages = Math.ceil(trabajadores.length / itemsPerPage);
+  const trabajadoresFiltrados = useMemo(() => {
+    return trabajadores.filter(t => {
+      // Filtro de CURP
+      let cumpleCurp = true;
+      if (soloFaltaCurp) {
+        const fechaIngresoStr = formatForInput(t.fecha_ingreso_obra);
+        const isAlta = fechaIngresoStr >= fechaInicio && fechaIngresoStr <= fechaFin;
+        const categoriasCriticas = ["SUPERVISOR DE SEGURIDAD", "OPERADOR DE MAQUINARIA", "SOLDADOR", "PINTOR", "ANDAMIERO", "ANDAMIERO A", "SANDBLASTERO", "SANDBLASTERO A", "MANIOBRISTA"];
+        const requiereCurp = t.puesto_categoria && categoriasCriticas.some(cat => t.puesto_categoria.toUpperCase().includes(cat));
+        cumpleCurp = isAlta && requiereCurp && (!t.curp || t.curp.length < 18);
+      }
+
+      // Filtro de Cuadrilla
+      let cumpleCuadrilla = true;
+      if (soloFaltaCuadrilla) {
+        cumpleCuadrilla = !t.id_subcontratista_ft || t.id_subcontratista_ft === '';
+      }
+
+      if (soloFaltaCurp && soloFaltaCuadrilla) return cumpleCurp && cumpleCuadrilla;
+      if (soloFaltaCurp) return cumpleCurp;
+      if (soloFaltaCuadrilla) return cumpleCuadrilla;
+      
+      return true;
+    });
+  }, [trabajadores, soloFaltaCurp, soloFaltaCuadrilla, fechaInicio, fechaFin]);
+
+  const totalPages = Math.ceil(trabajadoresFiltrados.length / itemsPerPage);
   
   const getPageNumbers = () => {
     const maxPagesToShow = 5;
@@ -199,7 +227,7 @@ export default function FuerzaTrabajoPage() {
 
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const trabajadoresPaginados = trabajadores.slice(indexOfFirstItem, indexOfLastItem);
+  const trabajadoresPaginados = trabajadoresFiltrados.slice(indexOfFirstItem, indexOfLastItem);
 
   const manejarOrden = (columna) => {
     if (ordenPor === columna) setOrdenDireccion(ordenDireccion === 'ASC' ? 'DESC' : 'ASC');
@@ -645,15 +673,36 @@ const handleDc3Submit = async (e) => {
             {catPrincipales.map(empresa => (<option key={empresa.id_subcontratista} value={empresa.id_subcontratista}>{empresa.razon_social}</option>))}
           </select>
         </div>
-        <div className="md:col-span-1 flex items-end">
-          <button onClick={limpiarFiltros} className="w-full bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-md font-medium sm:text-sm transition-colors border border-gray-300 dark:border-slate-600">Limpiar Todo</button>
+        <div className="md:col-span-1 flex flex-col gap-2">
+          <div className="flex gap-1.5 h-full items-end">
+            <button 
+              onClick={() => { setSoloFaltaCurp(!soloFaltaCurp); setSoloFaltaCuadrilla(false); }} 
+              className={`flex-1 text-[10px] font-black border px-2 py-2 rounded-md transition-all duration-300 ${soloFaltaCurp ? 'bg-red-600 text-white border-red-700 shadow-md' : 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 hover:bg-red-100'}`}
+              title="Personal crítico sin CURP"
+            >
+              {soloFaltaCurp ? 'VER TODO' : 'FALTA CURP'}
+            </button>
+            <button 
+              onClick={() => { setSoloFaltaCuadrilla(!soloFaltaCuadrilla); setSoloFaltaCurp(false); }} 
+              className={`flex-1 text-[10px] font-black border px-2 py-2 rounded-md transition-all duration-300 ${soloFaltaCuadrilla ? 'bg-orange-500 text-white border-orange-600 shadow-md' : 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-800 hover:bg-orange-100'}`}
+              title="Personal sin cuadrilla"
+            >
+              {soloFaltaCuadrilla ? 'VER TODO' : 'SIN CUADRILLA'}
+            </button>
+          </div>
+          <button 
+            onClick={() => { setBusqueda(''); setFiltroSub(''); setSoloFaltaCurp(false); setSoloFaltaCuadrilla(false); }} 
+            className="w-full bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-md font-bold text-xs transition-colors border border-gray-300 dark:border-slate-600 uppercase"
+          >
+            Limpiar Todo
+          </button>
         </div>
       </div>
 
       <div className="bg-white dark:bg-slate-800 shadow-sm rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full divide-y divide-gray-200 dark:divide-slate-700 block md:table">
-            <thead className="bg-gray-50 dark:bg-slate-900 hidden md:table-header-group">
+        <div className="overflow-auto max-h-[65vh]">
+          <table className="w-full divide-y divide-gray-200 dark:divide-slate-700 block md:table relative">
+            <thead className="bg-gray-50 dark:bg-slate-900 hidden md:table-header-group sticky top-0 z-10 shadow-sm outline outline-1 outline-gray-200 dark:outline-slate-700">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('apellido_trabajador')}>Nombre {ordenPor === 'apellido_trabajador' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('puesto_categoria')}>Categoría {ordenPor === 'puesto_categoria' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
@@ -848,7 +897,7 @@ const handleDc3Submit = async (e) => {
       {totalPages > 1 && (
         <div className="flex flex-col sm:flex-row items-center justify-between bg-white dark:bg-slate-800 px-4 py-3 border border-gray-200 dark:border-slate-700 rounded-lg shadow-sm gap-4 sm:gap-0 mt-4">
           <div className="text-sm text-gray-700 dark:text-gray-300 text-center sm:text-left">
-            Mostrando del <span className="font-bold">{indexOfFirstItem + 1}</span> al <span className="font-bold">{Math.min(indexOfLastItem, trabajadores.length)}</span> de <span className="font-bold">{trabajadores.length}</span> trabajadores
+            Mostrando del <span className="font-bold">{indexOfFirstItem + 1}</span> al <span className="font-bold">{Math.min(indexOfLastItem, trabajadoresFiltrados.length)}</span> de <span className="font-bold">{trabajadoresFiltrados.length}</span> trabajadores
           </div>
           <div>
             <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">

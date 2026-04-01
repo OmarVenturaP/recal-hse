@@ -481,9 +481,9 @@ export default function MaquinariaPage() {
 
       {/* TABLA PRINCIPAL */}
       <div className="bg-white dark:bg-slate-800 shadow-sm rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
-            <thead className="bg-gray-50 dark:bg-slate-900 hidden md:table-header-group">
+        <div className="overflow-auto max-h-[65vh] custom-scrollbar">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700 relative">
+            <thead className="bg-gray-50 dark:bg-slate-900 hidden md:table-header-group sticky top-0 z-10 shadow-sm outline outline-1 outline-gray-200 dark:outline-slate-700">
               <tr>
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Imagen</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('tipo')}>

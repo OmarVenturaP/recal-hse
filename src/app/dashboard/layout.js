@@ -154,7 +154,7 @@ export default function DashboardLayout({ children }) {
           )}
           
           {hasDc3Permission && (
-            <NavItem href="/dashboard/catalogos" icon={BookOpen} label="Catálogos Globales" />
+            <NavItem href="/dashboard/catalogos" icon={BookOpen} label="Catálogos" />
           )}
           
           <NavItem href="/dashboard/citas" icon={CalendarDays} label="Citas Dossier" />

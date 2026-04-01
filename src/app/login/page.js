@@ -88,7 +88,7 @@ export default function LoginPage() {
               value={correo}
               onChange={(e) => setCorreo(e.target.value)}
               className="w-full bg-gray-50/50 dark:bg-slate-900/50 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 text-gray-900 dark:text-white placeholder-gray-400 px-4 py-3 outline-none transition-all"
-              placeholder="tu@correo.com"
+              placeholder="tu@recalhse.com"
             />
           </div>
 
