@@ -382,11 +382,25 @@ export default function MaquinariaPage() {
     }
   };
   return (
-    <div className="space-y-6 relative" ref={topRef}>
+    <>
+    <div className="max-w-[100rem] mx-auto p-4 md:p-6 lg:p-8 space-y-6 animate-in fade-in duration-500" ref={topRef}>
+      <div className="bg-white/90 dark:bg-slate-800/80 backdrop-blur-xl rounded-[2.5rem] p-6 lg:p-8 shadow-xl shadow-gray-200/50 dark:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.6)] border border-white/80 dark:border-slate-700/50">
+        
+        {/* HERO BENTO HEADER */}
+        <div className="flex flex-col md:flex-row items-start md:items-center gap-6 mb-8 border-b border-gray-100 dark:border-slate-700/50 pb-6">
+           <div className="w-16 h-16 bg-gradient-to-br from-orange-400 to-orange-600 rounded-2xl shadow-lg shadow-orange-500/30 flex items-center justify-center text-white shrink-0">
+             <Tractor className="w-8 h-8" />
+           </div>
+           <div>
+             <h1 className="text-3xl font-black text-gray-800 dark:text-white tracking-tight leading-none mb-2">Maquinaria e Inventario Operativo</h1>
+             <p className="text-gray-500 dark:text-gray-400 font-medium text-sm md:text-base">Listado, códigos QR interactivos e historiales de mantenimiento de campo.</p>
+           </div>
+        </div>
+
+        <div className="space-y-6 relative">
       
-      {/* HEADER Y BOTONES RESPONSIVOS */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center space-y-4 lg:space-y-0">
-        <h2 className="text-xl sm:text-2xl font-bold text-[var(--recal-blue)] dark:text-white">Maquinaria y Equipo</h2>
+      {/* BOTONES RESPONSIVOS */}
+      <div className="flex flex-col lg:flex-row justify-end items-start lg:items-center space-y-4 lg:space-y-0">
         
         <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full lg:w-auto">
           
@@ -670,6 +684,9 @@ export default function MaquinariaPage() {
           </div>
         </div>
       )}
+        </div>
+      </div>
+    </div>
 
             {/* MODALES REFACTORIZADOS */}
       <MaquinariaFormModal
@@ -722,7 +739,6 @@ export default function MaquinariaPage() {
         importPreviewData={importPreviewData}
         handleGuardarImportacion={handleGuardarImportacion}
       />
-
-    </div>
+    </>
   );
 }

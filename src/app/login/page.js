@@ -43,13 +43,21 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[var(--recal-gray)] dark:bg-slate-900 px-4 transition-colors duration-300">
-      <div className="max-w-md w-full bg-white dark:bg-slate-800 rounded-lg shadow-xl p-8 border-t-4 border-[var(--recal-blue)] dark:border-blue-500">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-900 px-4 transition-colors duration-500 relative overflow-hidden">
+      
+      {/* Background Decorativo Estilo Bento */}
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
+        <div className="absolute -top-[10%] -right-[5%] w-[40%] h-[40%] rounded-full bg-gradient-to-br from-blue-400/20 to-purple-500/20 blur-3xl dark:from-blue-600/20 dark:to-purple-900/20"></div>
+        <div className="absolute -bottom-[10%] -left-[5%] w-[50%] h-[50%] rounded-full bg-gradient-to-tr from-indigo-400/20 to-cyan-400/20 blur-3xl dark:from-indigo-900/20 dark:to-cyan-900/20"></div>
+      </div>
+
+      <div className="max-w-md w-full relative z-10">
+        <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl rounded-[2rem] shadow-2xl shadow-gray-200/50 dark:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.6)] border border-white/50 dark:border-slate-700/50 p-8 sm:p-10 animate-in slide-in-from-bottom-8 fade-in duration-700">
         
         <div className="text-center mb-8">
           {/* Título con el azul corporativo */}
           <h2 className="text-3xl font-extrabold text-[var(--recal-blue)] dark:text-blue-400">
-            <a id="logo-header" className="" href="https://recal-hse.vercel.app" target="_blank" rel="noopener noreferrer">
+            <a id="logo-header" className="" href="/" target="_blank" rel="noopener noreferrer">
                 <svg className="h-6 sm:h-8 mx-auto w-auto" viewBox="0 0 133 32" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path 
                     fillRule="evenodd" 
@@ -72,26 +80,26 @@ export default function LoginPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Correo</label>
+          <div className="space-y-1">
+            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 ml-1">Correo Electrónico</label>
             <input 
               type="email" 
               required
               value={correo}
               onChange={(e) => setCorreo(e.target.value)}
-              className="mt-1 block w-full bg-white dark:bg-slate-700 rounded-md border-gray-300 dark:border-slate-600 shadow-sm focus:border-[var(--recal-blue)] dark:focus:border-blue-400 focus:ring-[var(--recal-blue)] dark:focus:ring-blue-400 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 px-4 py-2 border outline-none transition-colors"
-              placeholder="correo@recalhse.com"
+              className="w-full bg-gray-50/50 dark:bg-slate-900/50 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 text-gray-900 dark:text-white placeholder-gray-400 px-4 py-3 outline-none transition-all"
+              placeholder="tu@correo.com"
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Contraseña</label>
+          <div className="space-y-1">
+            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 ml-1">Contraseña</label>
             <input 
               type="password" 
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 block w-full bg-white dark:bg-slate-700 rounded-md border-gray-300 dark:border-slate-600 shadow-sm focus:border-[var(--recal-blue)] dark:focus:border-blue-400 focus:ring-[var(--recal-blue)] dark:focus:ring-blue-400 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 px-4 py-2 border outline-none transition-colors"
+              className="w-full bg-gray-50/50 dark:bg-slate-900/50 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 text-gray-900 dark:text-white placeholder-gray-400 px-4 py-3 outline-none transition-all"
               placeholder="••••••••"
             />
           </div>
@@ -99,14 +107,14 @@ export default function LoginPage() {
           <button 
             type="submit" 
             disabled={loading}
-            // Aplicamos el azul de RECAL al botón
-            className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-white transition-colors
-              ${loading ? 'bg-gray-400 dark:bg-slate-600 cursor-not-allowed' : 'bg-[var(--recal-blue)] hover:bg-[var(--recal-blue-hover)] dark:bg-blue-600 dark:hover:bg-blue-700'}`}
+            className={`w-full flex justify-center py-3.5 px-4 border border-transparent rounded-xl shadow-lg text-sm font-black text-white transition-all transform hover:-translate-y-0.5
+              ${loading ? 'bg-gray-400 dark:bg-slate-600 shadow-none cursor-not-allowed' : 'bg-gradient-to-r from-[var(--recal-blue)] to-blue-600 hover:from-blue-600 hover:to-indigo-600 shadow-blue-500/30 dark:shadow-blue-900/50'}`}
           >
-            {loading ? 'Verificando...' : 'Entrar al Dashboard'}
+            {loading ? 'INGRESANDO...' : 'ENTRAR AL SISTEMA'}
           </button>
         </form>
 
+      </div>
       </div>
     </div>
   );

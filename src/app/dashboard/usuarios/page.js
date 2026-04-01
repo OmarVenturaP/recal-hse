@@ -9,6 +9,8 @@ export default function UsuariosPage() {
   const [usuarios, setUsuarios] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
 
   // Estados para el Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -19,6 +21,11 @@ export default function UsuariosPage() {
     area: 'Seguridad', rol: 'Usuario', activo: 1
   };
   const [formData, setFormData] = useState(formInicial);
+
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = usuarios.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(usuarios.length / itemsPerPage);
 
   const fetchUsuarios = async () => {
     setLoading(true);
@@ -116,19 +123,31 @@ export default function UsuariosPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-[var(--recal-blue)] dark:text-white flex items-center gap-2">
-            <Shield className="w-6 h-6" /> Control de Accesos
-          </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Gestión de usuarios y permisos del sistema RECAL</p>
+    <>
+    <div className="max-w-[100rem] mx-auto p-4 md:p-6 lg:p-8 space-y-6 animate-in fade-in duration-500">
+      <div className="bg-white/90 dark:bg-slate-800/80 backdrop-blur-xl rounded-[2.5rem] p-6 lg:p-8 shadow-xl shadow-gray-200/50 dark:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.6)] border border-white/80 dark:border-slate-700/50">
+        
+        {/* HERO BENTO HEADER */}
+        <div className="flex flex-col md:flex-row items-start md:items-center gap-6 mb-8 border-b border-gray-100 dark:border-slate-700/50 pb-6">
+           <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-[var(--recal-blue)] rounded-2xl shadow-lg shadow-blue-500/30 flex items-center justify-center text-white shrink-0">
+             <Shield className="w-8 h-8" />
+           </div>
+           <div>
+             <h1 className="text-3xl font-black text-gray-800 dark:text-white tracking-tight leading-none mb-2">Control de Accesos</h1>
+             <p className="text-gray-500 dark:text-gray-400 font-medium text-sm md:text-base">Gestión de usuarios, permisos y contraseñas del sistema RECAL.</p>
+           </div>
+           
+           {/* Botón flotante a la derecha en Desktop */}
+           <div className="md:ml-auto w-full md:w-auto mt-4 md:mt-0">
+               <button onClick={handleNewClick} className="w-full sm:w-auto bg-[var(--recal-blue)] hover:bg-[var(--recal-blue-hover)] text-white px-4 py-3 sm:py-2 rounded-md font-medium shadow-sm flex items-center justify-center gap-2">
+                 + Nuevo Usuario
+               </button>
+           </div>
         </div>
-        <button onClick={handleNewClick} className="w-full sm:w-auto bg-[var(--recal-blue)] hover:bg-[var(--recal-blue-hover)] text-white px-4 py-3 sm:py-2 rounded-md font-medium shadow-sm">
-          + Nuevo Usuario
-        </button>
-      </div>
 
+        <div className="space-y-6">
+
+      <div className="flex flex-col gap-4">
       <div className="bg-white dark:bg-slate-800 shadow-sm rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
@@ -143,7 +162,9 @@ export default function UsuariosPage() {
             <tbody className="bg-white dark:bg-slate-800 divide-y md:divide-y-0 md:divide-gray-200 dark:md:divide-slate-700 block md:table-row-group">
               {loading ? (
                 <tr className="block md:table-row"><td colSpan="4" className="px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400 block md:table-cell">Cargando usuarios...</td></tr>
-              ) : usuarios.map((u) => (
+              ) : currentItems.length === 0 ? (
+                <tr className="block md:table-row"><td colSpan="4" className="px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400 block md:table-cell">No se encontraron usuarios.</td></tr>
+              ) : currentItems.map((u) => (
                 <tr key={u.id_personal} className="block md:table-row border border-gray-200 dark:border-slate-700 md:border-none mb-4 md:mb-0 rounded-lg shadow-sm md:shadow-none p-4 md:p-0 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
                   
                   <td className="flex justify-between md:table-cell px-2 md:px-6 py-2 md:py-4 border-b dark:border-slate-700 md:border-none">
@@ -216,10 +237,26 @@ export default function UsuariosPage() {
           </table>
         </div>
       </div>
+      
+      {!loading && totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between bg-white dark:bg-slate-800 px-4 py-3 border border-gray-200 dark:border-slate-700 rounded-lg shadow-sm gap-4 sm:gap-0 mt-4">
+          <div className="text-sm text-gray-700 dark:text-gray-300">
+            Mostrando <span className="font-bold">{indexOfFirstItem + 1}</span> a <span className="font-bold">{Math.min(indexOfLastItem, usuarios.length)}</span> de <span className="font-bold">{usuarios.length}</span> usuarios
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-3 py-1 border border-gray-300 dark:border-slate-600 rounded-md disabled:opacity-50 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">Anterior</button>
+            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="px-3 py-1 border border-gray-300 dark:border-slate-600 rounded-md disabled:opacity-50 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">Siguiente</button>
+          </div>
+        </div>
+      )}
+      </div>
+      </div>
+      </div>
+    </div>
 
       {/* MODAL DE REGISTRO / EDICIÓN */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[999] p-4 w-full h-full">
           <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-lg w-full border dark:border-slate-700">
             <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center bg-[var(--recal-gray)] dark:bg-slate-900 rounded-t-lg">
               <h3 className="text-lg font-bold text-[var(--recal-blue)] dark:text-white">{isEditing ? 'Editar Accesos' : 'Nuevo Usuario'}</h3>
@@ -296,6 +333,6 @@ export default function UsuariosPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

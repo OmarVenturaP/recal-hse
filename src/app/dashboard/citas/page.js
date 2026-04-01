@@ -6,24 +6,47 @@ import Swal from 'sweetalert2';
 import DaySummaryModal from '@/components/citas/DaySummaryModal';
 import CitaModalForm from '@/components/citas/CitaModalForm';
 
+// Importaciones de React Big Calendar
+import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
+import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop';
+import { format, parse, startOfWeek, getDay } from 'date-fns';
+import { es } from 'date-fns/locale/es';
+import 'react-big-calendar/lib/css/react-big-calendar.css';
+import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
+
+const DnDCalendar = withDragAndDrop(Calendar);
+
+// Configuración de Localizador para el Calendario (Español)
+const locales = {
+  'es': es,
+}
+
+const localizer = dateFnsLocalizer({
+  format,
+  parse,
+  startOfWeek,
+  getDay,
+  locales,
+})
+
 export default function CitasDossierPage() {
   // =====================================================================
   // 🔧 CONFIGURACIÓN DE DÍAS DE "REVISIÓN EN CORDINA"
-  // Coloca los números de los días de la semana que requieran el badge:
-  // 0 = Domingo, 1 = Lunes, 2 = Martes, 3 = Miércoles, 4 = Jueves, 5 = Viernes, 6 = Sábado
-  // Ejemplo para Lunes y Martes: [1, 2]
-  // =====================================================================
   const diasSemanalesRevision = [1, 2]; 
   // =====================================================================
 
   const [userRole, setUserRole] = useState(null);
   const [userArea, setUserArea] = useState(null);
   const [userName, setUserName] = useState('');
+  const [userPermisoCitas, setUserPermisoCitas] = useState(0);
   const [loading, setLoading] = useState(true);
 
+  // Big Calendar Views
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentView, setCurrentView] = useState('month'); 
   const [activeTab, setActiveTab] = useState('Seguridad'); 
   const [citas, setCitas] = useState([]); 
+  const [events, setEvents] = useState([]); // Arreglo procesado para react-big-calendar
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -51,6 +74,7 @@ export default function CitasDossierPage() {
           setUserRole(data.user.rol);
           setUserArea(data.user.area);
           setUserName(data.user.nombre);
+          setUserPermisoCitas(data.user.permisos_citas);
           if (data.user.area !== 'Ambas') {
             setActiveTab(data.user.area);
           }
@@ -77,7 +101,31 @@ export default function CitasDossierPage() {
     try {
       const res = await fetch(`/api/citas?mes=${mes}&anio=${anio}&area=${activeTab}`);
       const data = await res.json();
-      if (data.success) setCitas(data.data);
+      if (data.success) {
+        setCitas(data.data);
+        
+        // Transformar citas a "Events" para react-big-calendar
+        const calendarEvents = data.data.map(cita => {
+          // Extraer fecha yyyy-MM-dd y combinarla con hh:mm
+          const fechaStr = cita.fecha_cita.split('T')[0];
+          const [yyyy, mm, dd] = fechaStr.split('-');
+          const [hh, min] = cita.hora_cita.split(':');
+          
+          const startDate = new Date(yyyy, mm - 1, dd, hh, min);
+          // DURACIÓN 4 HORAS según requerimiento
+          const endDate = new Date(startDate.getTime() + (4 * 60 * 60 * 1000));
+          
+          return {
+            id: cita.id_cita,
+            title: `${cita.revisor_nombre === userName ? '[TÚ] ' : ''}${cita.area === 'Seguridad' ? 'SEG' : 'AMB'} - ${cita.contratista || 'S/N'}`,
+            start: startDate,
+            end: endDate,
+            resource: cita // guardamos toda la info original para usarla en modals
+          };
+        });
+        
+        setEvents(calendarEvents);
+      }
     } catch (error) {
       console.error(error);
     } finally {
@@ -89,15 +137,8 @@ export default function CitasDossierPage() {
     fetchCitas();
   }, [currentDate, activeTab]);
 
-  const canManageCitas = userRole === 'Admin' || userRole === 'Master';
+  const canManageCitas = userRole === 'Admin' || userRole === 'Master' || userPermisoCitas === 1;
   const canEditResults = canManageCitas || formData.revisor_nombre === userName;
-
-  const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
-  const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay();
-  const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-
-  const prevMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
-  const nextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
 
   // --- FUNCIONES MODAL AGENDA ---
   const openModalNew = (dateStr = null) => {
@@ -113,7 +154,7 @@ export default function CitasDossierPage() {
   };
 
   const openModalEdit = (cita, e) => {
-    e.stopPropagation();
+    if(e) e.stopPropagation();
     const fechaInput = cita.fecha_cita ? cita.fecha_cita.split('T')[0] : '';
     setFormData({
       id_cita: cita.id_cita, fecha_cita: fechaInput, hora_cita: cita.hora_cita.substring(0, 5),
@@ -128,10 +169,22 @@ export default function CitasDossierPage() {
   const closeModal = () => setIsModalOpen(false);
 
   // --- FUNCIÓN MODAL RESUMEN DEL DÍA ---
-  const openInfoModal = (fecha, citasDelDia, isDiaCordina, e) => {
-    e.stopPropagation();
+  const openInfoModal = (fecha, citasDelDia, isDiaCordina) => {
     setInfoModalData({ fecha, citas: citasDelDia, isDiaCordina });
     setIsInfoModalOpen(true);
+  };
+
+  const handleSelectSlot = ({ start }) => {
+     // react-big-calendar action when clicking an empty space or day
+     const defaultDate = format(start, 'yyyy-MM-dd');
+     if (canManageCitas) {
+         openModalNew(defaultDate);
+     }
+  };
+
+   const handleSelectEvent = (event) => {
+     // Dando clic directo a un evento abrimos edición
+     openModalEdit(event.resource, null);
   };
 
   const handleSubmit = async (e) => {
@@ -166,155 +219,173 @@ export default function CitasDossierPage() {
     });
   };
 
-  const getStatusStyles = (estatus, areaCita) => {
+  // Asignar colores corporativos a React Big Calendar
+  const eventPropGetter = (event) => {
+    const { estatus, area, revisor_nombre } = event.resource;
+    let backgroundColor = area === 'Seguridad' ? '#3b82f6' : '#22c55e'; // Azul para Seg, Verde para Amb (Programada base)
+
     if (activeTab === 'Ambas') {
-        if(areaCita === 'Seguridad') return 'bg-blue-100 text-blue-800 border-l-2 border-blue-500';
-        return 'bg-green-100 text-green-800 border-l-2 border-green-500';
+        if(area === 'Seguridad') backgroundColor = '#3b82f6';
+        if(area === 'Medio Ambiente') backgroundColor = '#10b981';
+    } else {
+        if (estatus === 'Liberado') backgroundColor = '#10b981'; // Emerald
+        if (estatus === 'En observaciones') backgroundColor = '#f59e0b'; // Amber
+        if (estatus === 'No asistió') backgroundColor = '#ef4444'; // Red
     }
-    switch(estatus) {
-      case 'Liberado': return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300';
-      case 'En observaciones': return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300';
-      case 'No asistió': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
-      default: return 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'; 
-    }
+    
+    // Borde amarillo si es del propio usuario
+    const border = revisor_nombre === userName ? '2px solid #facc15' : 'none';
+
+    return {
+      style: {
+        backgroundColor,
+        border,
+        color: 'white',
+        fontWeight: 'bold',
+        fontSize: '11px',
+        borderRadius: '5px'
+      }
+    };
   };
 
-  const getStatusIcon = (estatus) => {
-    switch(estatus) {
-      case 'Liberado': return <CheckCircle2 className="w-3 h-3 inline mr-1" />;
-      case 'En observaciones': return <AlertCircle className="w-3 h-3 inline mr-1" />;
-      case 'No asistió': return <XCircle className="w-3 h-3 inline mr-1" />;
-      default: return <Clock className="w-3 h-3 inline mr-1" />;
-    }
-  };
+  // Componente personalizado para el encabezado de cada día
+  const CustomDateHeader = ({ label, date }) => {
+    const dateString = format(date, 'yyyy-MM-dd');
+    const isDiaCordina = diasSemanalesRevision.includes(date.getDay());
+    const citasDelDia = citas.filter(c => c.fecha_cita.split('T')[0] === dateString);
 
-  const renderCalendarDays = () => {
-    const days = [];
-    for (let i = 0; i < firstDayOfMonth; i++) {
-      days.push(<div key={`empty-${i}`} className="h-24 md:h-32 border border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900/20"></div>);
-    }
-
-    for (let d = 1; d <= daysInMonth; d++) {
-      const dateObj = new Date(currentDate.getFullYear(), currentDate.getMonth(), d);
-      const dayOfWeek = dateObj.getDay(); // 0 a 6
-      const dateString = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      
-      const isDiaCordina = diasSemanalesRevision.includes(dayOfWeek);
-
-      const citasDelDia = citas.filter(c => {
-        const formatCita = c.fecha_cita.split('T')[0];
-        return formatCita === dateString;
-      });
-
-      days.push(
-        <div 
-          key={d} 
-          onClick={() => { if (canManageCitas) openModalNew(dateString); }}
-          className={`h-24 md:h-32 border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-1 md:p-2 flex flex-col group relative overflow-hidden transition-colors ${canManageCitas ? 'cursor-pointer hover:bg-blue-50 dark:hover:bg-slate-700/50' : 'cursor-default'}`}
-        >
-          <div className="flex justify-between items-start">
-            {/* IZQUIERDA: Info Icon */}
-            <button 
-              onClick={(e) => openInfoModal(dateString, citasDelDia, isDiaCordina, e)} 
-              className="text-gray-400 hover:text-[var(--recal-blue)] transition-colors p-0.5 rounded-md hover:bg-blue-100 dark:hover:bg-slate-700"
-              title="Resumen del Día"
-            >
-              <Info className="w-4 h-4 md:w-5 md:h-5" />
-            </button>
-            
-            {/* DERECHA: Plus Icon (Admins) + Número de Día */}
-            <div className="flex items-center gap-1">
-              {canManageCitas && (
-                <button className="hidden group-hover:block text-[var(--recal-blue)] text-xs mr-1"><Plus className="w-4 h-4" /></button>
-              )}
-              <span className={`text-xs md:text-sm font-bold ${citasDelDia.length > 0 ? 'text-[var(--recal-blue)]' : 'text-gray-700 dark:text-gray-300'}`}>{d}</span>
-            </div>
+    return (
+      <>
+        {/* VISTA MOBILE: Número a la derecha, iconos justo debajo en bloque separado */}
+        <div className="md:hidden flex flex-col items-end w-full px-1 pt-1 group">
+          <div className="flex items-center gap-1">
+            {citasDelDia.length > 0 && (
+              <span className="bg-[var(--recal-blue)] text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full shadow-sm animate-pulse-once">
+                {citasDelDia.length}
+              </span>
+            )}
+            <span className={`text-[11px] font-bold ${citasDelDia.length > 0 ? 'text-[var(--recal-blue)]' : 'text-gray-700 dark:text-gray-300'}`}>
+              {label}
+            </span>
           </div>
-
-          {/* BADGE DE REVISIÓN EN CORDINA */}
-          {isDiaCordina && (
-            <div className="bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 text-[8px] md:text-[9px] font-extrabold px-1 py-0.5 rounded text-center mt-1 uppercase border border-purple-200 dark:border-purple-800/50 shadow-sm leading-tight truncate">
-              Rev. Cordina
-            </div>
-          )}
-          
-          <div className="mt-1 flex-1 overflow-y-auto space-y-1 scrollbar-thin">
-            {citasDelDia.map(c => {
-              const isMiCita = c.revisor_nombre === userName;
-              return (
-                <div 
-                  key={c.id_cita} 
-                  onClick={(e) => openModalEdit(c, e)}
-                  className={`text-[10px] md:text-xs truncate px-1 py-0.5 rounded font-medium cursor-pointer shadow-sm hover:opacity-80 transition-opacity ${getStatusStyles(c.estatus, c.area)}`}
-                  title={`${c.contratista} - ${c.estatus} ${isMiCita ? '(Asignada a ti)' : ''}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="truncate flex items-center">
-                      {activeTab === 'Ambas' ? (
-                        <span className="font-bold mr-1">[{c.area === 'Seguridad' ? 'SEG' : 'AMB'}]</span>
-                      ) : (
-                        getStatusIcon(c.estatus)
-                      )}
-                      {c.hora_cita.substring(0, 5)} - {c.contratista || 'S/N'}
-                    </div>
-                    {isMiCita && (
-                      <span className="bg-yellow-300 text-yellow-900 text-[8px] leading-tight px-1 py-0.5 rounded font-extrabold ml-1 flex-shrink-0 shadow-sm border border-yellow-400">
-                        TÚ
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+          <div className="flex justify-between w-full mt-0.5">
+            <button 
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); openInfoModal(dateString, citasDelDia, isDiaCordina); }} 
+              className="text-gray-400 hover:text-[var(--recal-blue)] p-0.5"
+            >
+              <Info className="w-[14px] h-[14px]" />
+            </button>
+            {canManageCitas && (
+              <button 
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); openModalNew(dateString); }}
+                className="text-[var(--recal-blue)] p-0.5"
+              >
+                <Plus className="w-[14px] h-[14px]" />
+              </button>
+            )}
           </div>
         </div>
-      );
+
+        {/* VISTA DESKTOP: Iconos a la izquierda, número a la derecha (junto en barra) */}
+        <div className="hidden md:flex justify-between items-start w-full px-1 pt-1 group">
+          <button 
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); openInfoModal(dateString, citasDelDia, isDiaCordina); }} 
+            className="text-gray-400 hover:text-[var(--recal-blue)] transition-colors p-0.5 rounded-md hover:bg-blue-100 dark:hover:bg-slate-700"
+            title="Resumen del Día"
+          >
+            <Info className="w-4 h-4 lg:w-5 lg:h-5" />
+          </button>
+          <div className="flex items-center gap-1">
+            {canManageCitas && (
+              <button 
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); openModalNew(dateString); }}
+                className="text-[var(--recal-blue)] text-xs mr-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                title="Añadir Cita"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            )}
+            <span className={`text-xs md:text-sm font-bold ${citasDelDia.length > 0 ? 'text-[var(--recal-blue)]' : 'text-gray-700 dark:text-gray-300'}`}>
+              {label}
+            </span>
+          </div>
+        </div>
+      </>
+    );
+  };
+
+  const onEventDrop = async ({ event, start, end }) => {
+    if (!canManageCitas && event.resource.revisor_nombre !== userName) {
+      Swal.fire('Denegado', 'Solo puedes mover citas que te pertenezcan o si eres administrador.', 'error');
+      return;
     }
-    return days;
+
+    const fechaInput = format(start, 'yyyy-MM-dd');
+    const horaInput = format(start, 'HH:mm');
+    const { id_cita, id_subcontratista, area, dossiers_entregados, periodo_evaluado, num_revision, revisor_nombre, estatus, comentarios_revisor } = event.resource;
+
+    const updatedCita = {
+      id_cita, fecha_cita: fechaInput, hora_cita: horaInput, id_subcontratista, area, 
+      dossiers_entregados, periodo_evaluado, num_revision, revisor_nombre, estatus, comentarios_revisor
+    };
+
+    try {
+      const res = await fetch('/api/citas', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedCita) });
+      const data = await res.json();
+      if (data.success) {
+        Swal.fire({ title: 'Re-agendada', text: data.mensaje, icon: 'success', toast: true, position: 'top-end', timer: 2000, showConfirmButton: false });
+        fetchCitas(); 
+      } else {
+        Swal.fire('Empalme o Error', data.error, 'error');
+      }
+    } catch (e) {
+      Swal.fire('Error', 'No se pudo mover la cita por un error de conexión.', 'error');
+    }
   };
 
   return (
-    <div className="space-y-6">
-      {/* HEADER */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-[var(--recal-blue)] dark:text-white flex items-center gap-2">
-            <CalendarIcon className="w-6 h-6" /> Agenda de Dossiers
-          </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Control de revisiones documentales para contratistas</p>
+    <>
+    <div className="max-w-[100rem] mx-auto p-4 md:p-6 lg:p-8 space-y-6 animate-in fade-in duration-500">
+      <div className="bg-white/90 dark:bg-slate-800/80 backdrop-blur-xl rounded-[2.5rem] p-6 lg:p-8 shadow-xl shadow-gray-200/50 dark:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.6)] border border-white/80 dark:border-slate-700/50">
+        
+        {/* HERO BENTO HEADER */}
+        <div className="flex flex-col md:flex-row items-start md:items-center gap-6 mb-8 border-b border-gray-100 dark:border-slate-700/50 pb-6">
+           <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-2xl shadow-lg shadow-indigo-500/30 flex items-center justify-center text-white shrink-0">
+             <CalendarIcon className="w-8 h-8" />
+           </div>
+           <div>
+             <h1 className="text-3xl font-black text-gray-800 dark:text-white tracking-tight leading-none mb-2">Agenda de Revisiones</h1>
+             <p className="text-gray-500 dark:text-gray-400 font-medium text-sm md:text-base">Calendario de citas para contratistas.</p>
+           </div>
+           
+           {/* Botón flotante a la derecha en Desktop */}
+           <div className="md:ml-auto w-full md:w-auto mt-4 md:mt-0">
+              {canManageCitas && (
+                <button onClick={() => openModalNew()} className="w-full sm:w-auto bg-[var(--recal-blue)] hover:bg-[var(--recal-blue-hover)] text-white px-4 py-3 sm:py-2 rounded-md font-medium shadow-sm flex justify-center items-center gap-2">
+                  <Plus className="w-5 h-5"/> Nueva Cita
+                </button>
+              )}
+           </div>
         </div>
-        {canManageCitas && (
-          <button onClick={() => openModalNew()} className="w-full sm:w-auto bg-[var(--recal-blue)] hover:bg-[var(--recal-blue-hover)] text-white px-4 py-3 sm:py-2 rounded-md font-medium shadow-sm">
-            + Nueva Cita
-          </button>
-        )}
-      </div>
 
-      {/* PESTAÑAS Y CONTROL DE MES */}
-      <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 flex flex-col md:flex-row justify-between items-center gap-4">
+        <div className="space-y-6">
+
+      {/* PESTAÑAS */}
+      <div className="bg-white dark:bg-slate-800 p-2 sm:p-4 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 flex flex-col md:flex-row justify-between items-center gap-2 sm:gap-4 overflow-x-auto">
         
         {/* Switch de Áreas */}
-        <div className="flex bg-gray-100 dark:bg-slate-900 p-1 rounded-lg w-full md:w-auto">
+        <div className="flex bg-gray-100 dark:bg-slate-900 p-1 rounded-lg w-full md:w-auto overflow-x-auto min-w-max">
           {userArea === 'Ambas' ? (
             <>
-              <button onClick={() => setActiveTab('Seguridad')} className={`flex-1 md:flex-none px-3 py-1.5 rounded-md text-sm font-bold transition-all ${activeTab === 'Seguridad' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}>🔵 Seguridad</button>
-              <button onClick={() => setActiveTab('Medio Ambiente')} className={`flex-1 md:flex-none px-3 py-1.5 rounded-md text-sm font-bold transition-all ${activeTab === 'Medio Ambiente' ? 'bg-white dark:bg-slate-700 text-green-600 dark:text-green-400 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}>🟢 Ambiental</button>
-              <button onClick={() => setActiveTab('Ambas')} className={`flex-1 md:flex-none px-3 py-1.5 rounded-md text-sm font-bold transition-all ${activeTab === 'Ambas' ? 'bg-white dark:bg-slate-700 text-purple-600 dark:text-purple-400 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}>🟣 Ver Ambas</button>
+              <button onClick={() => setActiveTab('Seguridad')} className={`flex-1 md:flex-none px-2 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-bold transition-all ${activeTab === 'Seguridad' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}>🔵 Seg.</button>
+              <button onClick={() => setActiveTab('Medio Ambiente')} className={`flex-1 md:flex-none px-2 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-bold transition-all ${activeTab === 'Medio Ambiente' ? 'bg-white dark:bg-slate-700 text-green-600 dark:text-green-400 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}>🟢 Amb.</button>
+              <button onClick={() => setActiveTab('Ambas')} className={`flex-1 md:flex-none px-2 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-bold transition-all ${activeTab === 'Ambas' ? 'bg-white dark:bg-slate-700 text-purple-600 dark:text-purple-400 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}>🟣 Ambas</button>
             </>
           ) : (
-            <div className="px-4 py-2 text-sm font-bold text-gray-700 dark:text-gray-300">
-              {activeTab === 'Seguridad' ? '🔵 Citas de Seguridad' : '🟢 Citas de Medio Ambiente'}
+            <div className="px-2 sm:px-4 py-2 text-xs sm:text-sm font-bold text-gray-700 dark:text-gray-300 whitespace-nowrap">
+              {activeTab === 'Seguridad' ? '🔵 Citas Seguridad' : '🟢 Citas Medio Ambiente'}
             </div>
           )}
-        </div>
-
-        {/* Controles del Mes */}
-        <div className="flex items-center justify-between w-full md:w-auto gap-4">
-          <button onClick={prevMonth} className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-full transition-colors border border-gray-200 dark:border-slate-600"><ChevronLeft className="w-5 h-5 text-gray-600 dark:text-gray-300" /></button>
-          <div className="w-40 text-center">
-            <h3 className="text-sm md:text-lg font-bold text-gray-800 dark:text-white uppercase tracking-wider">{monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}</h3>
-          </div>
-          <button onClick={nextMonth} className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-full transition-colors border border-gray-200 dark:border-slate-600"><ChevronRight className="w-5 h-5 text-gray-600 dark:text-gray-300" /></button>
         </div>
       </div>
 
@@ -322,28 +393,62 @@ export default function CitasDossierPage() {
       {activeTab !== 'Ambas' && (
         <div className="flex flex-wrap gap-4 px-2 text-xs font-bold text-gray-500 dark:text-gray-400">
           <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-blue-400"></span> Programada</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-emerald-400"></span> Liberado</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-amber-400"></span> En Observaciones</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-red-400"></span> No Asistió</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-[#10b981]"></span> Liberado</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-[#f59e0b]"></span> En Observaciones</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-[#ef4444]"></span> No Asistió</span>
           <span className="flex items-center gap-1 ml-auto"><span className="bg-yellow-300 text-yellow-900 text-[8px] px-1 py-0.5 rounded font-extrabold border border-yellow-400">TÚ</span> Tus revisiones</span>
         </div>
       )}
 
-      {/* EL CALENDARIO GRID */}
+      {/* REACT BIG CALENDAR COMPONENT */}
       {loading ? (
-        <div className="bg-white dark:bg-slate-800 shadow-sm rounded-lg border border-gray-200 dark:border-slate-700 p-12 text-center text-gray-500 font-bold">Cargando calendario...</div>
+        <div className="bg-white dark:bg-slate-800 shadow-sm rounded-lg border border-gray-200 dark:border-slate-700 p-12 text-center text-gray-500 font-bold">Cargando calendario interactivo...</div>
       ) : (
-        <div className="bg-white dark:bg-slate-800 shadow-sm rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden">
-          <div className="grid grid-cols-7 bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-slate-700">
-            {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(day => (
-              <div key={day} className="py-2 md:py-3 text-center text-[10px] md:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-r border-gray-200 dark:border-slate-700 last:border-r-0">{day}</div>
-            ))}
-          </div>
-          <div className="grid grid-cols-7">
-            {renderCalendarDays()}
-          </div>
+        <div className="bg-white dark:bg-slate-800 shadow-sm rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden p-2 sm:p-4 h-[60vh] md:h-[75vh] min-h-[500px] md:min-h-[600px] reset-calendar-styles text-[10px] sm:text-xs md:text-sm">
+           <DnDCalendar
+            localizer={localizer}
+            events={events}
+            startAccessor="start"
+            endAccessor="end"
+            culture="es"
+            messages={{
+              next: "Sig",
+              previous: "Ant",
+              today: "Hoy",
+              month: "Mes",
+              agenda: "Agenda",
+              date: "Fecha",
+              time: "Hora",
+              event: "Cita",
+              noEventsInRange: "No hay citas en este rango de tiempo.",
+              showMore: total => `+ Ver más (${total})`
+            }}
+            views={['month', 'agenda']}
+            defaultView="month"
+            view={currentView}
+            onView={(newView) => setCurrentView(newView)}
+            date={currentDate}
+            onNavigate={(date) => setCurrentDate(date)}
+            style={{ height: '100%' }}
+            selectable={true}
+            onSelectSlot={handleSelectSlot}
+            onSelectEvent={handleSelectEvent}
+            eventPropGetter={eventPropGetter}
+            onEventDrop={onEventDrop}
+            resizable={false}
+            components={{
+              month: {
+                dateHeader: CustomDateHeader
+              }
+            }}
+             popup={true}
+             className="dark:text-white pb-4 min-w-full"
+          />
         </div>
       )}
+      </div>
+      </div>
+    </div>
 
       <DaySummaryModal 
         isOpen={isInfoModalOpen} 
@@ -352,6 +457,10 @@ export default function CitasDossierPage() {
         citas={infoModalData.citas}
         isDiaCordina={infoModalData.isDiaCordina}
         userName={userName}
+        onEditClick={(cita) => {
+          setIsInfoModalOpen(false);
+          openModalEdit(cita, null);
+        }}
       />
 
       <CitaModalForm
@@ -368,6 +477,6 @@ export default function CitasDossierPage() {
         catUsuarios={catUsuarios}
         activeTab={activeTab}
       />
-    </div>
+    </>
   );
 }

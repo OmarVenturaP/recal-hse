@@ -12,3 +12,47 @@
 body {
   background-color: var(--recal-gray);
 }
+
+/* React Big Calendar - Soporte Modo Oscuro Tailwind */
+.dark .reset-calendar-styles .rbc-month-view,
+.dark .reset-calendar-styles .rbc-time-view,
+.dark .reset-calendar-styles .rbc-header,
+.dark .reset-calendar-styles .rbc-day-bg,
+.dark .reset-calendar-styles .rbc-month-row,
+.dark .reset-calendar-styles .rbc-agenda-view table.rbc-agenda-table,
+.dark .reset-calendar-styles .rbc-time-header.rbc-overflowing {
+  border-color: #334155 !important; /* slate-700 */
+}
+
+.dark .reset-calendar-styles .rbc-off-range-bg {
+  background-color: #0f172a !important; /* slate-900 */
+}
+
+.dark .reset-calendar-styles .rbc-today {
+  background-color: #1e293b !important; /* slate-800 focus */
+}
+
+.dark .reset-calendar-styles .rbc-btn-group button {
+  color: #cbd5e1; /* slate-300 */
+  border-color: #334155;
+}
+
+.dark .reset-calendar-styles .rbc-btn-group button:hover,
+.dark .reset-calendar-styles .rbc-btn-group button:focus {
+  background-color: #334155;
+  color: white;
+}
+
+.dark .reset-calendar-styles .rbc-btn-group button.rbc-active {
+  background-color: var(--recal-blue);
+  color: white;
+  border-color: var(--recal-blue);
+}
+
+/* Responsive React Big Calendar - Ocultar "barras de evento" nativas en móviles para dar prioridad al nuevo Badge */
+@media (max-width: 767px) {
+  .reset-calendar-styles .rbc-month-row .rbc-row-segment .rbc-event,
+  .reset-calendar-styles .rbc-month-row .rbc-row-segment .rbc-show-more {
+    display: none !important;
+  }
+}

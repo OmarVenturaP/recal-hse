@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { Pencil, Trash2, Upload, FileSpreadsheet } from 'lucide-react';
+import { Pencil, Trash2, Upload, FileSpreadsheet, Users } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 export default function FuerzaTrabajoPage() {
@@ -577,10 +577,24 @@ const handleDc3Submit = async (e) => {
   const selectedCursoObj = catCursos.find(c => c.id_curso.toString() === dc3FormData.id_curso.toString());
 
   return (
-    <div className="space-y-6 relative" ref={topRef}>
+    <>
+    <div className="max-w-[100rem] mx-auto p-4 md:p-6 lg:p-8 space-y-6 animate-in fade-in duration-500" ref={topRef}>
+      <div className="bg-white/90 dark:bg-slate-800/80 backdrop-blur-xl rounded-[2.5rem] p-6 lg:p-8 shadow-xl shadow-gray-200/50 dark:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.6)] border border-white/80 dark:border-slate-700/50">
+        
+        {/* HERO BENTO HEADER */}
+        <div className="flex flex-col md:flex-row items-start md:items-center gap-6 mb-8 border-b border-gray-100 dark:border-slate-700/50 pb-6">
+           <div className="w-16 h-16 bg-gradient-to-br from-[var(--recal-blue)] to-blue-500 rounded-2xl shadow-lg shadow-blue-500/30 flex items-center justify-center text-white shrink-0">
+             <Users className="w-8 h-8" />
+           </div>
+           <div>
+             <h1 className="text-3xl font-black text-gray-800 dark:text-white tracking-tight leading-none mb-2">Fuerza de Trabajo</h1>
+             <p className="text-gray-500 dark:text-gray-400 font-medium text-sm md:text-base">Administración de personal, expedientes DC-3 y certificados de campo.</p>
+           </div>
+        </div>
+
+        <div className="space-y-6 relative">
       
-      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center space-y-4 xl:space-y-0">
-        <h2 className="text-xl sm:text-2xl font-bold text-[var(--recal-blue)] dark:text-white">Control de Fuerza de Trabajo</h2>
+      <div className="flex flex-col xl:flex-row justify-end items-start xl:items-center space-y-4 xl:space-y-0">
         
         <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full xl:w-auto">
           
@@ -638,7 +652,7 @@ const handleDc3Submit = async (e) => {
 
       <div className="bg-white dark:bg-slate-800 shadow-sm rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+          <table className="w-full divide-y divide-gray-200 dark:divide-slate-700 block md:table">
             <thead className="bg-gray-50 dark:bg-slate-900 hidden md:table-header-group">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('apellido_trabajador')}>Nombre {ordenPor === 'apellido_trabajador' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
@@ -676,9 +690,9 @@ const handleDc3Submit = async (e) => {
 
                   return (
                     <tr key={t.id_trabajador} className="block md:table-row border border-gray-200 dark:border-slate-700 md:border-none mb-4 md:mb-0 rounded-lg shadow-sm md:shadow-none p-4 md:p-0 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
-                      <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm font-bold text-[var(--recal-blue)] dark:text-white md:text-gray-900 border-b dark:border-slate-700 md:border-none">
-                        <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Nombre:</span>
-                        {`${t.apellido_trabajador || ''} ${t.nombre_trabajador}`.trim()}
+                      <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm font-bold text-[var(--recal-blue)] dark:text-white md:text-gray-900 border-b dark:border-slate-700 md:border-none gap-4">
+                        <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 shrink-0">Nombre:</span>
+                        <span className="text-right md:text-left break-words max-w-[65%] md:max-w-none">{`${t.apellido_trabajador || ''} ${t.nombre_trabajador}`.trim()}</span>
                       </td>
                       <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
                         <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Categoría:</span>{t.puesto_categoria}
@@ -699,16 +713,7 @@ const handleDc3Submit = async (e) => {
                       
                       <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 text-sm border-b dark:border-slate-700 md:border-none">
                         <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Info:</span>
-                        <div className="flex flex-col items-end md:items-start gap-2">
-                          <div className="flex flex-wrap gap-1 justify-end md:justify-start">
-                            {isAlta && <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">ALTA</span>}
-                            {faltaCurp && <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-600 text-white dark:bg-red-900/30 dark:text-white">FALTA CURP</span>}
-                            {hayCurp && <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-green-600 text-white dark:bg-green-900/30 dark:text-white">CURP</span>}
-                            {!t.id_subcontratista_ft && <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-600 text-white dark:bg-red-900/30 dark:text-white">FALTA CUADRILLA</span>}
-                            {!isAlta && !faltaCurp && !hayCurp && <span className="text-gray-400 dark:text-gray-600">-</span>}
-                          </div>
-                          
-                          {canManageFt && (
+                        {canManageFt && (
                           <label className="relative inline-flex items-center cursor-pointer mt-1">
                             <input 
                               type="checkbox" 
@@ -722,6 +727,14 @@ const handleDc3Submit = async (e) => {
                             </span>
                           </label>
                           )}
+                          <div className="flex flex-col items-end md:items-start gap-2">
+                          <div className="flex flex-wrap gap-1 justify-end md:justify-start">
+                            {!isAlta && !faltaCurp && !hayCurp && <span className="text-gray-400 dark:text-gray-600">-</span>}
+                            {isAlta && <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">ALTA</span>}
+                            {faltaCurp && <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-600 text-white dark:bg-red-900/30 dark:text-white">FALTA CURP</span>}
+                            {hayCurp && <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-green-600 text-white dark:bg-green-900/30 dark:text-white">CURP</span>}
+                            {!t.id_subcontratista_ft && <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-600 text-white dark:bg-red-900/30 dark:text-white">FALTA CUADRILLA</span>}
+                          </div>
                         </div>
                       </td>
 
@@ -730,8 +743,9 @@ const handleDc3Submit = async (e) => {
                         <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Estatus:</span>
                         {t.fecha_baja ? (<span className="px-2 inline-flex text-xs font-semibold rounded-full bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300">Baja: {formatDDMMYYYY(t.fecha_baja)}</span>) : (<span className="px-2 inline-flex text-xs font-semibold rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">Activo</span>)}
                       </td>
-                      <td className="flex justify-end items-center md:table-cell px-2 md:px-6 py-4 md:py-4 text-sm font-medium border-b dark:border-slate-700 md:border-none">
-                        <div className="flex justify-end items-center gap-2 md:gap-3">
+                      <td className="flex justify-between md:justify-end items-center md:table-cell px-2 md:px-6 py-4 md:py-4 text-sm font-medium border-b dark:border-slate-700 md:border-none">
+                        <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Acciones:</span>
+                        <div className="flex justify-end items-center gap-2 md:gap-3 flex-wrap">
 
                         {canManageCert && t.puesto_categoria && ['SUPERVISOR', 'RESIDENTE'].some(rol => t.puesto_categoria.toUpperCase().includes(rol)) && (
                             <div className="relative group flex items-center justify-center">
@@ -803,18 +817,18 @@ const handleDc3Submit = async (e) => {
                         {(userRole === 'Admin' || userRole === 'Master') && (
                           <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 border-b dark:border-slate-700 md:border-none">
                             <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 text-sm">Trazabilidad:</span>
-                            <div className="flex flex-col items-end md:items-start gap-1">
+                            <div className="flex flex-col items-end md:items-start gap-1 max-w-[65%] md:max-w-none">
                               {t.creador ? (
-                                <span className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 px-2 py-0.5 rounded text-[10px] font-bold border border-green-200 dark:border-green-800 w-max" title="Registrado por">
+                                <span className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 px-2 py-0.5 rounded text-[10px] font-bold border border-green-200 dark:border-green-800 flex-wrap break-words inline-block" title="Registrado por">
                                   Agregó: {t.creador}
                                 </span>
                               ) : (
-                                <span className="bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-400 px-2 py-0.5 rounded text-[10px] font-bold border border-gray-200 dark:border-slate-600 w-max" title="Registrado por Master">
+                                <span className="bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-400 px-2 py-0.5 rounded text-[10px] font-bold border border-gray-200 dark:border-slate-600 flex-wrap break-words inline-block" title="Registrado por Master">
                                   Agregó: Master
                                 </span>
                               )}
                               {t.modificador && (
-                                <span className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 px-2 py-0.5 rounded text-[10px] font-bold border border-yellow-200 dark:border-yellow-800 w-max" title="Modificado por">
+                                <span className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 px-2 py-0.5 rounded text-[10px] font-bold border border-yellow-200 dark:border-yellow-800 flex-wrap break-words inline-block" title="Modificado por">
                                   Modificó: {t.modificador}
                                 </span>
                               )}
@@ -850,10 +864,13 @@ const handleDc3Submit = async (e) => {
           </div>
         </div>
       )}
+        </div>
+      </div>
+    </div>
 
       {/* MODAL 1: REGISTRO / EDICIÓN */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[999] p-4 w-full h-full">
           <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border dark:border-slate-700">
             <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center bg-[var(--recal-gray)] dark:bg-slate-900">
               <h3 className="text-lg font-bold text-[var(--recal-blue)] dark:text-white">{isEditing ? 'Editar Trabajador' : 'Registro de Nuevo Trabajador'}</h3>
@@ -965,7 +982,7 @@ const handleDc3Submit = async (e) => {
 
       {/* MODAL 2: CONFIRMACIÓN DE BAJA */}
       {isBajaModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[999] p-4 w-full h-full">
           <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-sm w-full border dark:border-slate-700">
             <div className="px-6 py-4 border-b border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-900/20 rounded-t-lg">
               <h3 className="text-lg font-bold text-red-700 dark:text-red-400">Confirmar Baja</h3>
@@ -986,7 +1003,7 @@ const handleDc3Submit = async (e) => {
 
       {/* --- MODAL 3: IMPORTACIÓN DE EXCEL (Carga Masiva) --- */}
       {isImportModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[999] p-4 w-full h-full">
           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-4xl w-full max-h-[95vh] overflow-hidden flex flex-col border dark:border-slate-700">
             
             {/* Header del Modal */}
@@ -1111,7 +1128,7 @@ const handleDc3Submit = async (e) => {
 
       {/* MODAL 4: GENERACIÓN DE DC-3 */}
       {isDc3ModalOpen && dc3Trabajador && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[999] p-4 w-full h-full">
           <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-md w-full border dark:border-slate-700 overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center bg-indigo-50 dark:bg-indigo-900/20">
               <div className="flex items-center">
@@ -1219,6 +1236,6 @@ const handleDc3Submit = async (e) => {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

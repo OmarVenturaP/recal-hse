@@ -41,7 +41,8 @@ export async function POST(request) {
       nombre: user.nombre,
       rol: user.rol,
       area: user.area,
-      requiere_cambio: requiereCambio 
+      requiere_cambio: requiereCambio,
+      permisos_citas: user.permisos_citas
     };
 
     const token = await new SignJWT(payload)

@@ -7,9 +7,12 @@ import Swal from 'sweetalert2';
 export default function CatalogosPage() {
   const [activeTab, setActiveTab] = useState('contratistas');
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
   
   const [userRole, setUserRole] = useState(null);
   const [userDcPermission, setUserDcPermission] = useState(null);
+  const [userFtPermission, setUserFtPermission] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
 
   const [contratistas, setContratistas] = useState([]);
@@ -39,6 +42,7 @@ export default function CatalogosPage() {
         if (resAuth.success) setUserRole(resAuth.user.rol);
         if (resUser.success && resUser.data.length > 0) {
           setUserDcPermission(resUser.data[0].permisos_dc3);
+          setUserFtPermission(resUser.data[0].permisos_ft);
         }
       } catch (error) {
         console.error("Error verificando permisos:", error);
@@ -51,20 +55,22 @@ export default function CatalogosPage() {
 
   const isAdmin = userRole === 'Admin' || userRole === 'Master';
   const hasDc3Permission = userDcPermission === 1 || userRole === 'Master';
+  const canManageContratistas = isAdmin || userFtPermission === 1;
 
   useEffect(() => {
     if (!authLoading) {
-      if (!isAdmin && hasDc3Permission) {
+      if (!canManageContratistas && hasDc3Permission) {
         setActiveTab('agentes'); 
       }
-      if (hasDc3Permission || isAdmin) {
+      if (hasDc3Permission || canManageContratistas) {
         cargarDatos();
       }
     }
-  }, [authLoading, isAdmin, hasDc3Permission]);
+  }, [authLoading, isAdmin, hasDc3Permission, canManageContratistas]);
 
   useEffect(() => {
     setSearchTerm('');
+    setCurrentPage(1);
   }, [activeTab]);
 
   const cargarDatos = async () => {
@@ -423,7 +429,13 @@ export default function CatalogosPage() {
       (c.rfc?.toLowerCase() || '').includes(searchTerm.toLowerCase())
     );
 
+    const indexOfLastItem = currentPage * itemsPerPage;
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+    const currentItems = filtered.slice(indexOfFirstItem, indexOfLastItem);
+    const totalPages = Math.ceil(filtered.length / itemsPerPage);
+
     return (
+      <div className="flex flex-col gap-4">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden transition-colors border border-gray-200 dark:border-gray-700">
         <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="relative w-full sm:w-96">
@@ -432,7 +444,7 @@ export default function CatalogosPage() {
               type="text" 
               placeholder="Buscar contratista por nombre o RFC..." 
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {setSearchTerm(e.target.value); setCurrentPage(1);}}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700/50 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 outline-none" 
             />
           </div>
@@ -453,12 +465,12 @@ export default function CatalogosPage() {
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-slate-800 divide-y md:divide-y-0 md:divide-gray-200 dark:md:divide-slate-700 block md:table-row-group">
-              {filtered.length === 0 ? (
+              {currentItems.length === 0 ? (
                 <tr className="block md:table-row">
                   <td colSpan="5" className="p-8 text-center text-gray-500 block md:table-cell">No se encontraron resultados.</td>
                 </tr>
               ) : (
-                filtered.map((empresa) => (
+                currentItems.map((empresa) => (
                   <tr key={empresa.id_subcontratista} className="block md:table-row border border-gray-200 dark:border-slate-700 md:border-none mb-4 md:mb-0 rounded-lg shadow-sm md:shadow-none p-4 md:p-0 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
                     
                     <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm font-bold md:font-medium text-[var(--recal-blue)] md:text-gray-900 dark:text-white border-b dark:border-slate-700 md:border-none">
@@ -517,6 +529,19 @@ export default function CatalogosPage() {
           </table>
         </div>
       </div>
+      
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between bg-white dark:bg-slate-800 px-4 py-3 border border-gray-200 dark:border-slate-700 rounded-lg shadow-sm gap-4 sm:gap-0 mt-4">
+          <div className="text-sm text-gray-700 dark:text-gray-300">
+            Mostrando <span className="font-bold">{indexOfFirstItem + 1}</span> a <span className="font-bold">{Math.min(indexOfLastItem, filtered.length)}</span> de <span className="font-bold">{filtered.length}</span> empresas
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-3 py-1 border border-gray-300 dark:border-slate-600 rounded-md disabled:opacity-50 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">Anterior</button>
+            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="px-3 py-1 border border-gray-300 dark:border-slate-600 rounded-md disabled:opacity-50 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">Siguiente</button>
+          </div>
+        </div>
+      )}
+      </div>
     );
   };
 
@@ -526,12 +551,18 @@ export default function CatalogosPage() {
       (a.registro_stps?.toLowerCase() || '').includes(searchTerm.toLowerCase())
     );
 
+    const indexOfLastItem = currentPage * itemsPerPage;
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+    const currentItems = filtered.slice(indexOfFirstItem, indexOfLastItem);
+    const totalPages = Math.ceil(filtered.length / itemsPerPage);
+
     return (
+      <div className="flex flex-col gap-4">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden transition-colors border border-gray-200 dark:border-gray-700">
         <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="relative w-full sm:w-96">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-            <input type="text" placeholder="Buscar agente o registro STPS..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700/50 text-gray-900 dark:text-gray-100 outline-none" />
+            <input type="text" placeholder="Buscar agente o registro STPS..." value={searchTerm} onChange={(e) => {setSearchTerm(e.target.value); setCurrentPage(1);}} className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700/50 text-gray-900 dark:text-gray-100 outline-none" />
           </div>
           <button onClick={() => openModal('agente')} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm">
             <Plus className="h-5 w-5" /> Nuevo Agente
@@ -549,12 +580,12 @@ export default function CatalogosPage() {
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-slate-800 divide-y md:divide-y-0 md:divide-gray-200 dark:md:divide-slate-700 block md:table-row-group">
-              {filtered.length === 0 ? (
+              {currentItems.length === 0 ? (
                 <tr className="block md:table-row">
                   <td colSpan="4" className="p-8 text-center text-gray-500 block md:table-cell">No se encontraron resultados.</td>
                 </tr>
               ) : (
-                filtered.map((agente) => (
+                currentItems.map((agente) => (
                   <tr key={agente.id_agente} className="block md:table-row border border-gray-200 dark:border-slate-700 md:border-none mb-4 md:mb-0 rounded-lg shadow-sm md:shadow-none p-4 md:p-0 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
                     <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm font-bold md:font-medium text-green-700 dark:text-green-400 md:text-gray-900 md:dark:text-white border-b dark:border-slate-700 md:border-none">
                       <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 text-xs uppercase">Nombre:</span>{agente.nombre_agente}
@@ -589,6 +620,18 @@ export default function CatalogosPage() {
           </table>
         </div>
       </div>
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between bg-white dark:bg-slate-800 px-4 py-3 border border-gray-200 dark:border-slate-700 rounded-lg shadow-sm gap-4 sm:gap-0 mt-4">
+          <div className="text-sm text-gray-700 dark:text-gray-300">
+            Mostrando <span className="font-bold">{indexOfFirstItem + 1}</span> a <span className="font-bold">{Math.min(indexOfLastItem, filtered.length)}</span> de <span className="font-bold">{filtered.length}</span> agentes
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-3 py-1 border border-gray-300 dark:border-slate-600 rounded-md disabled:opacity-50 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">Anterior</button>
+            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="px-3 py-1 border border-gray-300 dark:border-slate-600 rounded-md disabled:opacity-50 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">Siguiente</button>
+          </div>
+        </div>
+      )}
+      </div>
     );
   };
 
@@ -598,12 +641,18 @@ export default function CatalogosPage() {
       (c.area_tematica?.toLowerCase() || '').includes(searchTerm.toLowerCase())
     );
 
+    const indexOfLastItem = currentPage * itemsPerPage;
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+    const currentItems = filtered.slice(indexOfFirstItem, indexOfLastItem);
+    const totalPages = Math.ceil(filtered.length / itemsPerPage);
+
     return (
+      <div className="flex flex-col gap-4">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden transition-colors border border-gray-200 dark:border-gray-700">
         <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="relative w-full sm:w-96">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-            <input type="text" placeholder="Buscar curso por nombre o área..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700/50 text-gray-900 dark:text-gray-100 outline-none" />
+            <input type="text" placeholder="Buscar curso por nombre o área..." value={searchTerm} onChange={(e) => {setSearchTerm(e.target.value); setCurrentPage(1);}} className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700/50 text-gray-900 dark:text-gray-100 outline-none" />
           </div>
           <button onClick={() => openModal('curso')} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm">
             <Plus className="h-5 w-5" /> Nuevo Curso
@@ -622,12 +671,12 @@ export default function CatalogosPage() {
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-slate-800 divide-y md:divide-y-0 md:divide-gray-200 dark:md:divide-slate-700 block md:table-row-group">
-              {filtered.length === 0 ? (
+              {currentItems.length === 0 ? (
                 <tr className="block md:table-row">
                   <td colSpan="5" className="p-8 text-center text-gray-500 block md:table-cell">No se encontraron resultados.</td>
                 </tr>
               ) : (
-                filtered.map((curso) => (
+                currentItems.map((curso) => (
                   <tr key={curso.id_curso} className="block md:table-row border border-gray-200 dark:border-slate-700 md:border-none mb-4 md:mb-0 rounded-lg shadow-sm md:shadow-none p-4 md:p-0 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
                     <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm font-bold md:font-medium text-purple-700 dark:text-purple-400 md:text-gray-900 md:dark:text-white border-b dark:border-slate-700 md:border-none">
                       <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 text-xs uppercase">Curso:</span>{curso.nombre_curso}
@@ -656,6 +705,18 @@ export default function CatalogosPage() {
           </table>
         </div>
       </div>
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between bg-white dark:bg-slate-800 px-4 py-3 border border-gray-200 dark:border-slate-700 rounded-lg shadow-sm gap-4 sm:gap-0 mt-4">
+          <div className="text-sm text-gray-700 dark:text-gray-300">
+            Mostrando <span className="font-bold">{indexOfFirstItem + 1}</span> a <span className="font-bold">{Math.min(indexOfLastItem, filtered.length)}</span> de <span className="font-bold">{filtered.length}</span> cursos
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-3 py-1 border border-gray-300 dark:border-slate-600 rounded-md disabled:opacity-50 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">Anterior</button>
+            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="px-3 py-1 border border-gray-300 dark:border-slate-600 rounded-md disabled:opacity-50 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">Siguiente</button>
+          </div>
+        </div>
+      )}
+      </div>
     );
   };
 
@@ -668,7 +729,7 @@ export default function CatalogosPage() {
     );
   }
 
-  if (!isAdmin && !hasDc3Permission) {
+  if (!canManageContratistas && !hasDc3Permission) {
     return (
       <div className="p-6 max-w-7xl mx-auto min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center">
         <div className="text-6xl mb-4">🔒</div>
@@ -679,14 +740,25 @@ export default function CatalogosPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
-      <div className="mb-6 md:mb-8">
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Catálogos del Sistema</h1>
-        <p className="text-sm md:text-base text-gray-600 dark:text-gray-400 mt-1">Administra la información general de la plataforma.</p>
-      </div>
+    <>
+    <div className="max-w-[100rem] mx-auto p-4 md:p-6 lg:p-8 space-y-6 animate-in fade-in duration-500">
+      <div className="bg-white/90 dark:bg-slate-800/80 backdrop-blur-xl rounded-[2.5rem] p-6 lg:p-8 shadow-xl shadow-gray-200/50 dark:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.6)] border border-white/80 dark:border-slate-700/50">
+        
+        {/* HERO BENTO HEADER */}
+        <div className="flex flex-col md:flex-row items-start md:items-center gap-6 mb-8 border-b border-gray-100 dark:border-slate-700/50 pb-6">
+           <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl shadow-lg shadow-purple-500/30 flex items-center justify-center text-white shrink-0">
+             <Building2 className="w-8 h-8" />
+           </div>
+           <div>
+             <h1 className="text-3xl font-black text-gray-800 dark:text-white tracking-tight leading-none mb-2">Catálogos del Sistema</h1>
+             <p className="text-gray-500 dark:text-gray-400 font-medium text-sm md:text-base">Administración central de Contratistas, Cursos DC-3 y Agentes Capacitadores.</p>
+           </div>
+        </div>
+        
+        <div className="space-y-6">
 
       <div className="flex space-x-2 border-b border-gray-200 dark:border-gray-700 mb-6 overflow-x-auto pb-2">
-        {isAdmin && (
+        {canManageContratistas && (
           <button onClick={() => setActiveTab('contratistas')} className={`flex items-center gap-2 px-4 py-3 font-medium transition-colors whitespace-nowrap ${activeTab === 'contratistas' ? 'border-b-2 border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}><Building2 className="h-5 w-5" /> Contratistas</button>
         )}
         
@@ -703,29 +775,32 @@ export default function CatalogosPage() {
         <div className="flex flex-col items-center justify-center py-20"><Loader2 className="h-10 w-10 text-blue-600 animate-spin dark:text-blue-400" /></div>
       ) : (
         <div className="animate-in fade-in duration-300">
-          {activeTab === 'contratistas' && isAdmin && renderContratistas()}
+          {activeTab === 'contratistas' && canManageContratistas && renderContratistas()}
           {activeTab === 'agentes' && hasDc3Permission && renderAgentes()}
           {activeTab === 'cursos' && hasDc3Permission && renderCursos()}
         </div>
       )}
+        </div>
+      </div>
+      </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-3xl my-8">
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 overflow-y-auto w-full h-full">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-3xl my-auto animate-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center p-4 md:p-6 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-900 z-10 rounded-t-2xl">
               <h2 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white">
                 {editMode ? 'Editar' : 'Nuevo'} {modalType === 'contratista' ? 'Contratista' : modalType === 'agente' ? 'Agente Capacitador' : 'Curso'}
               </h2>
-              <button onClick={closeModal} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800">
+              <button type="button" onClick={closeModal} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800">
                 <X className="h-6 w-6" />
               </button>
             </div>
-            <div className="p-4 md:p-6 max-h-[70vh] overflow-y-auto">
+            <div className="p-4 md:p-6 max-h-[75vh] overflow-y-auto">
               {renderModalForm()}
             </div>
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

@@ -1,6 +1,6 @@
 import { Calendar as CalendarIcon, MapPin, Clock, User } from 'lucide-react';
 
-export default function DaySummaryModal({ isOpen, onClose, fecha, citas, isDiaCordina, userName }) {
+export default function DaySummaryModal({ isOpen, onClose, fecha, citas, isDiaCordina, userName, onEditClick }) {
   if (!isOpen) return null;
 
   return (
@@ -37,7 +37,11 @@ export default function DaySummaryModal({ isOpen, onClose, fecha, citas, isDiaCo
                 else if (c.estatus === 'No asistió') borderClass = 'border-l-red-500';
 
                 return (
-                  <div key={c.id_cita} className={`p-4 rounded-lg shadow-sm bg-white dark:bg-slate-800/80 border ${borderClass} border-t-gray-200 border-r-gray-200 border-b-gray-200 dark:border-t-slate-700 dark:border-r-slate-700 dark:border-b-slate-700 relative`}>
+                  <div 
+                    key={c.id_cita} 
+                    onClick={() => onEditClick && onEditClick(c)}
+                    className={`p-4 rounded-lg shadow-sm bg-white dark:bg-slate-800/80 border ${borderClass} border-t-gray-200 border-r-gray-200 border-b-gray-200 dark:border-t-slate-700 dark:border-r-slate-700 dark:border-b-slate-700 relative cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all`}
+                  >
                     {isMiCita && (
                       <span className="absolute top-3 right-3 bg-yellow-300 text-yellow-900 text-[9px] px-1.5 py-0.5 rounded font-extrabold border border-yellow-400 shadow-sm">
                         TU CITA
