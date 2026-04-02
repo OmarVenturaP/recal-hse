@@ -82,6 +82,13 @@ export default function FuerzaTrabajoPage() {
   const [importFase, setImportFase] = useState(1); 
   const [importResumen, setImportResumen] = useState({ totales: 0, nuevos: 0 });
 
+  // --- ESTADOS PARA IMPORTADOR SUA (PDF) ---
+  const [showSuaModal, setShowSuaModal] = useState(false);
+  const [suaFile, setSuaFile] = useState(null);
+  const [suaLoading, setSuaLoading] = useState(false);
+  const [suaPreview, setSuaPreview] = useState([]);
+  const [suaFase, setSuaFase] = useState(1); // 1: Upload, 2: Preview
+
   const [isDc3ModalOpen, setIsDc3ModalOpen] = useState(false);
   const [dc3Trabajador, setDc3Trabajador] = useState(null);
   const [catCursos, setCatCursos] = useState([]);
@@ -388,7 +395,82 @@ export default function FuerzaTrabajoPage() {
         setIsModalOpen(false); fetchTrabajadores(); 
         Swal.fire('Guardado', 'Los datos del trabajador se guardaron correctamente.', 'success');
       } else Swal.fire('Error', data.error, 'error');
-    } catch (error) { Swal.fire('Error', 'Error de conexión al guardar', 'error'); } finally { setSaving(false); }
+    } catch (err) {
+      console.error(err);
+      Swal.fire('Error', 'Error al procesar el archivo', 'error');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  // --- LÓGICA IMPORTADOR SUA ---
+  const handleSuaFileChange = (e) => {
+    if (e.target.files[0]) {
+      setSuaFile(e.target.files[0]);
+    }
+  };
+
+  const handleSuaUpload = async (e) => {
+    e.preventDefault();
+    if (!suaFile) return;
+
+    setSuaLoading(true);
+    const formData = new FormData();
+    formData.append('file', suaFile);
+
+    try {
+      const res = await fetch('/api/fuerza-trabajo/importar-sua', {
+        method: 'POST',
+        body: formData,
+      });
+      const result = await res.json();
+
+      if (result.success) {
+        if (result.data.length === 0) {
+          Swal.fire('Información', 'No se encontraron CURPs nuevas para actualizar en este archivo.', 'info');
+        } else {
+          setSuaPreview(result.data);
+          setSuaFase(2);
+        }
+      } else {
+        Swal.fire('Error', result.message || 'Error al procesar PDF', 'error');
+      }
+    } catch (error) {
+      console.error(error);
+      Swal.fire('Error', 'Ocurrió un error en el servidor', 'error');
+    } finally {
+      setSuaLoading(false);
+    }
+  };
+
+  const handleConfirmSuaUpdate = async () => {
+    setSuaLoading(true);
+    try {
+      const res = await fetch('/api/fuerza-trabajo/importar-sua', {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-user-id': '1' // Temporal, idealmente viene del context
+        },
+        body: JSON.stringify({ trabajadores: suaPreview }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        Swal.fire('Éxito', data.message, 'success');
+        setShowSuaModal(false);
+        setSuaFile(null);
+        setSuaPreview([]);
+        setSuaFase(1);
+        fetchTrabajadores();
+      } else {
+        Swal.fire('Error', data.error, 'error');
+      }
+    } catch (error) {
+      Swal.fire('Error', 'Error al actualizar datos', 'error');
+    } finally {
+      setSuaLoading(false);
+    }
   };
 
   const handleBajaClick = (id) => {
@@ -639,9 +721,15 @@ const handleDc3Submit = async (e) => {
             <span className="mr-1 sm:mr-2">📊</span> Exportar
           </button>
           
+          {(canManageDc3 || canManageCert) && (
+            <button onClick={() => { setShowSuaModal(true); setSuaFase(1); }} className="flex-1 sm:flex-none justify-center bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
+              <span className="mr-1 sm:mr-2">📄</span> Importar SUA
+            </button>
+          )}
+          
           {canManageFt && (
             <button onClick={handleOpenImportModal} className="flex-1 sm:flex-none justify-center bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
-              <Upload className="w-4 h-4 mr-1 sm:mr-2" /> Importar
+              <Upload className="w-4 h-4 mr-1 sm:mr-2" /> Importar FT
             </button>
           )}
           {canManageFt && (
@@ -1282,6 +1370,144 @@ const handleDc3Submit = async (e) => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 5: IMPORTADOR SUA PDF */}
+      {showSuaModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-[1000] p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-[2rem] shadow-2xl max-w-4xl w-full border border-white/20 overflow-hidden animate-in zoom-in duration-300">
+            {/* Header */}
+            <div className="px-8 py-6 bg-gradient-to-r from-sky-600 to-indigo-600 text-white flex justify-between items-center">
+              <div>
+                <h3 className="text-2xl font-black flex items-center gap-3">
+                  <span className="bg-white/20 p-2 rounded-xl">📄</span>
+                  Actualización Masiva CURP (SUA)
+                </h3>
+                <p className="text-sky-100 text-sm font-medium mt-1">Sincroniza expedientes con información oficial del IMSS</p>
+              </div>
+              <button 
+                onClick={() => setShowSuaModal(false)}
+                className="hover:bg-white/20 p-2 rounded-full transition-colors text-2xl"
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="p-8">
+              {suaFase === 1 ? (
+                <div className="space-y-6">
+                  <div className="bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800/50 rounded-2xl p-6 flex gap-4 items-start">
+                    <div className="bg-sky-500 text-white p-2 rounded-lg text-xl">💡</div>
+                    <div className="text-sm text-sky-800 dark:text-sky-300 leading-relaxed">
+                      <p className="font-bold mb-1">¿Cómo funciona?</p>
+                      Sube el PDF original generado por el sistema SUA. Nuestro motor extraerá automáticamente los 11 dígitos del NSS y buscará a los trabajadores en el sistema para asignarles su CURP de 18 caracteres. No se duplicarán registros.
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleSuaUpload} className="border-2 border-dashed border-gray-300 dark:border-slate-600 rounded-[2rem] p-12 text-center hover:border-sky-500 transition-all group bg-gray-50/50 dark:bg-slate-900/30">
+                    <input 
+                      type="file" 
+                      accept=".pdf" 
+                      onChange={handleSuaFileChange}
+                      className="hidden" 
+                      id="sua-input"
+                    />
+                    <label htmlFor="sua-input" className="cursor-pointer space-y-4 block">
+                      <div className="mx-auto w-20 h-20 bg-white dark:bg-slate-800 rounded-3xl shadow-lg flex items-center justify-center text-sky-600 group-hover:scale-110 transition-transform">
+                        <Upload className="w-10 h-10" />
+                      </div>
+                      <div>
+                        <p className="text-xl font-bold text-gray-700 dark:text-white">
+                          {suaFile ? suaFile.name : 'Selecciona el PDF del SUA'}
+                        </p>
+                        <p className="text-gray-500 text-sm mt-1">Arrastra aquí el archivo o haz clic para buscar</p>
+                      </div>
+                    </label>
+
+                    {suaFile && (
+                      <button 
+                        type="submit" 
+                        disabled={suaLoading}
+                        className="mt-8 bg-sky-600 hover:bg-sky-700 text-white font-black py-4 px-10 rounded-2xl shadow-xl shadow-sky-500/30 transition-all flex items-center mx-auto disabled:opacity-50"
+                      >
+                        {suaLoading ? 'Procesando PDF...' : 'Analizar Documento'}
+                      </button>
+                    )}
+                  </form>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="flex justify-between items-end">
+                    <div>
+                      <p className="text-2xl font-black text-gray-800 dark:text-white">Sugerencias de Actualización</p>
+                      <p className="text-gray-500 font-medium">Se detectaron {suaPreview.length} trabajadores con CURP disponible en el PDF.</p>
+                    </div>
+                    <button 
+                      onClick={() => setSuaFase(1)}
+                      className="text-sky-600 font-bold hover:underline"
+                    >
+                      Cargar otro archivo
+                    </button>
+                  </div>
+
+                  <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 overflow-hidden shadow-sm">
+                    <div className="max-h-[350px] overflow-y-auto">
+                      <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-800">
+                        <thead className="bg-gray-50 dark:bg-slate-800 sticky top-0">
+                          <tr>
+                            <th className="px-6 py-4 text-left text-xs font-black text-gray-500 uppercase tracking-wider">Trabajador</th>
+                            <th className="px-6 py-4 text-left text-xs font-black text-gray-500 uppercase tracking-wider">NSS</th>
+                            <th className="px-6 py-4 text-left text-xs font-black text-gray-500 uppercase tracking-wider">CURP Actual</th>
+                            <th className="px-6 py-4 text-left text-xs font-black text-sky-600 uppercase tracking-wider">CURP Encontrada</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
+                          {suaPreview.map((item, idx) => (
+                            <tr key={idx} className="hover:bg-sky-50/30 dark:hover:bg-sky-900/10 transition-colors">
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-bold text-gray-900 dark:text-white">{item.nombre}</div>
+                                <div className="text-[10px] text-gray-400">Empl: {item.numero_empleado || 'S/N'}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400 font-mono">
+                                {item.nss}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`px-2 py-1 rounded-md text-[10px] font-bold ${item.curp_actual === 'SIN REGISTRO' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'}`}>
+                                  {item.curp_actual}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-md text-[10px] font-black font-mono border border-green-200 dark:border-green-800/50">
+                                  {item.curp_nuevo}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4">
+                    <button 
+                      onClick={() => setShowSuaModal(false)}
+                      className="flex-1 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 text-gray-700 dark:text-gray-200 font-bold py-4 rounded-2xl transition-colors"
+                    >
+                      Descartar Todo
+                    </button>
+                    <button 
+                      onClick={handleConfirmSuaUpdate}
+                      disabled={suaLoading}
+                      className="flex-[2] bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 rounded-2xl shadow-xl shadow-indigo-500/30 transition-all flex items-center justify-center gap-2"
+                    >
+                      {suaLoading ? 'Guardando cambios...' : `Actualizar ${suaPreview.length} Registros`}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
