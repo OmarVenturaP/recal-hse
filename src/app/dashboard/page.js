@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Tractor, Users, CalendarDays, BookOpen, Clock, Activity, Zap, ShieldCheck } from 'lucide-react';
+import { Tractor, Users, CalendarDays, BookOpen, Clock, Activity, Zap, ShieldCheck, FileBarChart } from 'lucide-react';
 import Link from 'next/link';
 
 export default function DashboardHome() {
   const [stats, setStats] = useState({ maquinaria: 0, personal: 0 });
   const [loading, setLoading] = useState(true);
   const [userAuth, setUserAuth] = useState(null);
+  const [userPerms, setUserPerms] = useState({ ft: 0, dc3: 0, informe: 0 });
   const [greeting, setGreeting] = useState('');
 
   useEffect(() => {
@@ -30,6 +31,20 @@ export default function DashboardHome() {
       }
     };
 
+    const fetchPerms = async () => {
+      try {
+        const res = await fetch('/api/usuarios/me');
+        const data = await res.json();
+        if (data.success && data.data?.length > 0) {
+          setUserPerms({
+            ft: data.data[0].permisos_ft,
+            dc3: data.data[0].permisos_dc3,
+            informe: data.data[0].permisos_informe || 0,
+          });
+        }
+      } catch (e) { /* silencioso */ }
+    };
+
     // 2. Obtener estadísticas globales
     const fetchStats = async () => {
       try {
@@ -48,7 +63,7 @@ export default function DashboardHome() {
       }
     };
 
-    Promise.all([fetchUser(), fetchStats()]);
+    Promise.all([fetchUser(), fetchPerms(), fetchStats()]);
   }, []);
 
   // Extrae iniciales (Ej: "Juan Perez" -> "JP")
@@ -56,6 +71,11 @@ export default function DashboardHome() {
     if (!name) return 'U';
     return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
   };
+
+  // ---- PERMISOS ----
+  const isAdminDash = userAuth?.rol === 'Admin' || userAuth?.rol === 'Master';
+  const canSeeCatalogosDash = isAdminDash || userPerms.ft === 1 || userPerms.dc3 === 1;
+  const canSeeInformesDash  = userAuth?.rol === 'Master' || userPerms.informe === 1;
 
   // Fecha capitalizada y legible en español
   const currentDate = new Date().toLocaleDateString('es-MX', { 
@@ -144,9 +164,8 @@ export default function DashboardHome() {
             </div>
           </Link>
 
-          {/* TARJETA FUERZA DE TRABAJO (Solo Seguridad o Ambas) */}
-          {userAuth && (userAuth.area === 'Seguridad' || userAuth.area === 'Ambas') && (
-            <Link href="/dashboard/fuerza-trabajo" className="group h-full">
+          {/* TARJETA FUERZA DE TRABAJO (Visible para todos) */}
+          <Link href="/dashboard/fuerza-trabajo" className="group h-full">
               <div className="h-full flex flex-col relative overflow-hidden bg-white/90 dark:bg-slate-800/70 backdrop-blur-xl border border-white/80 dark:border-slate-700/50 rounded-[2rem] p-8 transition-all duration-500 hover:-translate-y-2 shadow-xl shadow-gray-200/50 hover:shadow-2xl hover:shadow-blue-900/10 dark:shadow-none dark:hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.6)]">
                 <div className="absolute -right-10 -top-10 w-40 h-40 bg-blue-100 dark:bg-blue-900/20 rounded-full blur-3xl group-hover:bg-blue-200 dark:group-hover:bg-blue-900/40 transition-colors duration-500"></div>
                 
@@ -169,10 +188,57 @@ export default function DashboardHome() {
                   )}
                 </div>
               </div>
-            </Link>
+          </Link>
+
+          {/* TARJETA INFORMES DE SEGURIDAD (Solo Master o permisos_informe) */}
+          {canSeeInformesDash && (
+          <Link href="/dashboard/informes-seguridad" className="group h-full">
+             <div className="h-full flex flex-col relative overflow-hidden bg-white/90 dark:bg-slate-800/70 backdrop-blur-xl border border-white/80 dark:border-slate-700/50 rounded-[2rem] p-8 transition-all duration-500 hover:-translate-y-2 shadow-xl shadow-gray-200/50 hover:shadow-2xl hover:shadow-red-900/10 dark:shadow-none dark:hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.6)]">
+                <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-red-100 dark:bg-red-900/20 rounded-full blur-3xl group-hover:bg-red-200 dark:group-hover:bg-red-900/40 transition-colors duration-500"></div>
+                
+                <div className="relative z-10 flex flex-col h-full flex-grow">
+                  <div className="w-16 h-16 bg-gradient-to-br from-red-600 to-red-700 rounded-2xl shadow-lg shadow-red-500/30 flex items-center justify-center text-white mb-6 group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300">
+                    <FileBarChart className="w-8 h-8" />
+                  </div>
+                  <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight mb-3">Informes de Seguridad</h3>
+                  <p className="text-gray-500 dark:text-gray-400 text-sm font-medium mb-8 leading-relaxed">
+                    Control semanal de reportes, horas hombre y fuerza de trabajo por subcontratista.
+                  </p>
+                  
+                  <div className="flex items-center text-gray-400 dark:text-gray-500 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors mt-auto pt-5 border-t border-gray-200/60 dark:border-slate-700">
+                     <FileBarChart className="w-4 h-4 mr-2" />
+                     <span className="text-xs font-bold uppercase tracking-widest">Reportes Semanales</span>
+                  </div>
+                </div>
+             </div>
+          </Link>
+          )}
+          
+          {/* TARJETA CATÁLOGOS (Solo Admin, permisos_ft o permisos_dc3) */}
+          {canSeeCatalogosDash && (
+          <Link href="/dashboard/catalogos" className="group h-full">
+             <div className="h-full flex flex-col relative overflow-hidden bg-white/90 dark:bg-slate-800/70 backdrop-blur-xl border border-white/80 dark:border-slate-700/50 rounded-[2rem] p-8 transition-all duration-500 hover:-translate-y-2 shadow-xl shadow-gray-200/50 hover:shadow-2xl hover:shadow-blue-900/10 dark:shadow-none dark:hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.6)]">
+                <div className="absolute -left-10 -bottom-10 w-40 h-40 bg-purple-100 dark:bg-purple-900/20 rounded-full blur-3xl group-hover:bg-purple-200 dark:group-hover:bg-purple-900/40 transition-colors duration-500"></div>
+                
+                <div className="relative z-10 flex flex-col h-full flex-grow">
+                  <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-purple-700 rounded-2xl shadow-lg shadow-purple-500/30 flex items-center justify-center text-white mb-6 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300">
+                    <BookOpen className="w-8 h-8" />
+                  </div>
+                  <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight mb-3">Administración</h3>
+                  <p className="text-gray-500 dark:text-gray-400 text-sm font-medium mb-8 leading-relaxed">
+                    Catálogos del sistema: Gestiona Altas, Bajas y Cambios de Subcontratistas, Agentes y Cursos STPS.
+                  </p>
+                  
+                  <div className="flex items-center text-gray-400 dark:text-gray-500 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors mt-auto pt-5 border-t border-gray-200/60 dark:border-slate-700">
+                     <ShieldCheck className="w-4 h-4 mr-2" />
+                     <span className="text-xs font-bold uppercase tracking-widest">Ajustes Generales</span>
+                  </div>
+                </div>
+             </div>
+          </Link>
           )}
 
-          {/* TARJETA CITAS DOSSIER (Adaptada a Light / Dark Mode) */}
+          {/* TARJETA CITAS DOSSIER */}
           <Link href="/dashboard/citas" className="group h-full lg:col-span-1 md:col-span-2 lg:col-auto">
              <div className="h-full flex flex-col relative overflow-hidden bg-white/90 dark:bg-gradient-to-bl dark:from-[#18181b] dark:to-indigo-950 backdrop-blur-xl rounded-[2rem] p-8 transition-all duration-500 hover:-translate-y-2 shadow-xl shadow-gray-200/50 hover:shadow-2xl hover:shadow-indigo-900/10 dark:shadow-none dark:hover:shadow-[0_20px_40px_-15px_rgba(79,70,229,0.5)] border border-white/80 dark:border-indigo-700/50">
                 {/* Textura sutil y Brillos */}
@@ -193,28 +259,6 @@ export default function DashboardHome() {
                   
                   <div className="flex items-center text-gray-400 dark:text-indigo-300 group-hover:text-indigo-600 dark:group-hover:text-white transition-colors mt-auto pt-5 border-t border-gray-200/60 dark:border-indigo-800/60">
                      <span className="text-sm font-extrabold uppercase tracking-widest flex items-center gap-2">Abrir Citas <span className="text-xl leading-none">&rarr;</span></span>
-                  </div>
-                </div>
-             </div>
-          </Link>
-          
-          {/* TARJETA CATÁLOGOS */}
-          <Link href="/dashboard/catalogos" className="group h-full">
-             <div className="h-full flex flex-col relative overflow-hidden bg-white/90 dark:bg-slate-800/70 backdrop-blur-xl border border-white/80 dark:border-slate-700/50 rounded-[2rem] p-8 transition-all duration-500 hover:-translate-y-2 shadow-xl shadow-gray-200/50 hover:shadow-2xl hover:shadow-blue-900/10 dark:shadow-none dark:hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.6)]">
-                <div className="absolute -left-10 -bottom-10 w-40 h-40 bg-purple-100 dark:bg-purple-900/20 rounded-full blur-3xl group-hover:bg-purple-200 dark:group-hover:bg-purple-900/40 transition-colors duration-500"></div>
-                
-                <div className="relative z-10 flex flex-col h-full flex-grow">
-                  <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-purple-700 rounded-2xl shadow-lg shadow-purple-500/30 flex items-center justify-center text-white mb-6 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300">
-                    <BookOpen className="w-8 h-8" />
-                  </div>
-                  <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight mb-3">Administración</h3>
-                  <p className="text-gray-500 dark:text-gray-400 text-sm font-medium mb-8 leading-relaxed">
-                    Catálogos del sistema: Gestiona Altas, Bajas y Cambios de Subcontratistas, Agentes y Cursos STPS.
-                  </p>
-                  
-                  <div className="flex items-center text-gray-400 dark:text-gray-500 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors mt-auto pt-5 border-t border-gray-200/60 dark:border-slate-700">
-                     <ShieldCheck className="w-4 h-4 mr-2" />
-                     <span className="text-xs font-bold uppercase tracking-widest">Ajustes Generales</span>
                   </div>
                 </div>
              </div>
