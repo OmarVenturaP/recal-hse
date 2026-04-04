@@ -399,7 +399,7 @@ export default function FuerzaTrabajoPage() {
       console.error(err);
       Swal.fire('Error', 'Error al procesar el archivo', 'error');
     } finally {
-      setImporting(false);
+      setSaving(false);
     }
   };
 
