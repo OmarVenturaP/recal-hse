@@ -220,7 +220,7 @@ export default function FuerzaTrabajoPage() {
         const esSuaAnterior = esMesAnterior(t.fecha_alta_imss, fechaInicio);
 
         // Categorías que exigen CURP de forma obligatoria (DC-3)
-        const categoriasCriticas = ["SUPERVISOR DE SEGURIDAD", "OPERADOR DE MAQUINARIA", "SOLDADOR", "PINTOR", "ANDAMIERO", "ANDAMIERO A", "SANDBLASTERO", "SANDBLASTERO A", "MANIOBRISTA"];
+        const categoriasCriticas = ["SUPERVISOR DE SEGURIDAD", "TECNICO SUPERVISOR","COORDINADOR DE SEGURIDAD", "OPERADOR DE MAQUINARIA", "SOLDADOR", "PINTOR", "ANDAMIERO", "ANDAMIERO A", "SANDBLASTERO", "SANDBLASTERO A", "MANIOBRISTA", "AUXILIAR DE SEGURIDAD"];
         const esCritico = t.puesto_categoria && categoriasCriticas.some(cat => t.puesto_categoria.toUpperCase().includes(cat));
         
         // El badge/filtro aplica si:
@@ -850,7 +850,7 @@ const handleDc3Submit = async (e) => {
                   const esSuaAnterior = esMesAnterior(t.fecha_alta_imss, fechaInicio);
                   
                   // Lógica para el badge visual de "FALTA CURP"
-                  const categoriasCriticas = ["SUPERVISOR DE SEGURIDAD", "OPERADOR DE MAQUINARIA", "SOLDADOR", "PINTOR", "ANDAMIERO", "ANDAMIERO A", "SANDBLASTERO", "SANDBLASTERO A", "MANIOBRISTA"];
+                  const categoriasCriticas = ["SUPERVISOR DE SEGURIDAD", "TECNICO SUPERVISOR","COORDINADOR DE SEGURIDAD", "OPERADOR DE MAQUINARIA", "SOLDADOR", "PINTOR", "ANDAMIERO", "ANDAMIERO A", "SANDBLASTERO", "SANDBLASTERO A", "MANIOBRISTA", "AUXILIAR DE SEGURIDAD"];
                   const esCritico = t.puesto_categoria && categoriasCriticas.some(cat => t.puesto_categoria.toUpperCase().includes(cat));
                   
                   // El badge aplica si: es categoría crítica O es Ingreso Actual con SUA anterior
@@ -916,7 +916,7 @@ const handleDc3Submit = async (e) => {
                         <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Acciones:</span>
                         <div className="flex justify-end items-center gap-2 md:gap-3 flex-wrap">
 
-                        {canManageCert && t.puesto_categoria && ['SUPERVISOR', 'RESIDENTE'].some(rol => t.puesto_categoria.toUpperCase().includes(rol)) && (
+                        {canManageCert && t.puesto_categoria && ['SUPERVISOR', 'RESIDENTE', 'COORDINADOR DE SEGURIDAD', 'AUXILIAR DE SEGURIDAD'].some(rol => t.puesto_categoria.toUpperCase().includes(rol)) && (
                             <div className="relative group flex items-center justify-center">
                               <button 
                                 onClick={() => handleGenerarCartaAsignacion(t)} 

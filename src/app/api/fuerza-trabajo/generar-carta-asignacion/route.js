@@ -35,7 +35,8 @@ export async function GET(request) {
       SELECT 
         f.nombre_trabajador, 
         f.apellido_trabajador, 
-        f.fecha_ingreso_obra, 
+        f.fecha_ingreso_obra,
+        f.puesto_categoria, 
         c.razon_social AS nombre_subcontratista
       FROM Fuerza_Trabajo f
       LEFT JOIN Subcontratistas c ON f.id_subcontratista_principal = c.id_subcontratista
@@ -58,6 +59,7 @@ export async function GET(request) {
       FECHA_EMISION: formatearFechaCabecera(t.fecha_ingreso_obra),
       NOMBRE_SUPERVISOR: `${t.apellido_trabajador || ''} ${t.nombre_trabajador || ''}`.trim().toUpperCase(),
       CONTRATISTA: contratistaLimpio,
+      PUESTO: t.puesto_categoria.toUpperCase(),
       MES_VIGENCIA: obtenerMesMayusculas(t.fecha_ingreso_obra),
       ANIO_INICIO: fechaIngresoDate.getUTCFullYear(),
       ANIO_FIN: fechaIngresoDate.getUTCFullYear() + 1
