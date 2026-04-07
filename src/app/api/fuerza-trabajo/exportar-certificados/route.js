@@ -95,12 +95,17 @@ export async function GET(request) {
     // 2. Validación de CURP
     const faltantes = [];
     const validos = [];
+    const categoriasCriticas = ["SUPERVISOR DE SEGURIDAD", "OPERADOR DE MAQUINARIA", "SOLDADOR", "PINTOR", "ANDAMIERO", "ANDAMIERO A", "SANDBLASTERO", "SANDBLASTERO A", "MANIOBRISTA"];
 
     for (const t of trabajadores) {
         const mesAnterior = esMesAnterior(t.fecha_alta_imss, fechaInicio);
         const tieneCurp = t.curp && t.curp.length === 18;
+        const esCritico = t.puesto_categoria && categoriasCriticas.some(cat => t.puesto_categoria.toUpperCase().includes(cat));
         
-        if (mesAnterior && !tieneCurp) {
+        // Se requiere CURP si: es categoría crítica O es de mes anterior
+        const requiereCurp = esCritico || mesAnterior;
+
+        if (requiereCurp && !tieneCurp) {
             faltantes.push(`${t.nombre_trabajador || ''} ${t.apellido_trabajador || ''}`.trim());
         } else {
             validos.push(t);

@@ -4,6 +4,24 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { Pencil, Trash2, Upload, FileSpreadsheet, Users } from 'lucide-react';
 import Swal from 'sweetalert2';
 
+// FUNCIÓN DE UTILIDAD: Verifica si una fecha de alta es anterior al inicio del periodo filtrado (SUA anterior)
+const esMesAnterior = (fechaAltaStr, fechaInicioPeriodoStr) => {
+  if (!fechaAltaStr) return false;
+  const alta = new Date(fechaAltaStr);
+  const inicioPeriodo = new Date(fechaInicioPeriodoStr);
+  
+  const mesAlta = alta.getUTCMonth();
+  const anioAlta = alta.getUTCFullYear();
+  const mesInicio = inicioPeriodo.getUTCMonth();
+  const anioInicio = inicioPeriodo.getUTCFullYear();
+
+  if (anioAlta === anioInicio && mesAlta === mesInicio - 1) return true;
+  if (anioAlta === anioInicio - 1 && mesAlta === 11 && mesInicio === 0) return true;
+  if (alta < inicioPeriodo) return true; 
+
+  return false;
+};
+
 export default function FuerzaTrabajoPage() {
   const topRef = useRef(null); 
   const [userRole, setUserRole] = useState(null);
@@ -56,6 +74,7 @@ export default function FuerzaTrabajoPage() {
   const [filtroSub, setFiltroSub] = useState('');
   const [soloFaltaCurp, setSoloFaltaCurp] = useState(false);
   const [soloFaltaCuadrilla, setSoloFaltaCuadrilla] = useState(false);
+  const [soloAltas, setSoloAltas] = useState(false);
   const [busqueda, setBusqueda] = useState('');
 
   const [ordenPor, setOrdenPor] = useState('fecha_ingreso_obra');
@@ -191,14 +210,32 @@ export default function FuerzaTrabajoPage() {
 
   const trabajadoresFiltrados = useMemo(() => {
     return trabajadores.filter(t => {
-      // Filtro de CURP
+      // Filtrado por falta de CURP
       let cumpleCurp = true;
       if (soloFaltaCurp) {
         const fechaIngresoStr = formatForInput(t.fecha_ingreso_obra);
         const isAlta = fechaIngresoStr >= fechaInicio && fechaIngresoStr <= fechaFin;
+        
+        // Verificamos si es de mes anterior respecto al inicio del filtro
+        const esSuaAnterior = esMesAnterior(t.fecha_alta_imss, fechaInicio);
+
+        // Categorías que exigen CURP de forma obligatoria (DC-3)
         const categoriasCriticas = ["SUPERVISOR DE SEGURIDAD", "OPERADOR DE MAQUINARIA", "SOLDADOR", "PINTOR", "ANDAMIERO", "ANDAMIERO A", "SANDBLASTERO", "SANDBLASTERO A", "MANIOBRISTA"];
-        const requiereCurp = t.puesto_categoria && categoriasCriticas.some(cat => t.puesto_categoria.toUpperCase().includes(cat));
-        cumpleCurp = isAlta && requiereCurp && (!t.curp || t.curp.length < 18);
+        const esCritico = t.puesto_categoria && categoriasCriticas.some(cat => t.puesto_categoria.toUpperCase().includes(cat));
+        
+        // El badge/filtro aplica si:
+        // 1. Es categoría crítica (siempre requiere CURP)
+        // 2. O es Ingreso Actual (isAlta) Y es de mes anterior (SUA anterior)
+        const requiereCurp = esCritico || (isAlta && esSuaAnterior);
+
+        cumpleCurp = requiereCurp && (!t.curp || t.curp.length < 18);
+      }
+
+      // Filtro de Altas
+      let cumpleAltas = true;
+      if (soloAltas) {
+        const fechaIngresoStr = formatForInput(t.fecha_ingreso_obra);
+        cumpleAltas = fechaIngresoStr >= fechaInicio && fechaIngresoStr <= fechaFin;
       }
 
       // Filtro de Cuadrilla
@@ -210,10 +247,11 @@ export default function FuerzaTrabajoPage() {
       if (soloFaltaCurp && soloFaltaCuadrilla) return cumpleCurp && cumpleCuadrilla;
       if (soloFaltaCurp) return cumpleCurp;
       if (soloFaltaCuadrilla) return cumpleCuadrilla;
+      if (soloAltas) return cumpleAltas;
       
       return true;
     });
-  }, [trabajadores, soloFaltaCurp, soloFaltaCuadrilla, fechaInicio, fechaFin]);
+  }, [trabajadores, soloFaltaCurp, soloFaltaCuadrilla, soloAltas, fechaInicio, fechaFin]);
 
   const totalPages = Math.ceil(trabajadoresFiltrados.length / itemsPerPage);
   
@@ -500,23 +538,6 @@ export default function FuerzaTrabajoPage() {
 
   const cuadrillasFiltradas = catCuadrillas.filter(c => c.id_subcontratista_principal == formData.id_subcontratista_principal);
 
-  const esMesAnterior = (fechaAltaStr, fechaInicioPeriodoStr) => {
-    if (!fechaAltaStr) return false;
-    const alta = new Date(fechaAltaStr);
-    const inicioPeriodo = new Date(fechaInicioPeriodoStr);
-    
-    const mesAlta = alta.getUTCMonth();
-    const anioAlta = alta.getUTCFullYear();
-    const mesInicio = inicioPeriodo.getUTCMonth();
-    const anioInicio = inicioPeriodo.getUTCFullYear();
-
-    if (anioAlta === anioInicio && mesAlta === mesInicio - 1) return true;
-    if (anioAlta === anioInicio - 1 && mesAlta === 11 && mesInicio === 0) return true;
-    if (alta < inicioPeriodo) return true; 
-
-    return false;
-  };
-
   const handleGenerarCertificadosMasivo = async () => {
     if (!fechaInicio || !fechaFin) {
       Swal.fire('Atención', 'Selecciona el periodo para generar los certificados.', 'warning');
@@ -764,14 +785,21 @@ const handleDc3Submit = async (e) => {
         <div className="md:col-span-1 flex flex-col gap-2">
           <div className="flex gap-1.5 h-full items-end">
             <button 
-              onClick={() => { setSoloFaltaCurp(!soloFaltaCurp); setSoloFaltaCuadrilla(false); }} 
+              onClick={() => { setSoloFaltaCurp(!soloFaltaCurp); setSoloFaltaCuadrilla(false); setSoloAltas(false); }} 
               className={`flex-1 text-[10px] font-black border px-2 py-2 rounded-md transition-all duration-300 ${soloFaltaCurp ? 'bg-red-600 text-white border-red-700 shadow-md' : 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 hover:bg-red-100'}`}
               title="Personal crítico sin CURP"
             >
               {soloFaltaCurp ? 'VER TODO' : 'FALTA CURP'}
             </button>
             <button 
-              onClick={() => { setSoloFaltaCuadrilla(!soloFaltaCuadrilla); setSoloFaltaCurp(false); }} 
+              onClick={() => { setSoloAltas(!soloAltas); setSoloFaltaCurp(false); setSoloFaltaCuadrilla(false); }} 
+              className={`flex-1 text-[10px] font-black border px-2 py-2 rounded-md transition-all duration-300 ${soloAltas ? 'bg-blue-600 text-white border-blue-700 shadow-md' : 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 hover:bg-blue-100'}`}
+              title="Solo altas del periodo"
+            >
+              {soloAltas ? 'VER TODO' : 'ALTAS'}
+            </button>
+            <button 
+              onClick={() => { setSoloFaltaCuadrilla(!soloFaltaCuadrilla); setSoloFaltaCurp(false); setSoloAltas(false); }} 
               className={`flex-1 text-[10px] font-black border px-2 py-2 rounded-md transition-all duration-300 ${soloFaltaCuadrilla ? 'bg-orange-500 text-white border-orange-600 shadow-md' : 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-800 hover:bg-orange-100'}`}
               title="Personal sin cuadrilla"
             >
@@ -779,7 +807,7 @@ const handleDc3Submit = async (e) => {
             </button>
           </div>
           <button 
-            onClick={() => { setBusqueda(''); setFiltroSub(''); setSoloFaltaCurp(false); setSoloFaltaCuadrilla(false); }} 
+            onClick={() => { setBusqueda(''); setFiltroSub(''); setSoloFaltaCurp(false); setSoloFaltaCuadrilla(false); setSoloAltas(false); }} 
             className="w-full bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-md font-bold text-xs transition-colors border border-gray-300 dark:border-slate-600 uppercase"
           >
             Limpiar Todo
@@ -819,10 +847,14 @@ const handleDc3Submit = async (e) => {
               ) : trabajadoresPaginados.map((t) => {
                   const fechaIngresoStr = formatForInput(t.fecha_ingreso_obra);
                   const isAlta = fechaIngresoStr >= fechaInicio && fechaIngresoStr <= fechaFin;
+                  const esSuaAnterior = esMesAnterior(t.fecha_alta_imss, fechaInicio);
                   
+                  // Lógica para el badge visual de "FALTA CURP"
                   const categoriasCriticas = ["SUPERVISOR DE SEGURIDAD", "OPERADOR DE MAQUINARIA", "SOLDADOR", "PINTOR", "ANDAMIERO", "ANDAMIERO A", "SANDBLASTERO", "SANDBLASTERO A", "MANIOBRISTA"];
-                  const requiereCurp = t.puesto_categoria && categoriasCriticas.some(cat => t.puesto_categoria.toUpperCase().includes(cat));
-                  const faltaCurp = isAlta && requiereCurp && !t.curp;
+                  const esCritico = t.puesto_categoria && categoriasCriticas.some(cat => t.puesto_categoria.toUpperCase().includes(cat));
+                  
+                  // El badge aplica si: es categoría crítica O es Ingreso Actual con SUA anterior
+                  const faltaCurp = (esCritico || (isAlta && esSuaAnterior)) && (!t.curp || t.curp.length < 18);
                   const hayCurp = t.curp && t.curp.length === 18;
 
                   return (
