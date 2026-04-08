@@ -76,6 +76,7 @@ export default function DashboardHome() {
   const isAdminDash = userAuth?.rol === 'Admin' || userAuth?.rol === 'Master';
   const canSeeCatalogosDash = isAdminDash || userPerms.ft === 1 || userPerms.dc3 === 1;
   const canSeeInformesDash  = userAuth?.rol === 'Master' || userPerms.informe === 1;
+  const canSeeCitasDash     = userAuth?.rol === 'Master' || userAuth?.id_empresa === 1;
 
   // Fecha capitalizada y legible en español
   const currentDate = new Date().toLocaleDateString('es-MX', { 
@@ -239,6 +240,7 @@ export default function DashboardHome() {
           )}
 
           {/* TARJETA CITAS DOSSIER */}
+          {canSeeCitasDash && (
           <Link href="/dashboard/citas" className="group h-full lg:col-span-1 md:col-span-2 lg:col-auto">
              <div className="h-full flex flex-col relative overflow-hidden bg-white/90 dark:bg-gradient-to-bl dark:from-[#18181b] dark:to-indigo-950 backdrop-blur-xl rounded-[2rem] p-8 transition-all duration-500 hover:-translate-y-2 shadow-xl shadow-gray-200/50 hover:shadow-2xl hover:shadow-indigo-900/10 dark:shadow-none dark:hover:shadow-[0_20px_40px_-15px_rgba(79,70,229,0.5)] border border-white/80 dark:border-indigo-700/50">
                 {/* Textura sutil y Brillos */}
@@ -263,6 +265,7 @@ export default function DashboardHome() {
                 </div>
              </div>
           </Link>
+          )}
 
         </div>
       </div>

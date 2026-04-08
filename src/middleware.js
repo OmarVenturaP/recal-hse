@@ -54,7 +54,8 @@ export async function middleware(request) {
       const requestHeaders = new Headers(request.headers);
       
       requestHeaders.set('x-user-id', payload.id_usuario || payload.id);
-      requestHeaders.set('x-user-rol', payload.rol); // <-- AGREGAR ESTA LÍNEA
+      requestHeaders.set('x-user-rol', payload.rol);
+      requestHeaders.set('x-empresa-id', payload.id_empresa || ''); // <-- NUEVO: Inyección del ID de tenant
 
       return NextResponse.next({
         request: {

@@ -803,7 +803,7 @@ const handleDc3Submit = async (e) => {
               className={`flex-1 text-[10px] font-black border px-2 py-2 rounded-md transition-all duration-300 ${soloFaltaCuadrilla ? 'bg-orange-500 text-white border-orange-600 shadow-md' : 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-800 hover:bg-orange-100'}`}
               title="Personal sin cuadrilla"
             >
-              {soloFaltaCuadrilla ? 'VER TODO' : 'SIN CUADRILLA'}
+              {soloFaltaCuadrilla ? 'VER TODO' : 'S/CUADRILLA'}
             </button>
           </div>
           <button 

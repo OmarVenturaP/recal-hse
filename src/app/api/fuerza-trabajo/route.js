@@ -11,8 +11,17 @@ export async function GET(request) {
     const ordenPor = searchParams.get('ordenPor') || 'fecha_ingreso_obra';
     const ordenDireccion = searchParams.get('ordenDireccion') || 'DESC';
 
+    const idEmpresa = request.headers.get('x-empresa-id');
+    const userRol = request.headers.get('x-user-rol');
+
     let whereClause = "WHERE 1=1";
     const queryParams = [];
+
+    // Lógica Multi-Tenant: Si NO es Master, limitamos la vista a su propia empresa
+    if (userRol !== 'Master' && idEmpresa) {
+      whereClause += " AND f.id_empresa = ?";
+      queryParams.push(idEmpresa);
+    }
 
     if (subcontratista) {
       whereClause += ` AND f.id_subcontratista_principal = ?`;
@@ -61,11 +70,16 @@ export async function POST(request) {
     const body = await request.json();
     const { numero_empleado, nombre_trabajador, apellido_trabajador, puesto_categoria, nss, curp, fecha_ingreso_obra, fecha_alta_imss, origen, id_subcontratista_ft, id_subcontratista_principal } = body;
     const id_usuario_actual = request.headers.get('x-user-id');
+    const idEmpresa = request.headers.get('x-empresa-id');
+    const userRol = request.headers.get('x-user-rol');
 
     if (!id_usuario_actual) return NextResponse.json({ error: "Usuario no identificado" }, { status: 401 });
 
     // --- REGLA DE NEGOCIO: VALIDACIÓN DE NSS ---
     if (nss) {
+      // El NSS debe ser único pero ahora validamos que choque dentro de la misma empresa (o de forma global para evitar duplicados reales)
+      // Como el NSS es nacional, no debería haber NSS duplicados en general, así que busquemos globalmente o por empresa según el caso.
+      // Por consistencia, evaluaremos en general.
       const [duplicados] = await pool.query(
         `SELECT id_subcontratista_principal, fecha_baja FROM Fuerza_Trabajo WHERE nss = ?`,
         [nss]
@@ -89,11 +103,11 @@ export async function POST(request) {
 
     const query = `
       INSERT INTO Fuerza_Trabajo 
-      (numero_empleado, nombre_trabajador, apellido_trabajador, puesto_categoria, nss, curp, fecha_ingreso_obra, fecha_alta_imss, origen, id_subcontratista_ft, id_subcontratista_principal, usuario_registro) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (numero_empleado, nombre_trabajador, apellido_trabajador, puesto_categoria, nss, curp, fecha_ingreso_obra, fecha_alta_imss, origen, id_subcontratista_ft, id_subcontratista_principal, usuario_registro, id_empresa) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const [result] = await pool.query(query, [
-      numero_empleado, nombre_trabajador, apellido_trabajador || null, puesto_categoria, nss, curp || null, fecha_ingreso_obra, fecha_alta_imss || null, origen, id_subcontratista_ft || null, id_subcontratista_principal || null, id_usuario_actual 
+      numero_empleado, nombre_trabajador, apellido_trabajador || null, puesto_categoria, nss, curp || null, fecha_ingreso_obra, fecha_alta_imss || null, origen, id_subcontratista_ft || null, id_subcontratista_principal || null, id_usuario_actual, idEmpresa || 1 
     ]);
 
     return NextResponse.json({ success: true, id: result.insertId });
@@ -109,6 +123,8 @@ export async function PUT(request) {
     const body = await request.json();
     const { id_trabajador, numero_empleado, nombre_trabajador, apellido_trabajador, puesto_categoria, nss, curp, fecha_ingreso_obra, fecha_alta_imss, origen, id_subcontratista_ft, id_subcontratista_principal } = body;
     const id_usuario_actual = request.headers.get('x-user-id');
+    const idEmpresa = request.headers.get('x-empresa-id');
+    const userRol = request.headers.get('x-user-rol');
     
     if (!id_usuario_actual) return NextResponse.json({ error: "Usuario no identificado" }, { status: 401 });
 
@@ -141,8 +157,14 @@ export async function PUT(request) {
       queryParams.push(body.fecha_baja || null);
     }
 
-    const query = `UPDATE Fuerza_Trabajo SET ${updateFields} WHERE id_trabajador=?`;
+    let query = `UPDATE Fuerza_Trabajo SET ${updateFields} WHERE id_trabajador=?`;
     queryParams.push(id_trabajador);
+
+    // Seguridad: Un usuario normal solo puede actualizar de su empresa
+    if (userRol !== 'Master' && idEmpresa) {
+      query += ` AND id_empresa=?`;
+      queryParams.push(idEmpresa);
+    }
     
     await pool.query(query, queryParams);
 
@@ -158,6 +180,8 @@ export async function PATCH(request) {
     const body = await request.json();
     const { id_trabajador, fecha_baja, bActivo } = body; // Añadido bActivo
     const id_usuario_actual = request.headers.get('x-user-id');
+    const idEmpresa = request.headers.get('x-empresa-id');
+    const userRol = request.headers.get('x-user-rol');
 
     if (!id_usuario_actual) {
       return NextResponse.json({ error: "Usuario no identificado" }, { status: 401 });
@@ -166,15 +190,22 @@ export async function PATCH(request) {
       return NextResponse.json({ error: "Falta ID de trabajador" }, { status: 400 });
     }
 
+    let authFilter = "";
+    const authParams = [];
+    if (userRol !== 'Master' && idEmpresa) {
+      authFilter = " AND id_empresa = ?";
+      authParams.push(idEmpresa);
+    }
+
     if (bActivo !== undefined) {
-      const query = `UPDATE Fuerza_Trabajo SET bActivo = ?, usuario_actualizacion = ? WHERE id_trabajador = ?`;
-      await pool.query(query, [bActivo, id_usuario_actual, id_trabajador]);
+      const query = `UPDATE Fuerza_Trabajo SET bActivo = ?, usuario_actualizacion = ? WHERE id_trabajador = ?${authFilter}`;
+      await pool.query(query, [bActivo, id_usuario_actual, id_trabajador, ...authParams]);
       return NextResponse.json({ success: true, mensaje: "Estado actualizado" });
     } 
     // Lógica original de Baja
     else if (fecha_baja) {
-      const query = `UPDATE Fuerza_Trabajo SET fecha_baja = ?, usuario_actualizacion = ? WHERE id_trabajador = ?`;
-      await pool.query(query, [fecha_baja, id_usuario_actual, id_trabajador]);
+      const query = `UPDATE Fuerza_Trabajo SET fecha_baja = ?, usuario_actualizacion = ? WHERE id_trabajador = ?${authFilter}`;
+      await pool.query(query, [fecha_baja, id_usuario_actual, id_trabajador, ...authParams]);
       return NextResponse.json({ success: true, mensaje: "Trabajador dado de baja correctamente" });
     } else {
       return NextResponse.json({ error: "No se envió acción válida" }, { status: 400 });

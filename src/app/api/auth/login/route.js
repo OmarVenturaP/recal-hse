@@ -13,7 +13,13 @@ export async function POST(request) {
       return NextResponse.json({ error: "Por favor, ingresa correo y contraseña." }, { status: 400 });
     }
 
-    const [users] = await pool.query('SELECT * FROM Personal_Area WHERE correo = ? AND activo = TRUE', [correo]);
+    const [users] = await pool.query(
+      `SELECT p.*, e.nombre_comercial as empresa_nombre 
+       FROM Personal_Area p
+       LEFT JOIN cat_empresas e ON p.id_empresa = e.id_empresa
+       WHERE p.correo = ? AND p.activo = TRUE`, 
+      [correo]
+    );
     
     if (users.length === 0) {
       return NextResponse.json({ error: "Credenciales incorrectas o usuario inactivo." }, { status: 401 });
@@ -35,12 +41,14 @@ export async function POST(request) {
     const destinoUrl = requiereCambio ? "/cambiar-password" : "/dashboard";
     // ---------------------------------------------------
 
-    // Agregamos "requiere_cambio" al payload para que el Middleware lo sepa
+    // Agregamos "requiere_cambio" y "id_empresa" al payload para que el Middleware lo sepa
     const payload = {
       id: user.id_personal,
       nombre: user.nombre,
       rol: user.rol,
       area: user.area,
+      id_empresa: user.id_empresa, // <-- NUEVO: Agregado para soporte Multi-Tenant
+      empresa_nombre: user.empresa_nombre, // <-- NUEVO: Nombre dinámico para la UI
       requiere_cambio: requiereCambio,
       permisos_citas: user.permisos_citas
     };

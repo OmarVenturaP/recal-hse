@@ -3,6 +3,13 @@ import pool from '@/lib/db';
 
 export async function GET(request) {
   try {
+    const idEmpresa = Number(request.headers.get('x-empresa-id'));
+    const userRol = request.headers.get('x-user-rol');
+
+    if (userRol !== 'Master' && idEmpresa !== 1) {
+      return NextResponse.json({ success: false, error: 'Acceso exclusivo para Recal Estructuras' }, { status: 403 });
+    }
+
     const { searchParams } = new URL(request.url);
     const mes = searchParams.get('mes');
     const anio = searchParams.get('anio');
@@ -71,6 +78,13 @@ async function validateAppointmentTime(hora_cita, fecha_cita, revisor_nombre, id
 
 export async function POST(request) {
   try {
+    const idEmpresa = Number(request.headers.get('x-empresa-id'));
+    const userRol = request.headers.get('x-user-rol');
+
+    if (userRol !== 'Master' && idEmpresa !== 1) {
+      return NextResponse.json({ success: false, error: 'Acceso exclusivo para Recal Estructuras' }, { status: 403 });
+    }
+
     const data = await request.json();
     const { fecha_cita, hora_cita, id_subcontratista, area, dossiers_entregados, periodo_evaluado, num_revision, revisor_nombre } = data;
 
@@ -96,6 +110,13 @@ export async function POST(request) {
 
 export async function PUT(request) {
   try {
+    const idEmpresa = Number(request.headers.get('x-empresa-id'));
+    const userRol = request.headers.get('x-user-rol');
+
+    if (userRol !== 'Master' && idEmpresa !== 1) {
+      return NextResponse.json({ success: false, error: 'Acceso exclusivo para Recal Estructuras' }, { status: 403 });
+    }
+
     const data = await request.json();
     const { id_cita, fecha_cita, hora_cita, dossiers_entregados, periodo_evaluado, num_revision, estatus, comentarios_revisor, revisor_nombre } = data;
 
@@ -121,6 +142,13 @@ export async function PUT(request) {
 
 export async function DELETE(request) {
   try {
+    const idEmpresa = Number(request.headers.get('x-empresa-id'));
+    const userRol = request.headers.get('x-user-rol');
+
+    if (userRol !== 'Master' && idEmpresa !== 1) {
+      return NextResponse.json({ success: false, error: 'Acceso exclusivo para Recal Estructuras' }, { status: 403 });
+    }
+
     const { searchParams } = new URL(request.url);
     const id_cita = searchParams.get('id_cita');
 

@@ -13,9 +13,10 @@ export async function GET(request) {
     }
     // Por seguridad, no devolvemos el campo de password al frontend
     const query = `
-      SELECT id_personal, nombre, cargo, correo, ultimo_acceso, area, rol, activo, debe_cambiar_password 
-      FROM Personal_Area 
-      ORDER BY id_personal DESC
+      SELECT p.id_personal, p.nombre, p.cargo, p.correo, p.ultimo_acceso, p.area, p.rol, p.activo, p.debe_cambiar_password, p.id_empresa, e.nombre_comercial as empresa_nombre 
+      FROM Personal_Area p
+      LEFT JOIN cat_empresas e ON p.id_empresa = e.id_empresa
+      ORDER BY p.id_personal DESC
     `;
     const [rows] = await pool.query(query);
     return NextResponse.json({ success: true, data: rows });
@@ -34,17 +35,17 @@ export async function POST(request) {
       return NextResponse.json({ success: false, error: "Acceso denegado. Solo nivel Master." }, { status: 403 });
     }
 
-    const { nombre, cargo, correo, area, rol } = await request.json();
+    const { nombre, cargo, correo, area, rol, id_empresa } = await request.json();
 
     // Encriptamos la contraseña genérica "RecalHSE"
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash("RecalHSE", salt);
 
     const query = `
-      INSERT INTO Personal_Area (nombre, cargo, correo, password, area, rol, activo, debe_cambiar_password) 
-      VALUES (?, ?, ?, ?, ?, ?, 1, 1)
+      INSERT INTO Personal_Area (nombre, cargo, correo, password, area, rol, activo, debe_cambiar_password, id_empresa) 
+      VALUES (?, ?, ?, ?, ?, ?, 1, 1, ?)
     `;
-    const [result] = await pool.query(query, [nombre, cargo, correo, hashedPassword, area, rol]);
+    const [result] = await pool.query(query, [nombre, cargo, correo, hashedPassword, area, rol, id_empresa || 1]);
 
     return NextResponse.json({ success: true, mensaje: "Usuario creado exitosamente" });
   } catch (error) {
@@ -67,14 +68,14 @@ export async function PUT(request) {
       return NextResponse.json({ success: false, error: "Acceso denegado. Solo nivel Master." }, { status: 403 });
     }
 
-    const { id_personal, nombre, cargo, correo, area, rol, activo } = await request.json();
+    const { id_personal, nombre, cargo, correo, area, rol, activo, id_empresa } = await request.json();
 
     const query = `
       UPDATE Personal_Area 
-      SET nombre = ?, cargo = ?, correo = ?, area = ?, rol = ?, activo = ?
+      SET nombre = ?, cargo = ?, correo = ?, area = ?, rol = ?, activo = ?, id_empresa = ?
       WHERE id_personal = ?
     `;
-    await pool.query(query, [nombre, cargo, correo, area, rol, activo, id_personal]);
+    await pool.query(query, [nombre, cargo, correo, area, rol, activo, id_empresa || 1, id_personal]);
 
     return NextResponse.json({ success: true, mensaje: "Usuario actualizado" });
   } catch (error) {

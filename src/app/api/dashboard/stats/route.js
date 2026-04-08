@@ -7,6 +7,8 @@ export async function GET(request) {
   try {
     // Obtenemos al usuario logueado desde los headers
     const id_usuario_actual = request.headers.get('x-user-id');
+    const userRol = request.headers.get('x-user-rol');
+    const idEmpresa = request.headers.get('x-empresa-id');
     
     if (!id_usuario_actual) {
       return NextResponse.json({ error: "Usuario no identificado" }, { status: 401 });
@@ -25,14 +27,29 @@ export async function GET(request) {
     }
     // Si es 'Ambas', el filtroArea se queda vacío y cuenta todo.
 
-    // 3. Contar Maquinaria Activa respetando su área
+    // 3. Contar Maquinaria Activa respetando su área y tenant
+    let queryParamsMaquinaria = [];
+    let queryParamsPersonal = [];
+    
+    let baseMaquinariaWhere = `fecha_baja IS NULL${filtroArea}`;
+    let basePersonalWhere = `fecha_baja IS NULL`;
+
+    if (userRol !== 'Master' && idEmpresa) {
+      baseMaquinariaWhere += ` AND id_empresa = ?`;
+      basePersonalWhere += ` AND id_empresa = ?`;
+      queryParamsMaquinaria.push(idEmpresa);
+      queryParamsPersonal.push(idEmpresa);
+    }
+
     const [maquinaria] = await pool.query(
-      `SELECT COUNT(*) as total FROM Maquinaria_Equipo WHERE fecha_baja IS NULL${filtroArea}`
+      `SELECT COUNT(*) as total FROM Maquinaria_Equipo WHERE ${baseMaquinariaWhere}`,
+      queryParamsMaquinaria
     );
 
-    // 4. Contar Personal Activo (Esto se mantiene global o se puede filtrar después si lo requieres)
+    // 4. Contar Personal Activo respetando el tenant
     const [personal] = await pool.query(
-      `SELECT COUNT(*) as total FROM Fuerza_Trabajo WHERE fecha_baja IS NULL`
+      `SELECT COUNT(*) as total FROM Fuerza_Trabajo WHERE ${basePersonalWhere}`,
+      queryParamsPersonal
     );
 
     return NextResponse.json({

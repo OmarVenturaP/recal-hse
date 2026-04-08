@@ -1,5 +1,9 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
+## 📄 Documentación del Proyecto
+- [📘 Guía de Usuario](file:///Users/ventura/Desktop/Programacion/recal-hse/docs/usuario.md) - Manual paso a paso para usuarios finales.
+- [🛠️ Documentación Técnica](file:///Users/ventura/Desktop/Programacion/recal-hse/docs/tecnica.md) - Guía para desarrolladores y arquitectura.
+
 ## Getting Started
 
 First, run the development server:

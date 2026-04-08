@@ -1,0 +1,223 @@
+"use client";
+
+import { useState, useEffect } from 'react';
+import { Pencil, Building } from 'lucide-react';
+import Swal from 'sweetalert2';
+
+export default function EmpresasPage() {
+  const [empresas, setEmpresas] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  
+  const formInicial = {
+    id_empresa: null, nombre_comercial: '', rfc: ''
+  };
+  const [formData, setFormData] = useState(formInicial);
+
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = empresas.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(empresas.length / itemsPerPage);
+
+  const fetchEmpresas = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/empresas');
+      const json = await res.json();
+      if (json.success) setEmpresas(json.data);
+    } catch (error) {
+      console.error("Error cargando empresas:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchEmpresas(); }, []);
+
+  const handleNewClick = () => {
+    setFormData(formInicial);
+    setIsEditing(false);
+    setIsModalOpen(true);
+  };
+
+  const handleEditClick = (emp) => {
+    setFormData({
+      id_empresa: emp.id_empresa,
+      nombre_comercial: emp.nombre_comercial,
+      rfc: emp.rfc || ''
+    });
+    setIsEditing(true);
+    setIsModalOpen(true);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    
+    try {
+      const method = isEditing ? 'PUT' : 'POST';
+      const res = await fetch('/api/empresas', {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        setIsModalOpen(false);
+        fetchEmpresas();
+        Swal.fire('Guardado', 'Datos actualizados correctamente.', 'success');
+      } else {
+        Swal.fire('Error', data.error || 'Ocurrió un error', 'error');
+      }
+    } catch (error) {
+      Swal.fire('Error', 'Error de conexión.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id, nombre) => {
+    Swal.fire({
+      title: '¿Ocultar esta empresa?',
+      text: `La empresa ${nombre} ya no será visible ni elegible.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Sí, Ocultar'
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          const res = await fetch('/api/empresas', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id_empresa: id, estado: 'inactivo' })
+          });
+          const data = await res.json();
+          if (data.success) {
+            fetchEmpresas();
+          }
+        } catch {
+          Swal.fire('Error', 'Error en la petición.', 'error');
+        }
+      }
+    });
+  };
+
+  return (
+    <>
+    <div className="max-w-[100rem] mx-auto p-4 md:p-6 lg:p-8 space-y-6 animate-in fade-in duration-500">
+      <div className="bg-white/90 dark:bg-slate-800/80 backdrop-blur-xl rounded-[2.5rem] p-6 lg:p-8 shadow-xl border border-gray-200 dark:border-slate-700/50">
+        
+        <div className="flex flex-col md:flex-row items-start md:items-center gap-6 mb-8 border-b border-gray-100 dark:border-slate-700/50 pb-6">
+           <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-[var(--recal-blue)] rounded-2xl shadow-lg flex items-center justify-center text-white shrink-0">
+             <Building className="w-8 h-8" />
+           </div>
+           <div>
+             <h1 className="text-3xl font-black text-gray-800 dark:text-white mb-2">Control de Empresas</h1>
+             <p className="text-gray-500 dark:text-gray-400 font-medium">Gestión administrativa de los Tenants afiliados (Master).</p>
+           </div>
+           
+           <div className="md:ml-auto w-full md:w-auto mt-4 md:mt-0">
+               <button onClick={handleNewClick} className="w-full sm:w-auto bg-[var(--recal-blue)] hover:bg-[var(--recal-blue-hover)] text-white px-4 py-3 sm:py-2 rounded-md font-medium flex items-center justify-center gap-2">
+                 + Nueva Empresa
+               </button>
+           </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="bg-white dark:bg-slate-800 shadow-sm rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+                <thead className="bg-gray-50 dark:bg-slate-900 hidden md:table-header-group">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Empresa</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Estado</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-slate-800 divide-y md:divide-y-0 md:divide-gray-200 dark:md:divide-slate-700 block md:table-row-group">
+                  {loading ? (
+                    <tr className="block md:table-row"><td colSpan="3" className="px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400 block md:table-cell">Cargando empresas...</td></tr>
+                  ) : currentItems.length === 0 ? (
+                    <tr className="block md:table-row"><td colSpan="3" className="px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400 block md:table-cell">No hay empresas registradas.</td></tr>
+                  ) : currentItems.map((emp) => (
+                    <tr key={emp.id_empresa} className="block md:table-row border border-gray-200 dark:border-slate-700 md:border-none mb-4 md:mb-0 rounded-lg p-4 md:p-0 hover:bg-gray-50 dark:hover:bg-slate-700/50">
+                      
+                      <td className="flex justify-between md:table-cell px-2 md:px-6 py-2 md:py-4 border-b md:border-none">
+                        <span className="md:hidden font-bold text-gray-500 text-sm">Empresa:</span>
+                        <div className="text-right md:text-left">
+                          <div className="font-bold text-gray-900 dark:text-gray-200">{emp.nombre_comercial}</div>
+                          <div className="text-xs text-blue-600 dark:text-blue-400">{emp.rfc || 'Sin RFC'}</div>
+                        </div>
+                      </td>
+
+                      <td className="flex justify-between md:table-cell px-2 md:px-6 py-2 md:py-4 border-b md:border-none">
+                        <span className="md:hidden font-bold text-gray-500 text-sm">Estado:</span>
+                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${emp.estado === 'activo' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                          {emp.estado.toUpperCase()}
+                        </span>
+                      </td>
+
+                      <td className="flex justify-end items-center md:table-cell px-2 md:px-6 py-4 md:py-4 border-b md:border-none">
+                        <div className="flex justify-end gap-2 text-[var(--recal-blue)] cursor-pointer">
+                          <button onClick={() => handleEditClick(emp)} className="hover:text-blue-800 p-2 border rounded-md"><Pencil className="w-5 h-5"/></button>
+                          <button onClick={() => handleDelete(emp.id_empresa, emp.nombre_comercial)} className="hover:text-red-800 text-red-500 p-2 border rounded-md font-bold text-lg">&times;</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          
+          {!loading && totalPages > 1 && (
+            <div className="flex justify-between items-center mt-4">
+              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-2 border rounded-md disabled:opacity-50">Anterior</button>
+              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-2 border rounded-md disabled:opacity-50">Siguiente</button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+
+    {isModalOpen && (
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[999] p-4 w-full h-full">
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-lg w-full">
+          <div className="px-6 py-4 border-b flex justify-between bg-slate-100 dark:bg-slate-900 rounded-t-lg">
+            <h3 className="text-lg font-bold">{isEditing ? 'Editar Empresa' : 'Nueva Empresa'}</h3>
+            <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 font-bold text-xl">&times;</button>
+          </div>
+          
+          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-1 dark:text-white">Nombre Comercial *</label>
+              <input required type="text" className="w-full bg-transparent border rounded p-2 dark:text-white" 
+                value={formData.nombre_comercial} onChange={e => setFormData({...formData, nombre_comercial: e.target.value})} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1 dark:text-white">RFC</label>
+              <input type="text" className="w-full bg-transparent border rounded p-2 dark:text-white uppercase" 
+                value={formData.rfc} onChange={e => setFormData({...formData, rfc: e.target.value.toUpperCase()})} />
+            </div>
+
+            <div className="pt-4 flex justify-end space-x-3 mt-6 border-t">
+              <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 border rounded-md mt-4">Cancelar</button>
+              <button type="submit" disabled={saving} className="px-4 py-2 bg-blue-600 text-white rounded-md mt-4">
+                {saving ? 'Guardando...' : (isEditing ? 'Actualizar' : 'Registrar')}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )}
+    </>
+  );
+}

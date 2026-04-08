@@ -54,8 +54,8 @@ export default function CatalogosPage() {
   }, []);
 
   const isAdmin = userRole === 'Admin' || userRole === 'Master';
-  const hasDc3Permission = userDcPermission === 1 || userRole === 'Master';
-  const canManageContratistas = isAdmin || userFtPermission === 1;
+  const hasDc3Permission = userDcPermission === 1 || isAdmin;   // Admin y Master ven Agentes/Cursos
+  const canManageContratistas = isAdmin || userFtPermission === 1; // Admin, Master y permisos_ft ven Contratistas
 
   useEffect(() => {
     if (!authLoading) {

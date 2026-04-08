@@ -7,6 +7,7 @@ import Swal from 'sweetalert2';
 
 export default function UsuariosPage() {
   const [usuarios, setUsuarios] = useState([]);
+  const [empresas, setEmpresas] = useState([]); // <-- NUEVO: Guardaremos la lista de empresas
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -18,7 +19,7 @@ export default function UsuariosPage() {
   
   const formInicial = {
     id_personal: null, nombre: '', cargo: '', correo: '', 
-    area: 'Seguridad', rol: 'Usuario', activo: 1
+    area: 'Seguridad', rol: 'Usuario', activo: 1, id_empresa: 1
   };
   const [formData, setFormData] = useState(formInicial);
 
@@ -30,11 +31,16 @@ export default function UsuariosPage() {
   const fetchUsuarios = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/usuarios');
-      const json = await res.json();
-      if (json.success) setUsuarios(json.data);
+      const [resUsr, resEmp] = await Promise.all([
+        fetch('/api/usuarios'),
+        fetch('/api/empresas')
+      ]);
+      const [jsonUsr, jsonEmp] = await Promise.all([resUsr.json(), resEmp.json()]);
+
+      if (jsonUsr.success) setUsuarios(jsonUsr.data);
+      if (jsonEmp.success) setEmpresas(jsonEmp.data);
     } catch (error) {
-      console.error("Error cargando usuarios:", error);
+      console.error("Error cargando catálogos:", error);
     } finally {
       setLoading(false);
     }
@@ -56,7 +62,8 @@ export default function UsuariosPage() {
       correo: usuario.correo,
       area: usuario.area,
       rol: usuario.rol,
-      activo: usuario.activo
+      activo: usuario.activo,
+      id_empresa: usuario.id_empresa || 1
     });
     setIsEditing(true);
     setIsModalOpen(true);
@@ -182,6 +189,7 @@ export default function UsuariosPage() {
                       <span className={`px-2 py-1 inline-flex text-xs leading-5 font-bold rounded-full shadow-sm mb-1 ${u.rol === 'Master' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300' : u.rol === 'Admin' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300' : 'bg-gray-100 dark:bg-slate-700 text-gray-800 dark:text-gray-300'}`}>
                         {u.rol}
                       </span>
+                      <div className="text-[10px] font-black text-indigo-500 uppercase tracking-wider mb-1 mt-1">{u.empresa_nombre || 'RECAL ESTRUCTURAS'}</div>
                       <div className="text-xs text-gray-500 dark:text-gray-400">{u.area}</div>
                     </div>
                   </td>
@@ -285,6 +293,18 @@ export default function UsuariosPage() {
                     <option value="Ambas" className="dark:bg-slate-800">Ambas</option>
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Empresa Perteneciente (Tenant) *</label>
+                <select className="w-full bg-indigo-50/50 dark:bg-indigo-900/20 border border-gray-300 dark:border-indigo-800/50 dark:text-white rounded p-2 outline-none focus:ring-indigo-500 font-medium" 
+                  value={formData.id_empresa} onChange={e => setFormData({...formData, id_empresa: Number(e.target.value)})}>
+                  {empresas.map((emp) => (
+                    <option key={emp.id_empresa} value={emp.id_empresa} className="dark:bg-slate-800">
+                      {emp.nombre_comercial} {emp.id_empresa === 1 ? '(Principal)' : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>

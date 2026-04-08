@@ -7,7 +7,7 @@ import BotonTema from '@/components/BotonTema';
 import { 
   LayoutDashboard, Tractor, Users, ClipboardList, 
   BookOpen, CalendarDays, ShieldCheck, LogOut, Menu, X, FileBarChart,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, Building
 } from 'lucide-react';
 
 export default function DashboardLayout({ children }) {
@@ -25,6 +25,9 @@ export default function DashboardLayout({ children }) {
   const [userRol, setUserRol] = useState(null);
   const [userArea, setUserArea] = useState(null);
   const [userName, setUserName] = useState('');
+  const [userIdEmpresa, setUserIdEmpresa] = useState(null); // <-- NUEVO: Guardar Empresa
+  const [userEmpresaNombre, setUserEmpresaNombre] = useState('RECAL ESTRUCTURAS'); // <-- NUEVO: Nombre
+
   const [userDcPermission, setUserDcPermission] = useState(0);
   const [userFtPermission, setUserFtPermission] = useState(0);
   const [userPermisoInforme, setUserPermisoInforme] = useState(0);
@@ -56,6 +59,8 @@ export default function DashboardLayout({ children }) {
           setUserRol(data.user.rol);
           setUserArea(data.user.area);
           setUserName(data.user.nombre);
+          setUserIdEmpresa(data.user.id_empresa || 1); // <-- NUEVO: Leer id_empresa del token
+          setUserEmpresaNombre(data.user.empresa_nombre || 'RECAL ESTRUCTURAS');
         }
       });
 
@@ -90,6 +95,7 @@ export default function DashboardLayout({ children }) {
   const hasFtPermission  = userFtPermission  === 1 || isAdmin;
   const canSeeCatalogos  = isAdmin || hasFtPermission || hasDc3Permission;
   const canSeeInformes   = userRol === 'Master' || userPermisoInforme === 1;
+  const canSeeCitas      = userRol === 'Master' || userIdEmpresa === 1; // Solo Master o Empresa Recal
 
   const closeSidebar = () => setIsSidebarOpen(false);
   const toggleCollapse = () => {
@@ -107,6 +113,7 @@ export default function DashboardLayout({ children }) {
         <Link 
           href={href}
           onClick={closeSidebar}
+          title={isCollapsed ? label : undefined}
           className={`
             flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-300 group relative overflow-hidden
             ${isCollapsed ? 'md:px-0 md:justify-center' : ''}
@@ -135,21 +142,6 @@ export default function DashboardLayout({ children }) {
           )}
         </Link>
 
-        {/* Tooltip: solo en modo colapsado en desktop */}
-        {isCollapsed && (
-          <div className="
-            hidden md:block
-            absolute left-full top-1/2 -translate-y-1/2 ml-3 z-[100]
-            bg-slate-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg
-            border border-white/10 shadow-xl whitespace-nowrap
-            opacity-0 pointer-events-none -translate-x-1 
-            group-hover/nav:opacity-100 group-hover/nav:translate-x-0
-            transition-all duration-200
-          ">
-            {label}
-            <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-slate-800"></div>
-          </div>
-        )}
       </div>
     );
   };
@@ -192,7 +184,7 @@ export default function DashboardLayout({ children }) {
               />
             </div>
             {/* Texto siempre visible en móvil, se oculta en desktop colapsado */}
-            <span className={`text-xs font-black tracking-[0.2em] text-blue-200/50 mt-4 hidden md:block ${isCollapsed ? 'md:hidden' : ''}`}>RECAL ESTRUCTURAS</span>
+            <span className={`text-[10px] text-center font-black tracking-[0.2em] text-blue-200/50 mt-4 hidden md:block uppercase ${isCollapsed ? 'md:hidden' : ''}`}>{userEmpresaNombre}</span>
           </div>
           {/* Botón cerrar (solo móvil) */}
           <button onClick={closeSidebar} className="md:hidden text-blue-300 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors">
@@ -201,7 +193,7 @@ export default function DashboardLayout({ children }) {
         </div>
         
         {/* NAV */}
-        <nav className={`flex-1 py-2 space-y-2.5 overflow-y-auto overflow-x-visible w-full relative z-10 custom-scrollbar transition-all duration-300 px-4 ${isCollapsed ? 'md:px-2' : ''}`}>
+        <nav className={`flex-1 py-2 space-y-2.5 overflow-y-auto overflow-x-hidden w-full relative z-10 custom-scrollbar transition-all duration-300 px-4 ${isCollapsed ? 'md:px-2' : ''}`}>
           {/* BotonTema alineado */}
           <div className={`w-full flex mb-6 px-2 ${isCollapsed ? 'md:justify-center justify-end' : 'justify-end'}`}>
             <BotonTema className="w-8 h-8 opacity-70 hover:opacity-100 transition-opacity" />
@@ -223,15 +215,18 @@ export default function DashboardLayout({ children }) {
             <NavItem href="/dashboard/catalogos" icon={BookOpen} label="Catálogos" />
           )}
           
-          <NavItem href="/dashboard/citas" icon={CalendarDays} label="Citas Dossier" />
+          {canSeeCitas && (
+            <NavItem href="/dashboard/citas" icon={CalendarDays} label="Citas Dossier" />
+          )}
           
           {userRol === 'Master' && (
              <div className={`pt-6 mt-6 border-t border-white/10 ${isCollapsed ? 'border-t-0 pt-2 mt-2' : ''}`}>
                {/* Texto siempre en móvil, oculto en desktop colapsado */}
-               <span className={`px-4 text-[10px] font-black tracking-widest text-indigo-300/50 uppercase mb-2 block ${isCollapsed ? 'md:hidden' : ''}`}>Administración</span>
+               <span className={`px-4 text-[10px] font-black tracking-widest text-indigo-300/50 uppercase mb-2 block ${isCollapsed ? 'md:hidden' : ''}`}>Administración Global</span>
                {/* Separador solo en desktop colapsado */}
                {isCollapsed && <div className="hidden md:block border-t border-white/10 mb-2"></div>}
                <NavItem href="/dashboard/usuarios" icon={ShieldCheck} label="Control de Accesos" isPurple={true} />
+               <NavItem href="/dashboard/empresas" icon={Building} label="Control de Empresas" isPurple={true} />
              </div>
           )}
         </nav>
@@ -306,8 +301,7 @@ export default function DashboardLayout({ children }) {
         </header>
 
         {/* CONTAINER DEL CHILDREN */}
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-transparent relative z-0">
-          <div className="absolute inset-0 bg-gradient-to-br from-transparent to-blue-50/50 dark:to-slate-900/50 pointer-events-none -z-10"></div>
+        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gradient-to-br from-transparent to-blue-50/50 dark:to-slate-900/50">
           {children}
         </main>
       </div>

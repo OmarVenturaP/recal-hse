@@ -27,11 +27,14 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const id_trabajador = searchParams.get('id_trabajador'); 
 
+    const idEmpresa = request.headers.get('x-empresa-id');
+    const userRol = request.headers.get('x-user-rol');
+
     if (!id_trabajador) {
       return NextResponse.json({ success: false, error: 'Falta el ID del trabajador' }, { status: 400 });
     }
 
-    const query = `
+    let query = `
       SELECT 
         f.nombre_trabajador, 
         f.apellido_trabajador, 
@@ -42,7 +45,15 @@ export async function GET(request) {
       LEFT JOIN Subcontratistas c ON f.id_subcontratista_principal = c.id_subcontratista
       WHERE f.id_trabajador = ?
     `;
-    const [trabajadores] = await pool.query(query, [id_trabajador]);
+    const queryParams = [id_trabajador];
+
+    // Lógica Multi-Tenant: Si NO es Master, solo puede ver a trabajadores de su empresa
+    if (userRol !== 'Master' && idEmpresa) {
+      query += ` AND f.id_empresa = ?`;
+      queryParams.push(idEmpresa);
+    }
+
+    const [trabajadores] = await pool.query(query, queryParams);
 
     if (trabajadores.length === 0) {
       return NextResponse.json({ success: false, error: 'No se encontró al trabajador.' }, { status: 404 });

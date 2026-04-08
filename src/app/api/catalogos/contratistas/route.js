@@ -24,16 +24,27 @@ const uploadImage = async (file, folder) => {
   }
 };
 
-export async function GET() {
+export async function GET(request) {
   try {
+    const idEmpresa = request.headers.get('x-empresa-id');
+    const userRol = request.headers.get('x-user-rol');
+
+    let whereClause = "bActivo = 1";
+    const queryParams = [];
+
+    if (userRol !== 'Master' && idEmpresa) {
+      whereClause += " AND id_empresa = ?";
+      queryParams.push(idEmpresa);
+    }
+
     const query = `
       SELECT id_subcontratista, razon_social, rfc, nombre_fiscal, telefono, correo, representante_legal, 
       firma_representante_legal, representante_trabajadores, firma_representante_trabajadores, nombre_fiscal, logo_empresa
       FROM Subcontratistas 
-      WHERE bActivo = 1
+      WHERE ${whereClause}
       ORDER BY razon_social ASC
     `;
-    const [rows] = await pool.query(query);
+    const [rows] = await pool.query(query, queryParams);
     return NextResponse.json(rows);
   } catch (error) {
     console.error("Error al cargar contratistas:", error);
@@ -45,6 +56,9 @@ export async function POST(request) {
   const connection = await pool.getConnection();
   try {
     const formData = await request.formData();
+    
+    // Obtenemos los headers de seguridad
+    const idEmpresa = request.headers.get('x-empresa-id');
     
     const razon_social = formData.get('razon_social');
     if (!razon_social) return NextResponse.json({ error: "La Razón Social es obligatoria." }, { status: 400 });
@@ -64,12 +78,12 @@ export async function POST(request) {
 
     const queryInsert = `
       INSERT INTO Subcontratistas 
-      (razon_social, rfc, telefono, correo, representante_legal, representante_trabajadores, logo_empresa, firma_representante_legal, firma_representante_trabajadores, nombre_fiscal)
+      (razon_social, rfc, telefono, correo, representante_legal, representante_trabajadores, logo_empresa, firma_representante_legal, firma_representante_trabajadores, nombre_fiscal, id_empresa)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const [result] = await connection.query(queryInsert, [
       razon_social, rfc, telefono, correo, representante_legal, representante_trabajadores, 
-      logo_empresa, firma_representante_legal, firma_representante_trabajadores, nombre_fiscal
+      logo_empresa, firma_representante_legal, firma_representante_trabajadores, nombre_fiscal, idEmpresa || 1
     ]);
     
     const nuevoId = result.insertId;
@@ -78,7 +92,7 @@ export async function POST(request) {
     if (cuadrillasRaw) {
       const cuadrillas = JSON.parse(cuadrillasRaw);
       for (const cuadrilla of cuadrillas) {
-        await connection.query('INSERT INTO Subcontratistas_Fuerza_Trabajo (nombre, id_subcontratista_principal) VALUES (?, ?)', [cuadrilla.nombre, nuevoId]);
+        await connection.query('INSERT INTO Subcontratistas_Fuerza_Trabajo (nombre, id_subcontratista_principal, id_empresa) VALUES (?, ?, ?)', [cuadrilla.nombre, nuevoId, idEmpresa || 1]);
       }
     }
 
@@ -100,7 +114,17 @@ export async function PUT(request) {
     const formData = await request.formData();
     const id_subcontratista = formData.get('id_subcontratista');
     
+    // Obtenemos los headers de seguridad
+    const idEmpresa = request.headers.get('x-empresa-id');
+    const userRol = request.headers.get('x-user-rol');
+    
     if (!id_subcontratista) return NextResponse.json({ error: "Falta ID del contratista" }, { status: 400 });
+
+    // Validar propiedad del subcontratista antes de actualizar
+    if (userRol !== 'Master' && idEmpresa) {
+      const [verif] = await connection.query('SELECT 1 FROM Subcontratistas WHERE id_subcontratista = ? AND id_empresa = ?', [id_subcontratista, idEmpresa]);
+      if (verif.length === 0) return NextResponse.json({ error: "No tienes permisos para modificar este subcontratista." }, { status: 403 });
+    }
 
     const razon_social = formData.get('razon_social');
     const rfc = formData.get('rfc') || null;
@@ -153,7 +177,7 @@ export async function PUT(request) {
 
       for (const c of cuadrillas) {
         if (String(c.id_subcontratista_ft).startsWith('temp_')) {
-          await connection.query('INSERT INTO Subcontratistas_Fuerza_Trabajo (nombre, id_subcontratista_principal) VALUES (?, ?)', [c.nombre, id_subcontratista]);
+          await connection.query('INSERT INTO Subcontratistas_Fuerza_Trabajo (nombre, id_subcontratista_principal, id_empresa) VALUES (?, ?, ?)', [c.nombre, id_subcontratista, idEmpresa || 1]);
         } else if (c.isEdited) {
           await connection.query('UPDATE Subcontratistas_Fuerza_Trabajo SET nombre = ? WHERE id_subcontratista_ft = ?', [c.nombre, c.id_subcontratista_ft]);
         }
@@ -175,9 +199,19 @@ export async function PUT(request) {
 export async function DELETE(request) {
   try {
     const { id } = await request.json();
+    const idEmpresa = request.headers.get('x-empresa-id');
+    const userRol = request.headers.get('x-user-rol');
+
     if (!id) return NextResponse.json({ error: "Falta el ID del contratista." }, { status: 400 });
 
-    await pool.query('UPDATE Subcontratistas SET bActivo = 0 WHERE id_subcontratista = ?', [id]);
+    let authFilter = "";
+    const authParams = [];
+    if (userRol !== 'Master' && idEmpresa) {
+      authFilter = " AND id_empresa = ?";
+      authParams.push(idEmpresa);
+    }
+
+    await pool.query(`UPDATE Subcontratistas SET bActivo = 0 WHERE id_subcontratista = ?${authFilter}`, [id, ...authParams]);
     
     return NextResponse.json({ success: true, mensaje: "Contratista oculto correctamente." });
   } catch (error) {

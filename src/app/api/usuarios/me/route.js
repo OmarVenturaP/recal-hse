@@ -11,7 +11,7 @@ export async function GET(request) {
     }
 
     const query = `
-      SELECT id_personal, nombre, cargo, ultimo_acceso, area, permisos_ft, permisos_certificados, permisos_maquinaria, permisos_dc3, rol, activo, debe_cambiar_password 
+      SELECT id_personal, nombre, cargo, ultimo_acceso, area, permisos_ft, permisos_certificados, permisos_maquinaria, permisos_dc3, permisos_informe, rol, activo, debe_cambiar_password 
       FROM Personal_Area 
       WHERE id_personal = ?
       ORDER BY id_personal DESC
