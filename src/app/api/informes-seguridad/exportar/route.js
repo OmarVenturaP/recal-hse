@@ -95,14 +95,20 @@ export async function GET(request) {
     };
 
     const catUpper = (p) => (p.categoria || '').toUpperCase();
-    
+
+    const esCoordinador = (p) =>
+      catUpper(p).includes('COORDINADOR') || catUpper(p).includes('COORD.');
+
+    const esSupervisor = (p) =>
+      catUpper(p).includes('SUPERVISOR') || catUpper(p).includes('TECNICO SUPERVISOR');
+
     // Categorizamos de forma excluyente para no duplicar personal en las listas
-    const residentes = personalAll.filter(p => 
-      !catUpper(p).includes('SUPERVISOR') && !catUpper(p).includes('COORDINADOR') && 
+    const residentes = personalAll.filter(p =>
+      !esSupervisor(p) && !esCoordinador(p) &&
       (catUpper(p).includes('RESIDENTE') || catUpper(p).includes('SUPERINTENDENTE') || catUpper(p).includes('GERENTE'))
     );
-    const coordinadores = personalAll.filter(p => catUpper(p).includes('COORDINADOR'));
-    const supervisores = personalAll.filter(p => catUpper(p).includes('SUPERVISOR'));
+    const coordinadores = personalAll.filter(p => esCoordinador(p));
+    const supervisores = personalAll.filter(p => esSupervisor(p) && !esCoordinador(p));
 
     // Según instrucciones del usuario, Residentes van a partir de C20 y Supervisor en C26
     const resBaseRow = 20;
@@ -333,7 +339,46 @@ export async function GET(request) {
         };
         
         let imgRow = 56;
-        for (let i = 0; i < fotos.length; i += 3) {
+        if (fotos.length === 4) {
+          // --- Layout especial: 2 fotos por fila (cols C-E y G-I) ---
+          for (let i = 0; i < fotos.length; i += 2) {
+            const descRow = imgRow + 15;
+
+            // Foto Izquierda (Col: 2 → C,D,E)
+            if (i < fotos.length) {
+              const f1 = fotos[i];
+              try {
+                const b1 = await fetchImgBuffer(f1.ruta_imagen);
+                const id1 = workbook.addImage({ buffer: b1, extension: (f1.ruta_imagen.toLowerCase().endsWith('.png')?'png':'jpeg') });
+                ws3.addImage(id1, { tl: { col: 2, row: imgRow - 1 }, ext: { width: imgW, height: imgH } });
+                try { ws3.mergeCells(`C${descRow}:E${descRow}`); } catch(e){}
+                const c1 = ws3.getCell(`C${descRow}`);
+                c1.value = f1.descripcion || '';
+                c1.font = { name: 'Arial', size: 10, bold: true };
+                c1.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+              } catch(e) { console.error('Error insertando foto izq (4-layout):', e); }
+            }
+
+            // Foto Derecha (Col: 6 → G,H,I)
+            if (i + 1 < fotos.length) {
+              const f2 = fotos[i + 1];
+              try {
+                const b2 = await fetchImgBuffer(f2.ruta_imagen);
+                const id2 = workbook.addImage({ buffer: b2, extension: (f2.ruta_imagen.toLowerCase().endsWith('.png')?'png':'jpeg') });
+                ws3.addImage(id2, { tl: { col: 6, row: imgRow - 1 }, ext: { width: imgW, height: imgH } });
+                try { ws3.mergeCells(`G${descRow}:I${descRow}`); } catch(e){}
+                const c2 = ws3.getCell(`G${descRow}`);
+                c2.value = f2.descripcion || '';
+                c2.font = { name: 'Arial', size: 10, bold: true };
+                c2.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+              } catch(e) { console.error('Error insertando foto der (4-layout):', e); }
+            }
+
+            imgRow += rowsPerGroup;
+          }
+        } else {
+          // --- Layout normal: 3 fotos por fila ---
+          for (let i = 0; i < fotos.length; i += 3) {
           const descRow = imgRow + 15; 
           
           // ---- Foto Izquierda (Col: 1 -> B,C,D) ----
@@ -383,9 +428,10 @@ export async function GET(request) {
           
           // Incrementamos bloque
           imgRow += rowsPerGroup;
-        }
-      }
-    }
+          } // end for (3-per-row)
+        } // end else
+      } // end if (fotos.length > 0)
+    } // end if (ws3)
 
     const buffer = await workbook.xlsx.writeBuffer();
     const fileName = `INFORME_SEG_${informe.subcontratista.replace(/\s+/g, '_')}_R${informe.num_reporte}_${informe.mes_anio}.xlsx`;

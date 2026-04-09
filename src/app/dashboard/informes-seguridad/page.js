@@ -439,6 +439,22 @@ export default function InformesSeguridad() {
     }
 
     setSaving(true);
+
+    // Aviso si hay menos de 4 fotos en el reporte (no bloquea el guardado)
+    if ((formData.fotos || []).length < 4) {
+      const { isConfirmed } = await Swal.fire({
+        title: 'Pocas evidencias fotográficas',
+        text: `Solo se han cargado ${(formData.fotos || []).length} foto(s). Se recomienda incluir al menos 4 evidencias por informe. ¿Deseas guardar de todas formas?`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, guardar',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#dc2626',
+        customClass: { container: '!z-[99999]' },
+      });
+      if (!isConfirmed) { setSaving(false); return; }
+    }
+
     const payload = {
       ...formData,
       mes_anio: mesFilter,
@@ -925,15 +941,12 @@ export default function InformesSeguridad() {
                           className="max-w-full max-h-full object-contain"
                         />
                       </div>
-                      <div className="flex justify-end text-xs text-gray-500 dark:text-gray-400">
-                        {foto.descripcion.length}/40
-                      </div>
                       <textarea
                         placeholder="Descripción de la actividad"
                         value={foto.descripcion}
                         onChange={(e) => updateFotoDesc(idx, e.target.value)}
-                        className="w-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-red-500 outline-none min-h-[80px] resize-none uppercase"
-                        maxLength={40}
+                        className="w-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl py-3 text-sm font-medium focus:ring-2 focus:ring-red-500 outline-none min-h-[80px] resize-none uppercase"
+                        style={{ paddingLeft: '5px', paddingRight: '5px' }}
                       />
                     </div>
                   ))}
