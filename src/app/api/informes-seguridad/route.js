@@ -9,6 +9,9 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
 
+    const idEmpresa = request.headers.get('x-empresa-id');
+    const userRole = request.headers.get('x-user-rol');
+
     // Sub-endpoint: calcular hh_semana_anterior para un reporte nuevo
     if (searchParams.get('hh_anterior') === '1') {
       const mes = searchParams.get('mes');
@@ -19,12 +22,15 @@ export async function GET(request) {
         return NextResponse.json({ success: true, hh_semana_anterior: 0 });
       }
 
-      const [prev] = await pool.query(
-        `SELECT hh_semana_actual FROM informes_seguridad 
-         WHERE mes_anio = ? AND id_subcontratista = ? AND num_reporte = ?
-         LIMIT 1`,
-        [mes, idSub, numReporte - 1]
-      );
+      let query = `SELECT hh_semana_actual FROM informes_seguridad WHERE mes_anio = ? AND id_subcontratista = ? AND num_reporte = ?`;
+      const params = [mes, idSub, numReporte - 1];
+
+      if (userRole !== 'Master' && idEmpresa) {
+        query += ` AND id_empresa = ?`;
+        params.push(idEmpresa);
+      }
+
+      const [prev] = await pool.query(query + " LIMIT 1", params);
 
       const hh = prev.length > 0 ? parseFloat(prev[0].hh_semana_actual) : 0;
       return NextResponse.json({ success: true, hh_semana_anterior: hh });
@@ -35,9 +41,6 @@ export async function GET(request) {
     if (!mes) {
       return NextResponse.json({ error: "Parámetro 'mes' requerido (YYYY-MM)" }, { status: 400 });
     }
-
-    const idEmpresa = request.headers.get('x-empresa-id');
-    const userRole = request.headers.get('x-user-rol');
 
     let whereClause = "WHERE i.mes_anio = ?";
     const queryParams = [mes];

@@ -98,47 +98,77 @@ export async function GET(request) {
     const coordinadores = personalAll.filter(p => catUpper(p).includes('COORDINADOR'));
     const supervisores = personalAll.filter(p => catUpper(p).includes('SUPERVISOR'));
 
+    // Según instrucciones del usuario, Residentes van a partir de C20 y Supervisor en C26
+    const resBaseRow = 20;
+    const supBaseRow = 26;
     let offset = 0;
 
-    // 1. Inserción de Residentes (Base nativa: Fila 20)
-    const resBaseRow = 20;
-    if (residentes.length > 1) {
-       // Insertamos copias exactas empujando hacia abajo (incluye Merged Cells y formato)
-       ws1.duplicateRow(resBaseRow, residentes.length - 1, true);
-       offset += (residentes.length - 1);
-    }
-    residentes.forEach((p, idx) => {
-       const r = resBaseRow + idx;
-       ws1.getCell(`B${r}`).value = idx + 1;
-       ws1.getCell(`C${r}`).value = nombreCompleto(p.nombre).trim();
-       ws1.getCell(`E${r}`).value = categoriaCompleta(p.categoria).trim();
-    });
+    // Helper para duplicar filas de forma ultra-segura
+    const safeInsertRows = (ws, baseRow, totalPeople) => {
+        if (totalPeople <= 1) return 0;
+        const count = totalPeople - 1;
+        ws.spliceRows(baseRow + 1, 0, ...Array(count).fill([]));
+        for(let i = 1; i <= count; i++) {
+           const rowIdx = baseRow + i;
+           ws.getRow(rowIdx).height = ws.getRow(baseRow).height;
+           applyStyleFromTemplate(ws, baseRow, rowIdx, ['B', 'C', 'E']);
+        }
+        return count;
+    };
 
-    // 2. Inserción de Coordinadores (Base nativa desplazada: Fila 23)
-    const coordBaseRow = 23 + offset;
-    if (coordinadores.length > 1) {
-       ws1.duplicateRow(coordBaseRow, coordinadores.length - 1, true);
-       offset += (coordinadores.length - 1);
+    // 1. Inserción de Residentes
+    if (residentes.length > 0) {
+       offset += safeInsertRows(ws1, resBaseRow, residentes.length);
+       residentes.forEach((p, idx) => {
+          const r = resBaseRow + idx;
+          ws1.getCell(`B${r}`).value = idx + 1;
+          ws1.getCell(`C${r}`).value = nombreCompleto(p.nombre).trim();
+          ws1.getCell(`E${r}`).value = categoriaCompleta(p.categoria).trim();
+       });
     }
-    coordinadores.forEach((p, idx) => {
-       const r = coordBaseRow + idx;
-       ws1.getCell(`B${r}`).value = idx + 1;
-       ws1.getCell(`C${r}`).value = nombreCompleto(p.nombre).trim();
-       ws1.getCell(`E${r}`).value = categoriaCompleta(p.categoria).trim();
-    });
 
-    // 3. Inserción de Supervisores (Base nativa desplazada: Fila 26)
-    const supBaseRow = 26 + offset;
-    if (supervisores.length > 1) {
-       ws1.duplicateRow(supBaseRow, supervisores.length - 1, true);
-       offset += (supervisores.length - 1);
+    // 2. Inserción de Supervisores
+    if (supervisores.length > 0) {
+       const sRow = supBaseRow + offset;
+       safeInsertRows(ws1, sRow, supervisores.length); 
+       supervisores.forEach((p, idx) => {
+          const r = sRow + idx;
+          ws1.getCell(`B${r}`).value = idx + 1;
+          ws1.getCell(`C${r}`).value = nombreCompleto(p.nombre).trim();
+          ws1.getCell(`E${r}`).value = categoriaCompleta(p.categoria).trim();
+       });
     }
-    supervisores.forEach((p, idx) => {
-       const r = supBaseRow + idx;
-       ws1.getCell(`B${r}`).value = idx + 1;
-       ws1.getCell(`C${r}`).value = nombreCompleto(p.nombre).trim();
-       ws1.getCell(`E${r}`).value = categoriaCompleta(p.categoria).trim();
-    });
+
+    // --- REPARADOR DE MERGES DE PRODUCCIÓN "NUKE & REBUILD" ---
+    // Destruimos la basura de merges corruptos dejada por spliceRows y reconstruimos
+    for (let r = 13; r <= 50; r++) {
+       // Primero, aniquilar TODOS los merges que toquen esta fila para evitar colisiones internas en ExcelJS
+       const mergesParaEliminar = Object.values(ws1.model.merges || {}).filter(m => {
+           // m por ejemplo es "B19:E19"
+           const match = m.match(/\d+/g);
+           return match && match.includes(r.toString());
+       });
+       mergesParaEliminar.forEach(m => {
+           try { ws1.unMergeCells(m); } catch(e) {}
+       });
+
+       // Luego reconstruir celdas basadas en lectura de valores
+       const cellB = ws1.getCell(`B${r}`);
+       let valB = cellB.value;
+       if (!valB) {
+           valB = '';
+       } else if (typeof valB === 'object') {
+           valB = valB.richText ? valB.richText.map(rt=>rt.text).join('') : (valB.result || valB.formula || '');
+       }
+       const textB = valB.toString().trim().toUpperCase();
+
+       if (textB.includes('RESPONSABLES DE OBRA') || textB.includes('PERSONAL AREA DE SEGURIDAD')) {
+           try { ws1.mergeCells(`B${r}:E${r}`); } catch(e) {}
+           cellB.alignment = { horizontal: 'center', vertical: 'middle' };
+       } else if (textB === 'N°' || (!isNaN(parseInt(textB)) && textB !== '')) {
+           try { ws1.mergeCells(`C${r}:D${r}`); } catch(e) {}
+       }
+    }
 
 
     // --- HOJA 2: FUERZA DE TRABAJO ---
@@ -207,6 +237,18 @@ export async function GET(request) {
 
         const imgW = 378; // 10 cm exactos definidos por el usuario
         const imgH = 265; // 7  cm exactos
+
+        const fetchImgBuffer = async (ruta) => {
+            if (ruta.startsWith('http')) {
+                const res = await fetch(ruta);
+                if (!res.ok) throw new Error('Bad fetch');
+                return Buffer.from(await res.arrayBuffer());
+            } else {
+                const p = path.join(process.cwd(), 'public', ruta);
+                await access(p, constants.R_OK);
+                return await readFile(p);
+            }
+        };
         
         let imgRow = 56;
         for (let i = 0; i < fotos.length; i += 3) {
@@ -214,9 +256,9 @@ export async function GET(request) {
           
           // ---- Foto Izquierda (Col: 1 -> B,C,D) ----
           if (i < fotos.length) {
-            const f1 = fotos[i]; const p1 = path.join(process.cwd(), 'public', f1.ruta_imagen);
+            const f1 = fotos[i];
             try {
-              await access(p1, constants.R_OK); const b1 = await readFile(p1);
+              const b1 = await fetchImgBuffer(f1.ruta_imagen);
               const id1 = workbook.addImage({ buffer: b1, extension: (f1.ruta_imagen.toLowerCase().endsWith('.png')?'png':'jpeg') });
               ws3.addImage(id1, { tl: { col: 1, row: imgRow - 1 }, ext: { width: imgW, height: imgH } });
               try { ws3.mergeCells(`B${descRow}:D${descRow}`); } catch(e){}
@@ -224,14 +266,14 @@ export async function GET(request) {
               c1.value = f1.descripcion || ''; 
               c1.font = { name: 'Arial', size: 10, bold: true };
               c1.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-            } catch (e) {}
+            } catch (e) { console.error('Error insertando foto 1:', e) }
           }
 
           // ---- Foto Centro (Col: 4 -> E,F,G) ----
           if (i+1 < fotos.length) {
-            const f2 = fotos[i+1]; const p2 = path.join(process.cwd(), 'public', f2.ruta_imagen);
+            const f2 = fotos[i+1];
             try {
-              await access(p2, constants.R_OK); const b2 = await readFile(p2);
+              const b2 = await fetchImgBuffer(f2.ruta_imagen);
               const id2 = workbook.addImage({ buffer: b2, extension: (f2.ruta_imagen.toLowerCase().endsWith('.png')?'png':'jpeg') });
               ws3.addImage(id2, { tl: { col: 4, row: imgRow - 1 }, ext: { width: imgW, height: imgH } });
               try { ws3.mergeCells(`E${descRow}:G${descRow}`); } catch(e){}
@@ -239,14 +281,14 @@ export async function GET(request) {
               c2.value = f2.descripcion || ''; 
               c2.font = { name: 'Arial', size: 10, bold: true };
               c2.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-            } catch (e) {}
+            } catch (e) { console.error('Error insertando foto 2:', e) }
           }
 
           // ---- Foto Derecha (Col: 7 -> H,I,J) ----
           if (i+2 < fotos.length) {
-            const f3 = fotos[i+2]; const p3 = path.join(process.cwd(), 'public', f3.ruta_imagen);
+            const f3 = fotos[i+2];
             try {
-              await access(p3, constants.R_OK); const b3 = await readFile(p3);
+              const b3 = await fetchImgBuffer(f3.ruta_imagen);
               const id3 = workbook.addImage({ buffer: b3, extension: (f3.ruta_imagen.toLowerCase().endsWith('.png')?'png':'jpeg') });
               ws3.addImage(id3, { tl: { col: 7, row: imgRow - 1 }, ext: { width: imgW, height: imgH } });
               try { ws3.mergeCells(`H${descRow}:J${descRow}`); } catch(e){}
@@ -254,7 +296,7 @@ export async function GET(request) {
               c3.value = f3.descripcion || ''; 
               c3.font = { name: 'Arial', size: 10, bold: true };
               c3.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-            } catch (e) {}
+            } catch (e) { console.error('Error insertando foto 3:', e) }
           }
           
           // Incrementamos bloque

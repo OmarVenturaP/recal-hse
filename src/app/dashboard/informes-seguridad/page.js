@@ -220,6 +220,57 @@ export default function InformesSeguridad() {
       return { ...row, [field]: field === 'frente' ? value.toUpperCase() : value };
     }));
   };
+  
+  // =====================================================================
+  // AUXILIARES DE COMPRESIÓN
+  // =====================================================================
+  const compressImage = async (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onerror = (e) => reject(e);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target.result;
+        img.onerror = (e) => reject(e);
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          
+          // Límites razonables para reportes (Ej: 1280px)
+          const MAX_WIDTH = 1280;
+          const MAX_HEIGHT = 1280;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          canvas.toBlob((blob) => {
+            if (!blob) return reject(new Error('Canvas toBlob failed'));
+            const compressedFile = new File([blob], file.name, {
+              type: 'image/jpeg',
+              lastModified: Date.now(),
+            });
+            resolve(compressedFile);
+          }, 'image/jpeg', 0.8); // 80% de calidad
+        };
+      };
+    });
+  };
 
   // =====================================================================
   // LÓGICA FOTOGRAFÍAS
@@ -229,26 +280,54 @@ export default function InformesSeguridad() {
     if (!file) return;
 
     setUploadingFoto(true);
-    const formDataUpload = new FormData();
-    formDataUpload.append('foto', file);
-
+    
     try {
+      // COMPRESIÓN PRE-SUBIDA
+      const compressedFile = await compressImage(file);
+      
+      const formDataUpload = new FormData();
+      formDataUpload.append('foto', compressedFile);
+
       const res = await fetch('/api/informes-seguridad/upload-foto', {
         method: 'POST',
         body: formDataUpload
       });
-      const data = await res.json();
+      const textVal = await res.text();
+      let data;
+      try {
+        data = JSON.parse(textVal);
+      } catch(e) {
+        if (res.status === 413 || textVal.includes('Too Large') || textVal.includes('Entity')) {
+          throw new Error('La imagen es demasiado pesada (Error 413). Dile a tu administrador que aumente el client_max_body_size en NGINX.');
+        }
+        throw new Error('Respuesta del servidor no es JSON válido: ' + textVal.substring(0, 40));
+      }
 
-      if (data.success) {
+      if (data && data.success) {
         setFormData(prev => ({
           ...prev,
           fotos: [...prev.fotos, { ruta_imagen: data.ruta, descripcion: '' }]
         }));
       } else {
-        Swal.fire('Error', data.error || 'No se pudo subir la foto', 'error');
+        Swal.fire({
+          title: 'Error',
+          text: data.error || 'No se pudo subir la foto',
+          icon: 'error',
+          customClass: { container: 'swal2-container-z-index-high' },
+          didOpen: () => {
+            document.querySelector('.swal2-container').style.zIndex = '99999';
+          }
+        });
       }
     } catch (error) {
-      Swal.fire('Error', 'Error de conexión al subir foto', 'error');
+      Swal.fire({
+        title: 'Error',
+        text: 'Error de conexión al subir foto' + (error.message ? ': ' + error.message : ''),
+        icon: 'error',
+        didOpen: () => {
+          document.querySelector('.swal2-container').style.zIndex = '99999';
+        }
+      });
     } finally {
       setUploadingFoto(false);
       e.target.value = ''; // Reset input
@@ -272,6 +351,42 @@ export default function InformesSeguridad() {
   const totalHHActual = useMemo(() => {
     return ftRows.reduce((sum, row) => sum + calcRowTotal(row), 0);
   }, [ftRows]);
+
+  // =====================================================================
+  // SINCRONIZACIÓN AUTOMÁTICA
+  // =====================================================================
+  useEffect(() => {
+    if (!isModalOpen) return;
+    
+    // Extraer frentes únicos y no vacíos
+    const frentesUnicos = [...new Set(
+      ftRows
+        .map(row => row.frente?.trim().toUpperCase())
+        .filter(f => f && f !== '')
+    )];
+
+    // Si no hay frentes, dejar al menos uno vacío o resetear
+    if (frentesUnicos.length === 0) {
+      // Solo resetear si ya había algo para evitar loops si el estado inicial es diferente
+      setUbicaciones(prev => {
+        if (prev.length === 1 && prev[0].pk_referencia === '') return prev;
+        return [{ pk_referencia: '' }];
+      });
+      return;
+    }
+
+    // Convertir a formato de objetos { pk_referencia: '...' }
+    const nuevasUbicaciones = frentesUnicos.map(f => ({ pk_referencia: f }));
+
+    // Comparar con el estado actual para evitar actualizaciones infinitas
+    setUbicaciones(prev => {
+      const currentVals = prev.map(u => u.pk_referencia).filter(v => v).sort().join(',');
+      const newVals = frentesUnicos.sort().join(',');
+      
+      if (currentVals === newVals) return prev;
+      return nuevasUbicaciones;
+    });
+  }, [ftRows, isModalOpen]);
 
   // =====================================================================
   // GUARDAR
@@ -544,40 +659,11 @@ export default function InformesSeguridad() {
               </div>
             </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-lg font-black text-gray-800 dark:text-white flex items-center gap-2">
-                  <span className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center text-blue-600 text-sm font-black">2</span>
-                  Ubicaciones (PK de Referencia)
-                </h4>
-                <button type="button" onClick={addUbicacion} className="text-blue-600 hover:text-blue-700 font-bold text-sm flex items-center gap-1">
-                  <Plus className="w-4 h-4" /> Agregar
-                </button>
-              </div>
-              <div className="space-y-2">
-                {ubicaciones.map((ub, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      placeholder="EJ: KM 14+500"
-                      value={ub.pk_referencia}
-                      onChange={(e) => updateUbicacion(idx, e.target.value)}
-                      className="flex-1 border border-gray-300 dark:border-slate-600 rounded-xl px-4 py-2.5 bg-white dark:bg-slate-900 text-gray-900 dark:text-white font-bold uppercase focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                    />
-                    {ubicaciones.length > 1 && (
-                      <button type="button" onClick={() => removeUbicacion(idx)} className="p-2 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
 
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h4 className="text-lg font-black text-gray-800 dark:text-white flex items-center gap-2">
-                  <span className="w-8 h-8 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center text-green-600 text-sm font-black">3</span>
+                  <span className="w-8 h-8 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center text-green-600 text-sm font-black">2</span>
                   Fuerza de Trabajo
                 </h4>
                 <button type="button" onClick={addFtRow} className="text-green-600 hover:text-green-700 font-bold text-sm flex items-center gap-1">
@@ -656,7 +742,7 @@ export default function InformesSeguridad() {
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h4 className="text-lg font-black text-gray-800 dark:text-white flex items-center gap-2">
-                  <span className="w-8 h-8 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center text-red-600 text-sm font-black">4</span>
+                  <span className="w-8 h-8 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center text-red-600 text-sm font-black">3</span>
                   Reporte Fotográfico
                 </h4>
                 <div className="flex items-center gap-2">

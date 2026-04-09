@@ -1,41 +1,40 @@
 import { NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import path from 'path';
-import { randomUUID } from 'crypto';
+import { v2 as cloudinary } from 'cloudinary';
 
 // =====================================================================
-// POST: Subir foto para informe de seguridad
+// POST: Subir foto para informe de seguridad a Cloudinary
 // Recibe FormData con campo 'foto'
-// Guarda en public/uploads/informes/ y retorna la ruta
+// Retorna la URL segura de Cloudinary
 // =====================================================================
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
 export async function POST(request) {
   try {
     const formData = await request.formData();
     const file = formData.get('foto');
 
-    if (!file) {
-      return NextResponse.json({ error: 'No se envió ningún archivo' }, { status: 400 });
+    if (!file || typeof file === 'string') {
+      return NextResponse.json({ error: 'No se envió ningún archivo válido' }, { status: 400 });
     }
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
+    const fileBase64 = `data:${file.type};base64,${buffer.toString('base64')}`;
 
-    // Crear directorio si no existe
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'informes');
-    await mkdir(uploadDir, { recursive: true });
+    console.log("Subiendo foto de informe a Cloudinary...");
+    const uploadResponse = await cloudinary.uploader.upload(fileBase64, { 
+      folder: 'recal_hse_informes' 
+    });
 
-    // Nombre único para evitar colisiones
-    const ext = path.extname(file.name || '.jpg').toLowerCase();
-    const fileName = `${randomUUID()}${ext}`;
-    const filePath = path.join(uploadDir, fileName);
-
-    await writeFile(filePath, buffer);
-
-    const ruta = `/uploads/informes/${fileName}`;
-
-    return NextResponse.json({ success: true, ruta });
+    // uploadResponse.secure_url es la ruta absoluta en la nube
+    return NextResponse.json({ success: true, ruta: uploadResponse.secure_url });
   } catch (error) {
-    console.error('Error al subir foto:', error);
-    return NextResponse.json({ error: 'Error al subir la foto' }, { status: 500 });
+    console.error('Error al subir foto a Cloudinary:', error);
+    return NextResponse.json({ error: 'Error al subir la foto a la nube' }, { status: 500 });
   }
 }
