@@ -35,13 +35,18 @@ export async function GET(request, { params }) {
       `SELECT * FROM informes_fotos WHERE id_informe = ? ORDER BY orden`, [id]
     );
 
+    const [desviaciones] = await pool.query(
+      `SELECT * FROM informes_desviaciones WHERE id_informe = ? ORDER BY id_desviacion`, [id]
+    );
+
     return NextResponse.json({
       success: true,
       data: {
         ...informes[0],
         ubicaciones,
         ft_rows,
-        fotos
+        fotos,
+        desviaciones
       }
     });
   } catch (error) {
@@ -59,7 +64,7 @@ export async function PUT(request, { params }) {
     const body = await request.json();
     const {
       num_reporte, id_subcontratista, subcontratista, mes_anio,
-      periodo_inicio, periodo_fin, ubicaciones, ft_rows, fotos
+      periodo_inicio, periodo_fin, ubicaciones, ft_rows, fotos, desviaciones
     } = body;
 
     const idEmpresa = request.headers.get('x-empresa-id');
@@ -161,6 +166,29 @@ export async function PUT(request, { params }) {
           await pool.query(
             `INSERT INTO informes_fotos (id_informe, ruta_imagen, descripcion, orden) VALUES (?, ?, ?, ?)`,
             [id, fotos[i].ruta_imagen, fotos[i].descripcion || '', i]
+          );
+        }
+      }
+    }
+
+    // 7. DELETE + re-INSERT desviaciones
+    await pool.query(`DELETE FROM informes_desviaciones WHERE id_informe = ?`, [id]);
+    if (desviaciones && desviaciones.length > 0) {
+      for (const desv of desviaciones) {
+        if (desv.tipo_desviacion && desv.generada_por) {
+          await pool.query(
+            `INSERT INTO informes_desviaciones 
+              (id_informe, tipo_desviacion, generada_por, descripcion, accion_inmediata, fecha_plazo, dia_semana)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [
+              id,
+              desv.tipo_desviacion,
+              desv.generada_por,
+              desv.descripcion || '',
+              desv.accion_inmediata || '',
+              desv.fecha_plazo || null,
+              desv.dia_semana || 'lunes'
+            ]
           );
         }
       }

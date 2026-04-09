@@ -33,8 +33,14 @@ export async function GET(request) {
 
     const [fotos] = await pool.query(`SELECT * FROM informes_fotos WHERE id_informe = ? ORDER BY orden`, [id]);
 
-    // 2. Cargar plantilla
-    const templatePath = path.join(process.cwd(), 'public', 'plantillas', 'INFORME_SEGURIDAD.xlsx');
+    const [desviaciones] = await pool.query(
+      `SELECT * FROM informes_desviaciones WHERE id_informe = ? ORDER BY id_desviacion`, [id]
+    );
+
+    // 2. Seleccionar plantilla según el año del informe
+    const anioInforme = parseInt((informe.mes_anio || '').split('-')[0]) || new Date().getFullYear();
+    const templateFile = anioInforme >= 2026 ? '2026_INFORME_SEGURIDAD.xlsx' : 'INFORME_SEGURIDAD.xlsx';
+    const templatePath = path.join(process.cwd(), 'public', 'plantillas', templateFile);
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile(templatePath);
 
@@ -205,13 +211,89 @@ export async function GET(request) {
     }
 
 
-    // --- HOJA 3: INDICADORES e IMÁGENES ---
+    // --- HOJA 3: INDICADORES, DESVIACIONES e IMÁGENES ---
     if (ws3) {
       ws3.getCell('E46').value = parseFloat(informe.hh_semana_anterior) || 0;
       ws3.getCell('J46').value = parseFloat(informe.hh_semana_actual) || 0;
       ws3.getCell('E48').value = supervisores.length;
 
-      // 1. Dinamismo de Paginas: Calcular cuantas filas requeriemos para no pisar las firmas ni partir fotos
+      // ---- SECCIÓN 4: MARCADO DE DÍAS ACTIVOS (Col E, Filas 35-41) ----
+      // Si en la Hoja 2 hubo personal registrado ese día, se marca con 1 en la col E de la Sección 4.
+      const diasActividad = [
+        { dia: 'lunes',     fila: 35 },
+        { dia: 'martes',    fila: 36 },
+        { dia: 'miercoles', fila: 37 },
+        { dia: 'jueves',    fila: 38 },
+        { dia: 'viernes',   fila: 39 },
+        { dia: 'sabado',    fila: 40 },
+        { dia: 'domingo',   fila: 41 },
+      ];
+      diasActividad.forEach(({ dia, fila }) => {
+        const totalPersonas = ft_rows.reduce((sum, r) => sum + (parseInt(r[`per_${dia}`]) || 0), 0);
+        ws3.getCell(`E${fila}`).value = totalPersonas > 0 ? 1 : 0;
+      });
+
+      // ---- SECCIÓN 2: ÍNDICE SEMANAL DE DESVIACIONES (Fila 4 cabecera, datos filas 7-13) ----
+      // Columnas: C=Cond.Insegura, D=ActoInseguro, E=Acuerdo, F=Paros, G=Guía, H=AtMed, I=AccSMO, J=AccIMSS
+      const TIPOS_COL = [
+        { key: 'Condición Insegura / R. Preventivo',            col: 'C' },
+        { key: 'Acto Inseguro / R. Violación al Reglamento',    col: 'D' },
+        { key: 'Acuerdo y Seguimiento',                          col: 'E' },
+        { key: 'Paros de Actividad',                             col: 'F' },
+        { key: 'Guía de Inspección',                             col: 'G' },
+        { key: 'Atención Médica',                                col: 'H' },
+        { key: 'Accidente SMO',                                  col: 'I' },
+        { key: 'Accidente IMSS',                                 col: 'J' },
+      ];
+      const DIAS_ROW = { domingo: 7, lunes: 8, martes: 9, miercoles: 10, jueves: 11, viernes: 12, sabado: 13 };
+
+      if (desviaciones && desviaciones.length > 0) {
+        desviaciones.forEach(desv => {
+          const fila = DIAS_ROW[desv.dia_semana];
+          const tipoInfo = TIPOS_COL.find(t => t.key === desv.tipo_desviacion);
+          if (fila && tipoInfo) {
+            const cell = ws3.getCell(`${tipoInfo.col}${fila}`);
+            cell.value = (cell.value || 0) + 1;
+          }
+        });
+
+        // Fila 15: Total de Desviaciones (suma de columna C fila 7-13)
+        let totalDesv = 0;
+        TIPOS_COL.forEach(t => {
+          let colTotal = 0;
+          Object.values(DIAS_ROW).forEach(r => {
+            colTotal += (parseFloat(ws3.getCell(`${t.col}${r}`).value) || 0);
+          });
+          totalDesv += colTotal;
+        });
+        ws3.getCell('C15').value = totalDesv;
+      }
+
+      // ---- SECCIÓN 3: DESGLOSE DE DESVIACIONES (Fila 17 cabecera, datos desde fila 19) ----
+      // Se escribe directo en las filas existentes sin usar spliceRows, para evitar corrupción
+      // de fórmulas compartidas en ws3. Se copia estilo de la fila plantilla (fila 19).
+      if (desviaciones && desviaciones.length > 0) {
+        const desvBaseRow = 19;
+        const desvCols = ['B', 'C', 'F', 'I', 'J'];
+        desviaciones.forEach((desv, idx) => {
+          const r = desvBaseRow + idx;
+          // Copiar altura y estilo de la fila plantilla en filas adicionales
+          if (idx > 0) {
+            ws3.getRow(r).height = ws3.getRow(desvBaseRow).height || 15;
+            applyStyleFromTemplate(ws3, desvBaseRow, r, desvCols);
+          }
+          ws3.getCell(`B${r}`).value = desv.tipo_desviacion || '';
+          ws3.getCell(`C${r}`).value = desv.generada_por || '';
+          ws3.getCell(`F${r}`).value = desv.descripcion || '';
+          ws3.getCell(`I${r}`).value = desv.accion_inmediata || '';
+          ws3.getCell(`J${r}`).value = desv.fecha_plazo || '';
+          desvCols.forEach(col => {
+            ws3.getCell(`${col}${r}`).alignment = { vertical: 'middle', wrapText: true };
+            ws3.getCell(`${col}${r}`).font = { name: 'Arial', size: 9 };
+          });
+        });
+      }
+
       let extraRowsToInsert = 0;
       const rowsPerGroup = 18; // 15 filas de foto + 1 de texto + 2 margen
       if (fotos.length > 0) {

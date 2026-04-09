@@ -8,6 +8,37 @@ import Swal from 'sweetalert2';
 const DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
 const DIAS_LABEL = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
+const TIPOS_DESVIACION = [
+  'Condición Insegura / R. Preventivo',
+  'Acto Inseguro / R. Violación al Reglamento',
+  'Acuerdo y Seguimiento',
+  'Paros de Actividad',
+  'Guía de Inspección',
+  'Atención Médica',
+  'Accidente SMO',
+  'Accidente IMSS',
+];
+
+const GENERADA_POR_OPTIONS = [
+  'Gerencia de Construcción',
+  'Superintendencia',
+  'Supervisor Jefe de Obra o de Frente',
+  'Técnico Administrativo',
+  'Visitas y Proveedores',
+  'Supervisión de Seguridad',
+  'Encargado y/o Capataz',
+  'Personal Operativo (Sobrestante, etc.)',
+];
+
+const EMPTY_DESV = {
+  tipo_desviacion: '',
+  generada_por: '',
+  descripcion: '',
+  accion_inmediata: '',
+  fecha_plazo: '',
+  dia_semana: 'lunes',
+};
+
 const EMPTY_FT_ROW = {
   frente: '', hr_lunes: 0, per_lunes: 0, hr_martes: 0, per_martes: 0,
   hr_miercoles: 0, per_miercoles: 0, hr_jueves: 0, per_jueves: 0,
@@ -50,6 +81,7 @@ export default function InformesSeguridad() {
   const [editId, setEditId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [uploadingFoto, setUploadingFoto] = useState(false);
+  const [exportingId, setExportingId] = useState(null);
 
   // Form Data
   const [formData, setFormData] = useState({
@@ -60,6 +92,7 @@ export default function InformesSeguridad() {
   });
   const [ubicaciones, setUbicaciones] = useState([{ pk_referencia: '' }]);
   const [ftRows, setFtRows] = useState([{ ...EMPTY_FT_ROW }]);
+  const [desviaciones, setDesviaciones] = useState([]);
 
   // Paginación
   const [currentPage, setCurrentPage] = useState(1);
@@ -141,6 +174,7 @@ export default function InformesSeguridad() {
     });
     setUbicaciones([{ pk_referencia: '' }]);
     setFtRows([{ ...EMPTY_FT_ROW }]);
+    setDesviaciones([]);
     setIsModalOpen(true);
   };
 
@@ -162,6 +196,7 @@ export default function InformesSeguridad() {
       });
       setUbicaciones(d.ubicaciones?.length > 0 ? d.ubicaciones : [{ pk_referencia: '' }]);
       setFtRows(d.ft_rows?.length > 0 ? d.ft_rows : [{ ...EMPTY_FT_ROW }]);
+      setDesviaciones(d.desviaciones || []);
       setEditId(d.id_informe);
       setIsEditing(true);
       setIsModalOpen(true);
@@ -219,6 +254,12 @@ export default function InformesSeguridad() {
       if (i !== idx) return row;
       return { ...row, [field]: field === 'frente' ? value.toUpperCase() : value };
     }));
+  };
+
+  const addDesviacion = () => setDesviaciones(prev => [...prev, { ...EMPTY_DESV }]);
+  const removeDesviacion = (idx) => setDesviaciones(prev => prev.filter((_, i) => i !== idx));
+  const updateDesviacion = (idx, field, value) => {
+    setDesviaciones(prev => prev.map((d, i) => i === idx ? { ...d, [field]: value } : d));
   };
   
   // =====================================================================
@@ -401,8 +442,9 @@ export default function InformesSeguridad() {
     const payload = {
       ...formData,
       mes_anio: mesFilter,
-      ubicaciones: ubicaciones.filter(u => u.pk_referencia.trim()),
-      ft_rows: ftRows.filter(r => r.frente.trim()),
+      ubicaciones: ubicaciones.filter(u => u.pk_referencia && u.pk_referencia.trim()),
+      ft_rows: ftRows.filter(r => (r.frente && r.frente.trim()) || calcRowTotal(r) > 0),
+      desviaciones: desviaciones.filter(d => d.tipo_desviacion && d.generada_por),
     };
 
     try {
@@ -428,7 +470,9 @@ export default function InformesSeguridad() {
     } finally { setSaving(false); }
   };
 
-  const handleExport = async (id_informe) => {
+  const handleExport = async (inf) => {
+    const { id_informe, num_reporte, subcontratista, mes_anio } = inf;
+    setExportingId(id_informe);
     try {
       const res = await fetch(`/api/informes-seguridad/exportar?id=${id_informe}`);
       if (!res.ok) {
@@ -437,15 +481,21 @@ export default function InformesSeguridad() {
       }
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
+      
+      const periodoStr = mesNombre(mes_anio).toUpperCase();
+      const fileName = `INFORME_SEGURIDAD_${num_reporte}_${subcontratista}_${periodoStr}.xlsx`.replace(/\s+/g, '_');
+
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Informe_Seguridad_${id_informe}.xlsx`;
+      a.download = fileName;
       document.body.appendChild(a);
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
     } catch (e) {
       Swal.fire('Error', 'Error de descarga', 'error');
+    } finally {
+      setExportingId(null);
     }
   };
 
@@ -556,8 +606,17 @@ export default function InformesSeguridad() {
                         <button onClick={() => handleEdit(inf)} className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors" title="Editar">
                           <Pencil className="w-4 h-4" />
                         </button>
-                        <button onClick={() => handleExport(inf.id_informe)} className="p-2 rounded-lg bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors" title="Exportar a Excel">
-                          <Download className="w-4 h-4" />
+                        <button 
+                          onClick={() => handleExport(inf)} 
+                          disabled={exportingId === inf.id_informe}
+                          className="p-2 rounded-lg bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors disabled:opacity-50" 
+                          title="Exportar a Excel"
+                        >
+                          {exportingId === inf.id_informe ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Download className="w-4 h-4" />
+                          )}
                         </button>
                       </div>
                     </td>
@@ -736,6 +795,81 @@ export default function InformesSeguridad() {
                   </tbody>
                 </table>
               </div>
+            </div>
+
+
+            {/* SECCIÓN 3: DESVIACIONES */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-lg font-black text-gray-800 dark:text-white flex items-center gap-2">
+                  <span className="w-8 h-8 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center text-orange-600 text-sm font-black">3</span>
+                  Desviaciones de Seguridad
+                </h4>
+                <button type="button" onClick={addDesviacion} className="text-orange-600 hover:text-orange-700 font-bold text-sm flex items-center gap-1">
+                  <Plus className="w-4 h-4" /> Agregar Desviación
+                </button>
+              </div>
+
+              {desviaciones.length === 0 ? (
+                <div className="border-2 border-dashed border-orange-200 dark:border-orange-800/40 rounded-2xl p-8 text-center">
+                  <p className="text-gray-400 dark:text-gray-500 font-medium text-sm">Sin desviaciones registradas. Haz clic en "Agregar Desviación" para añadir una.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {desviaciones.map((desv, idx) => (
+                    <div key={idx} className="bg-orange-50/60 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-800/30 rounded-2xl p-4 relative">
+                      <button type="button" onClick={() => removeDesviacion(idx)} className="absolute top-3 right-3 p-1 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
+                        <div>
+                          <label className="block text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase mb-1">Día de la Semana</label>
+                          <select value={desv.dia_semana} onChange={e => updateDesviacion(idx, 'dia_semana', e.target.value)}
+                            className="w-full border border-orange-200 dark:border-orange-700 rounded-xl px-3 py-2 bg-white dark:bg-slate-900 text-gray-900 dark:text-white text-xs font-bold focus:ring-2 focus:ring-orange-500 outline-none">
+                            {DIAS.map((d, i) => <option key={d} value={d}>{['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'][i]}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase mb-1">Tipo de Desviación *</label>
+                          <select value={desv.tipo_desviacion} onChange={e => updateDesviacion(idx, 'tipo_desviacion', e.target.value)}
+                            className="w-full border border-orange-200 dark:border-orange-700 rounded-xl px-3 py-2 bg-white dark:bg-slate-900 text-gray-900 dark:text-white text-xs font-bold focus:ring-2 focus:ring-orange-500 outline-none">
+                            <option value="">Seleccionar...</option>
+                            {TIPOS_DESVIACION.map(t => <option key={t} value={t}>{t}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase mb-1">Generada por *</label>
+                          <select value={desv.generada_por} onChange={e => updateDesviacion(idx, 'generada_por', e.target.value)}
+                            className="w-full border border-orange-200 dark:border-orange-700 rounded-xl px-3 py-2 bg-white dark:bg-slate-900 text-gray-900 dark:text-white text-xs font-bold focus:ring-2 focus:ring-orange-500 outline-none">
+                            <option value="">Seleccionar...</option>
+                            {GENERADA_POR_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="md:col-span-1">
+                          <label className="block text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase mb-1">Descripción de la Desviación</label>
+                          <textarea value={desv.descripcion} onChange={e => updateDesviacion(idx, 'descripcion', e.target.value)}
+                            placeholder="Describa la situación..."
+                            className="w-full border border-orange-200 dark:border-orange-700 rounded-xl px-3 py-2 bg-white dark:bg-slate-900 text-gray-900 dark:text-white text-xs focus:ring-2 focus:ring-orange-500 outline-none resize-none min-h-[64px]" />
+                        </div>
+                        <div className="md:col-span-1">
+                          <label className="block text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase mb-1">Acción Inmediata</label>
+                          <textarea value={desv.accion_inmediata} onChange={e => updateDesviacion(idx, 'accion_inmediata', e.target.value)}
+                            placeholder="Acción tomada de inmediato..."
+                            className="w-full border border-orange-200 dark:border-orange-700 rounded-xl px-3 py-2 bg-white dark:bg-slate-900 text-gray-900 dark:text-white text-xs focus:ring-2 focus:ring-orange-500 outline-none resize-none min-h-[64px]" />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase mb-1">Fecha de Plazo</label>
+                          <input type="text" value={desv.fecha_plazo} onChange={e => updateDesviacion(idx, 'fecha_plazo', e.target.value)}
+                            placeholder="Ej: 15/04/2026 o Inmediato"
+                            className="w-full border border-orange-200 dark:border-orange-700 rounded-xl px-3 py-2 bg-white dark:bg-slate-900 text-gray-900 dark:text-white text-xs focus:ring-2 focus:ring-orange-500 outline-none" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* SECCIÓN 4: REPORTE FOTOGRÁFICO */}

@@ -79,7 +79,7 @@ export async function POST(request) {
     const body = await request.json();
     const {
       num_reporte, id_subcontratista, subcontratista, mes_anio,
-      periodo_inicio, periodo_fin, ubicaciones, ft_rows, fotos
+      periodo_inicio, periodo_fin, ubicaciones, ft_rows, fotos, desviaciones
     } = body;
 
     const creado_por = request.headers.get('x-user-id') || null;
@@ -163,6 +163,28 @@ export async function POST(request) {
           await pool.query(
             `INSERT INTO informes_fotos (id_informe, ruta_imagen, descripcion, orden) VALUES (?, ?, ?, ?)`,
             [id_informe, fotos[i].ruta_imagen, fotos[i].descripcion || '', i]
+          );
+        }
+      }
+    }
+
+    // 7. INSERT desviaciones
+    if (desviaciones && desviaciones.length > 0) {
+      for (const desv of desviaciones) {
+        if (desv.tipo_desviacion && desv.generada_por) {
+          await pool.query(
+            `INSERT INTO informes_desviaciones 
+              (id_informe, tipo_desviacion, generada_por, descripcion, accion_inmediata, fecha_plazo, dia_semana)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [
+              id_informe,
+              desv.tipo_desviacion,
+              desv.generada_por,
+              desv.descripcion || '',
+              desv.accion_inmediata || '',
+              desv.fecha_plazo || null,
+              desv.dia_semana || 'lunes'
+            ]
           );
         }
       }
