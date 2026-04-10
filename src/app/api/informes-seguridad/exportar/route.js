@@ -188,31 +188,62 @@ export async function GET(request) {
       const diasFT = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
       const colsFT = ['E', 'F', 'G', 'H', 'I', 'J', 'K'];
 
-      // Positición de filas: 8 para ordinarios, 6 para tiempo extra -> Máximo 14 frentes mapeables
-      const filasDisponibles = [7, 9, 11, 13, 15, 17, 19, 21, 27, 29, 31, 33, 35, 37];
+      // Positición de filas específicas de la plantilla
+      const filasOrdinario = [7, 9, 11, 13, 15, 17, 19, 21];
+      const filasExtra = [27, 29, 31, 33, 35, 37];
 
+      // 1. Mapear Turnos Ordinarios
       ft_rows.forEach((row, idx) => {
-        if (idx >= filasDisponibles.length) return; 
-        const fila = filasDisponibles[idx];
+        if (idx >= filasOrdinario.length) return; 
+        const fila = filasOrdinario[idx];
         
         ws2.getCell('B' + fila).value = row.frente;
+        let totalOrdFila = 0;
         diasFT.forEach((dia, dIdx) => {
           const col = colsFT[dIdx];
-          ws2.getCell(col + fila).value = parseFloat(row[`hr_${dia}`]) || 0;
-          ws2.getCell(col + (fila + 1)).value = parseInt(row[`per_${dia}`]) || 0;
+          const hr = parseInt(row[`hr_${dia}`]) || 0;
+          const per = parseInt(row[`per_${dia}`]) || 0;
+          totalOrdFila += (hr * per);
+          ws2.getCell(col + fila).value = hr;
+          ws2.getCell(col + (fila + 1)).value = per;
         });
         
-        // Sobrescribimos el cálculo de Excel con el de nuestra aplicación para asegurar integridad
-        ws2.getCell('L' + fila).value = parseFloat(row.total_hh_semana) || 0;
+        // El sub-total HH de este frente SOLO para turno ordinario
+        ws2.getCell('L' + fila).value = totalOrdFila;
       });
 
-      // Cálculo Inteligente de FTE (Promedio de Fuerza de Trabajo excluyendo días sin personal)
+      // 2. Mapear Tiempos Extra (en su sección dedicada si existen datos)
+      ft_rows.forEach((row, idx) => {
+        if (idx >= filasExtra.length) return; 
+        const fila = filasExtra[idx];
+        
+        // Verificamos si este frente tiene algún tiempo extra en la semana
+        const tieneExtra = diasFT.some(d => (parseInt(row[`ext_hr_${d}`]) > 0 && parseInt(row[`ext_per_${d}`]) > 0));
+        
+        if (tieneExtra) {
+          ws2.getCell('B' + fila).value = row.frente + " (T. EXTRA)";
+          let totalExtFila = 0;
+          diasFT.forEach((dia, dIdx) => {
+            const col = colsFT[dIdx];
+            const hr = parseInt(row[`ext_hr_${dia}`]) || 0;
+            const per = parseInt(row[`ext_per_${dia}`]) || 0;
+            totalExtFila += (hr * per);
+            ws2.getCell(col + fila).value = hr;
+            ws2.getCell(col + (fila + 1)).value = per;
+          });
+          // Inyectamos el sub-total HH de este frente SOLO para tiempo extra
+          ws2.getCell('L' + fila).value = totalExtFila;
+        }
+      });
+
+      // Cálculo Inteligente de FTE (Promedio de Fuerza de Trabajo incluyendo Ord + Ext)
       let sumT = 0; let countD = 0;
       diasFT.forEach((dia) => {
-        const totalCol = ft_rows.reduce((sum, r) => sum + (parseInt(r[`per_${dia}`]) || 0), 0);
+        const totalCol = ft_rows.reduce((sum, r) => {
+          return sum + (parseInt(r[`per_${dia}`]) || 0) + (parseInt(r[`ext_per_${dia}`]) || 0);
+        }, 0);
         if (totalCol > 0) { sumT += totalCol; countD++; }
       });
-      // Inyectamos como valor estático en G39 al igual que se hacía en versiones anteriores, o mediante fórmula Excel robusta
       ws2.getCell('G39').value = { formula: 'IFERROR(AVERAGEIF(E23:K23, ">0"), 0)', result: countD > 0 ? parseFloat((sumT / countD).toFixed(2)) : 0 };
     }
 
@@ -235,7 +266,9 @@ export async function GET(request) {
         { dia: 'domingo',   fila: 41 },
       ];
       diasActividad.forEach(({ dia, fila }) => {
-        const totalPersonas = ft_rows.reduce((sum, r) => sum + (parseInt(r[`per_${dia}`]) || 0), 0);
+        const totalPersonas = ft_rows.reduce((sum, r) => {
+          return sum + (parseInt(r[`per_${dia}`]) || 0) + (parseInt(r[`ext_per_${dia}`]) || 0);
+        }, 0);
         ws3.getCell(`E${fila}`).value = totalPersonas > 0 ? 1 : 0;
       });
 
@@ -432,6 +465,12 @@ export async function GET(request) {
         } // end else
       } // end if (fotos.length > 0)
     } // end if (ws3)
+
+    // Forzamos que el Excel se abra en la primera pestaña (Hoja 1)
+    workbook.views = [{
+        x: 0, y: 0, width: 10000, height: 20000,
+        firstSheet: 0, activeTab: 0, visibility: 'visible'
+    }];
 
     const buffer = await workbook.xlsx.writeBuffer();
     const fileName = `INFORME_SEG_${informe.subcontratista.replace(/\s+/g, '_')}_R${informe.num_reporte}_${informe.mes_anio}.xlsx`;

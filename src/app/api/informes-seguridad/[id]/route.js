@@ -99,7 +99,9 @@ export async function PUT(request, { params }) {
         for (const dia of dias) {
           const hr = parseFloat(row[`hr_${dia}`]) || 0;
           const per = parseInt(row[`per_${dia}`]) || 0;
-          hh_semana_actual += hr * per;
+          const extHr = parseFloat(row[`ext_hr_${dia}`]) || 0;
+          const extPer = parseInt(row[`ext_per_${dia}`]) || 0;
+          hh_semana_actual += (hr * per) + (extHr * extPer);
         }
       }
     }
@@ -134,24 +136,30 @@ export async function PUT(request, { params }) {
         for (const dia of dias) {
           const hr = parseFloat(row[`hr_${dia}`]) || 0;
           const per = parseInt(row[`per_${dia}`]) || 0;
-          total += hr * per;
+          const extHr = parseFloat(row[`ext_hr_${dia}`]) || 0;
+          const extPer = parseInt(row[`ext_per_${dia}`]) || 0;
+          total += (hr * per) + (extHr * extPer);
         }
         await pool.query(
           `INSERT INTO informes_seguridad_ft 
-            (id_informe, frente, hr_lunes, per_lunes, hr_martes, per_martes, 
-             hr_miercoles, per_miercoles, hr_jueves, per_jueves, 
-             hr_viernes, per_viernes, hr_sabado, per_sabado, 
-             hr_domingo, per_domingo, total_hh_semana)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            (id_informe, frente, hr_lunes, per_lunes, ext_hr_lunes, ext_per_lunes,
+             hr_martes, per_martes, ext_hr_martes, ext_per_martes,
+             hr_miercoles, per_miercoles, ext_hr_miercoles, ext_per_miercoles,
+             hr_jueves, per_jueves, ext_hr_jueves, ext_per_jueves,
+             hr_viernes, per_viernes, ext_hr_viernes, ext_per_viernes,
+             hr_sabado, per_sabado, ext_hr_sabado, ext_per_sabado,
+             hr_domingo, per_domingo, ext_hr_domingo, ext_per_domingo,
+             total_hh_semana)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             id, row.frente || '',
-            row.hr_lunes || 0, row.per_lunes || 0,
-            row.hr_martes || 0, row.per_martes || 0,
-            row.hr_miercoles || 0, row.per_miercoles || 0,
-            row.hr_jueves || 0, row.per_jueves || 0,
-            row.hr_viernes || 0, row.per_viernes || 0,
-            row.hr_sabado || 0, row.per_sabado || 0,
-            row.hr_domingo || 0, row.per_domingo || 0,
+            row.hr_lunes || 0, row.per_lunes || 0, row.ext_hr_lunes || 0, row.ext_per_lunes || 0,
+            row.hr_martes || 0, row.per_martes || 0, row.ext_hr_martes || 0, row.ext_per_martes || 0,
+            row.hr_miercoles || 0, row.per_miercoles || 0, row.ext_hr_miercoles || 0, row.ext_per_miercoles || 0,
+            row.hr_jueves || 0, row.per_jueves || 0, row.ext_hr_jueves || 0, row.ext_per_jueves || 0,
+            row.hr_viernes || 0, row.per_viernes || 0, row.ext_hr_viernes || 0, row.ext_per_viernes || 0,
+            row.hr_sabado || 0, row.per_sabado || 0, row.ext_hr_sabado || 0, row.ext_per_sabado || 0,
+            row.hr_domingo || 0, row.per_domingo || 0, row.ext_hr_domingo || 0, row.ext_per_domingo || 0,
             total
           ]
         );

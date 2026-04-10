@@ -56,3 +56,14 @@ body {
     display: none !important;
   }
 }
+/* Ocultar flechas (spin-buttons) en inputs de tipo número para mayor legibilidad */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type=number] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}

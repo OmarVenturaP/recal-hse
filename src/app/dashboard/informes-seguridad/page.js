@@ -40,15 +40,22 @@ const EMPTY_DESV = {
 };
 
 const EMPTY_FT_ROW = {
-  frente: '', hr_lunes: 0, per_lunes: 0, hr_martes: 0, per_martes: 0,
-  hr_miercoles: 0, per_miercoles: 0, hr_jueves: 0, per_jueves: 0,
-  hr_viernes: 0, per_viernes: 0, hr_sabado: 0, per_sabado: 0,
-  hr_domingo: 0, per_domingo: 0,
+  frente: '', 
+  hr_lunes: 0, per_lunes: 0, ext_hr_lunes: 0, ext_per_lunes: 0,
+  hr_martes: 0, per_martes: 0, ext_hr_martes: 0, ext_per_martes: 0,
+  hr_miercoles: 0, per_miercoles: 0, ext_hr_miercoles: 0, ext_per_miercoles: 0,
+  hr_jueves: 0, per_jueves: 0, ext_hr_jueves: 0, ext_per_jueves: 0,
+  hr_viernes: 0, per_viernes: 0, ext_hr_viernes: 0, ext_per_viernes: 0,
+  hr_sabado: 0, per_sabado: 0, ext_hr_sabado: 0, ext_per_sabado: 0,
+  hr_domingo: 0, per_domingo: 0, ext_hr_domingo: 0, ext_per_domingo: 0,
 };
 
 function calcRowTotal(row) {
   let t = 0;
-  for (const d of DIAS) { t += (parseFloat(row[`hr_${d}`]) || 0) * (parseInt(row[`per_${d}`]) || 0); }
+  for (const d of DIAS) { 
+    t += (parseInt(row[`hr_${d}`]) || 0) * (parseInt(row[`per_${d}`]) || 0); 
+    t += (parseInt(row[`ext_hr_${d}`]) || 0) * (parseInt(row[`ext_per_${d}`]) || 0); 
+  }
   return t;
 }
 
@@ -614,7 +621,7 @@ export default function InformesSeguridad() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <span className="text-lg font-black text-red-600 dark:text-red-400">
-                        {parseFloat(inf.hh_total || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                        {parseInt(inf.hh_total || 0).toLocaleString('es-MX', { minimumFractionDigits: 0 })}
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -722,13 +729,13 @@ export default function InformesSeguridad() {
                 <div className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl p-4">
                   <p className="text-[10px] font-black text-gray-400 uppercase mb-1">H.H. Semana Anterior</p>
                   <p className="text-2xl font-black text-gray-700 dark:text-gray-300">
-                    {parseFloat(formData.hh_semana_anterior).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                    {parseFloat(formData.hh_semana_anterior).toLocaleString('es-MX', { minimumFractionDigits: 0 })}
                   </p>
                 </div>
                 <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-xl p-4">
                   <p className="text-[10px] font-black text-red-600 dark:text-red-400 uppercase mb-1">H.H. Semana Actual (Calculado)</p>
                   <p className="text-2xl font-black text-red-700 dark:text-red-400">
-                    {totalHHActual.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                    {totalHHActual.toLocaleString('es-MX', { minimumFractionDigits: 0 })}
                   </p>
                 </div>
               </div>
@@ -747,28 +754,17 @@ export default function InformesSeguridad() {
               </div>
 
               <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-slate-700">
-                <table className="min-w-[1100px] w-full divide-y divide-gray-200 dark:divide-slate-700 text-xs">
-                  <thead className="bg-gray-50 dark:bg-slate-900">
+                <table className="min-w-[1200px] w-full divide-y divide-gray-200 dark:divide-slate-700 text-[10px]">
+                  <thead className="bg-gray-50 dark:bg-slate-900 sticky top-0 z-10">
                     <tr>
-                      <th className="px-3 py-3 text-left font-black text-gray-500 uppercase w-36">Frente</th>
+                      <th className="px-3 py-3 text-left font-black text-gray-500 uppercase w-40">Frente de Trabajo</th>
                       {DIAS_LABEL.map((dia, i) => (
-                        <th key={i} colSpan={2} className="px-1 py-3 text-center font-black text-gray-500 uppercase border-l border-gray-200 dark:border-slate-700">
+                        <th key={i} className="px-1 py-3 text-center font-black text-gray-500 uppercase border-l border-gray-200 dark:border-slate-700">
                           {dia}
                         </th>
                       ))}
-                      <th className="px-3 py-3 text-center font-black text-red-600 uppercase border-l border-gray-200 dark:border-slate-700">Total H.H.</th>
+                      <th className="px-3 py-3 text-center font-black text-red-600 uppercase border-l border-gray-200 dark:border-slate-700">Total HH</th>
                       <th className="px-2 py-3 w-10"></th>
-                    </tr>
-                    <tr className="bg-gray-100/50 dark:bg-slate-800/50">
-                      <th></th>
-                      {DIAS.map((_, i) => (
-                        <React.Fragment key={i}>
-                          <th className="px-1 py-1 text-center text-[9px] text-gray-400 border-l border-gray-200 dark:border-slate-700">Hr</th>
-                          <th className="px-1 py-1 text-center text-[9px] text-gray-400">Per</th>
-                        </React.Fragment>
-                      ))}
-                      <th className="border-l border-gray-200 dark:border-slate-700"></th>
-                      <th></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
@@ -777,34 +773,55 @@ export default function InformesSeguridad() {
                         <td className="px-2 py-2">
                           <input type="text" placeholder="FRENTE" value={row.frente}
                             onChange={(e) => updateFtRow(idx, 'frente', e.target.value)}
-                            className="w-full border border-gray-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-900 text-gray-900 dark:text-white font-bold uppercase text-xs focus:ring-1 focus:ring-red-500 outline-none"
+                            className="w-full border border-gray-200 dark:border-slate-600 rounded px-2 py-2 bg-white dark:bg-slate-900 text-gray-950 dark:text-white font-bold uppercase text-[10px] focus:ring-1 focus:ring-red-500 outline-none"
                           />
                         </td>
                         {DIAS.map((dia) => (
-                          <React.Fragment key={dia}>
-                            <td className="px-1 py-2 border-l border-gray-100 dark:border-slate-700">
-                              <input type="number" min="0" step="0.5" value={row[`hr_${dia}`]}
-                                onChange={(e) => updateFtRow(idx, `hr_${dia}`, parseFloat(e.target.value) || 0)}
-                                className="w-14 border border-gray-200 dark:border-slate-600 rounded px-1 py-1 text-center bg-white dark:bg-slate-900 text-gray-800 dark:text-white text-xs focus:ring-1 focus:ring-red-500 outline-none"
-                              />
-                            </td>
-                            <td className="px-1 py-2">
-                              <input type="number" min="0" value={row[`per_${dia}`]}
-                                onChange={(e) => updateFtRow(idx, `per_${dia}`, parseInt(e.target.value) || 0)}
-                                className="w-12 border border-gray-200 dark:border-slate-600 rounded px-1 py-1 text-center bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs font-bold focus:ring-1 focus:ring-blue-500 outline-none"
-                              />
-                            </td>
-                          </React.Fragment>
+                          <td key={dia} className="px-1 py-1 border-l border-gray-100 dark:border-slate-700 min-w-[90px]">
+                            <div className="flex flex-col gap-1">
+                              {/* ORDINARIO */}
+                              <div className="flex items-center gap-1">
+                                <span className="text-[8px] font-black text-blue-500 w-5 shrink-0 uppercase">Ord</span>
+                                <div className="flex gap-0.5 flex-1">
+                                  <input type="number" min="0" title="Horas Ordinarias" placeholder="H"
+                                    value={parseInt(row[`hr_${dia}`])}
+                                    onChange={(e) => updateFtRow(idx, `hr_${dia}`, parseInt(e.target.value) || 0)}
+                                    className="w-1/2 border border-gray-200 dark:border-slate-600 rounded px-1 py-1 text-center bg-white dark:bg-slate-900 text-gray-950 dark:text-white text-[10px] font-bold outline-none border-blue-100 dark:border-blue-900/30"
+                                  />
+                                  <input type="number" min="0" title="Personal Ordinario" placeholder="P"
+                                    value={row[`per_${dia}`]}
+                                    onChange={(e) => updateFtRow(idx, `per_${dia}`, parseInt(e.target.value) || 0)}
+                                    className="w-1/2 border border-blue-200 dark:border-blue-800/50 rounded px-1 py-1 text-center bg-blue-50/30 dark:bg-blue-900/10 text-blue-700 dark:text-blue-300 text-[10px] font-black outline-none"
+                                  />
+                                </div>
+                              </div>
+                              
+                              {/* EXTRA */}
+                              <div className="flex items-center gap-1 border-t border-gray-50 dark:border-slate-800/50 pt-1">
+                                <span className="text-[8px] font-black text-amber-500 w-5 shrink-0 uppercase">Ext</span>
+                                <div className="flex gap-0.5 flex-1">
+                                  <input type="number" min="0" title="Horas Extra" placeholder="H"
+                                    value={parseInt(row[`ext_hr_${dia}`])}
+                                    onChange={(e) => updateFtRow(idx, `ext_hr_${dia}`, parseInt(e.target.value) || 0)}
+                                    className="w-1/2 border border-gray-200 dark:border-slate-600 rounded px-1 py-1 text-center bg-white dark:bg-slate-900 text-gray-950 dark:text-white text-[10px] font-bold outline-none border-amber-50/50 dark:border-amber-900/20"
+                                  />
+                                  <input type="number" min="0" title="Personal Extra" placeholder="P"
+                                    value={row[`ext_per_${dia}`]}
+                                    onChange={(e) => updateFtRow(idx, `ext_per_${dia}`, parseInt(e.target.value) || 0)}
+                                    className="w-1/2 border border-amber-200 dark:border-amber-800/50 rounded px-1 py-1 text-center bg-amber-50/30 dark:bg-amber-900/10 text-amber-700 dark:text-amber-400 text-[10px] font-black outline-none"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </td>
                         ))}
-                        <td className="px-3 py-2 text-center font-black text-red-600 dark:text-red-400 border-l border-gray-200 dark:border-slate-700">
-                          {calcRowTotal(row).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                        <td className="px-2 py-2 text-center font-black text-red-600 dark:text-red-400 border-l border-gray-200 dark:border-slate-700 text-xs bg-red-50/10">
+                          {calcRowTotal(row).toLocaleString('es-MX', { minimumFractionDigits: 1 })}
                         </td>
                         <td className="px-2 py-2">
-                          {ftRows.length > 1 && (
-                            <button type="button" onClick={() => removeFtRow(idx)} className="p-1 rounded text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
+                          <button type="button" onClick={() => removeFtRow(idx)} className="p-1 rounded text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </td>
                       </tr>
                     ))}

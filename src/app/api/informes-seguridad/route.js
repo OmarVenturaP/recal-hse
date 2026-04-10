@@ -12,6 +12,15 @@ export async function GET(request) {
     const idEmpresa = request.headers.get('x-empresa-id');
     const userRole = request.headers.get('x-user-rol');
 
+    // --- MIGRACIÓN SILENCIOSA TIEMPO EXTRA ---
+    try {
+      const dias = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
+      for (const d of dias) {
+        try { await pool.query(`ALTER TABLE informes_seguridad_ft ADD COLUMN ext_hr_${d} DECIMAL(10,2) DEFAULT 0 AFTER per_${d}`); } catch(e) {}
+        try { await pool.query(`ALTER TABLE informes_seguridad_ft ADD COLUMN ext_per_${d} INT DEFAULT 0 AFTER ext_hr_${d}`); } catch(e) {}
+      }
+    } catch (e) { /* Ignorar errores de migración */ }
+
     // Sub-endpoint: calcular hh_semana_anterior para un reporte nuevo
     if (searchParams.get('hh_anterior') === '1') {
       const mes = searchParams.get('mes');
@@ -136,20 +145,24 @@ export async function POST(request) {
         const total = calcularTotalHH(row);
         await pool.query(
           `INSERT INTO informes_seguridad_ft 
-            (id_informe, frente, hr_lunes, per_lunes, hr_martes, per_martes, 
-             hr_miercoles, per_miercoles, hr_jueves, per_jueves, 
-             hr_viernes, per_viernes, hr_sabado, per_sabado, 
-             hr_domingo, per_domingo, total_hh_semana)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            (id_informe, frente, hr_lunes, per_lunes, ext_hr_lunes, ext_per_lunes,
+             hr_martes, per_martes, ext_hr_martes, ext_per_martes,
+             hr_miercoles, per_miercoles, ext_hr_miercoles, ext_per_miercoles,
+             hr_jueves, per_jueves, ext_hr_jueves, ext_per_jueves,
+             hr_viernes, per_viernes, ext_hr_viernes, ext_per_viernes,
+             hr_sabado, per_sabado, ext_hr_sabado, ext_per_sabado,
+             hr_domingo, per_domingo, ext_hr_domingo, ext_per_domingo,
+             total_hh_semana)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             id_informe, row.frente || '',
-            row.hr_lunes || 0, row.per_lunes || 0,
-            row.hr_martes || 0, row.per_martes || 0,
-            row.hr_miercoles || 0, row.per_miercoles || 0,
-            row.hr_jueves || 0, row.per_jueves || 0,
-            row.hr_viernes || 0, row.per_viernes || 0,
-            row.hr_sabado || 0, row.per_sabado || 0,
-            row.hr_domingo || 0, row.per_domingo || 0,
+            row.hr_lunes || 0, row.per_lunes || 0, row.ext_hr_lunes || 0, row.ext_per_lunes || 0,
+            row.hr_martes || 0, row.per_martes || 0, row.ext_hr_martes || 0, row.ext_per_martes || 0,
+            row.hr_miercoles || 0, row.per_miercoles || 0, row.ext_hr_miercoles || 0, row.ext_per_miercoles || 0,
+            row.hr_jueves || 0, row.per_jueves || 0, row.ext_hr_jueves || 0, row.ext_per_jueves || 0,
+            row.hr_viernes || 0, row.per_viernes || 0, row.ext_hr_viernes || 0, row.ext_per_viernes || 0,
+            row.hr_sabado || 0, row.per_sabado || 0, row.ext_hr_sabado || 0, row.ext_per_sabado || 0,
+            row.hr_domingo || 0, row.per_domingo || 0, row.ext_hr_domingo || 0, row.ext_per_domingo || 0,
             total
           ]
         );
@@ -204,7 +217,9 @@ function calcularTotalHH(row) {
   for (const dia of dias) {
     const hr = parseFloat(row[`hr_${dia}`]) || 0;
     const per = parseInt(row[`per_${dia}`]) || 0;
-    total += hr * per;
+    const extHr = parseFloat(row[`ext_hr_${dia}`]) || 0;
+    const extPer = parseInt(row[`ext_per_${dia}`]) || 0;
+    total += (hr * per) + (extHr * extPer);
   }
   return total;
 }
