@@ -75,27 +75,32 @@ export async function POST(request) {
 
     if (!id_usuario_actual) return NextResponse.json({ error: "Usuario no identificado" }, { status: 401 });
 
-    // --- REGLA DE NEGOCIO: VALIDACIÓN DE NSS ---
-    if (nss) {
-      // El NSS debe ser único pero ahora validamos que choque dentro de la misma empresa (o de forma global para evitar duplicados reales)
-      // Como el NSS es nacional, no debería haber NSS duplicados en general, así que busquemos globalmente o por empresa según el caso.
-      // Por consistencia, evaluaremos en general.
-      const [duplicados] = await pool.query(
-        `SELECT id_subcontratista_principal, fecha_baja FROM Fuerza_Trabajo WHERE nss = ?`,
-        [nss]
-      );
+    // --- REGLA DE NEGOCIO: VALIDACIÓN DE NSS Y CURP ---
+    if (nss || curp) {
+      let duplicateQuery = `SELECT id_subcontratista_principal, fecha_baja, nss, curp FROM Fuerza_Trabajo WHERE id_empresa = ? AND (1=0`;
+      const duplicateParams = [idEmpresa];
+
+      if (nss) {
+        duplicateQuery += ` OR nss = ?`;
+        duplicateParams.push(nss);
+      }
+      if (curp) {
+        duplicateQuery += ` OR curp = ?`;
+        duplicateParams.push(curp);
+      }
+      duplicateQuery += `)`;
+
+      const [duplicados] = await pool.query(duplicateQuery, duplicateParams);
 
       if (duplicados.length > 0) {
-        // 1. ¿Hay algún registro activo con este NSS?
         const activo = duplicados.some(d => d.fecha_baja === null);
         if (activo) {
-          return NextResponse.json({ success: false, error: "El NSS ya se encuentra activo en la obra." }, { status: 400 });
+          return NextResponse.json({ success: false, error: "El NSS o CURP ya se encuentra activo en esta empresa." }, { status: 400 });
         }
         
-        // 2. ¿Se está intentando dar de alta con la MISMA empresa de la que se dio de baja?
         const mismaEmpresa = duplicados.some(d => d.id_subcontratista_principal === parseInt(id_subcontratista_principal));
         if (mismaEmpresa) {
-          return NextResponse.json({ success: false, error: "Este trabajador ya estuvo en la obra con esta empresa. La única excepción para reingresar un NSS es hacerlo mediante una contratista distinta." }, { status: 400 });
+          return NextResponse.json({ success: false, error: "Este trabajador ya estuvo registrado con esta subcontratista en esta empresa." }, { status: 400 });
         }
       }
     }
@@ -128,23 +133,32 @@ export async function PUT(request) {
     
     if (!id_usuario_actual) return NextResponse.json({ error: "Usuario no identificado" }, { status: 401 });
 
-    // --- REGLA DE NEGOCIO: VALIDACIÓN DE NSS AL ACTUALIZAR ---
-    if (nss) {
-      // Excluimos el ID actual para que no marque error consigo mismo
-      const [duplicados] = await pool.query(
-        `SELECT id_subcontratista_principal, fecha_baja FROM Fuerza_Trabajo WHERE nss = ? AND id_trabajador != ?`,
-        [nss, id_trabajador]
-      );
+    // --- REGLA DE NEGOCIO: VALIDACIÓN DE NSS Y CURP AL ACTUALIZAR ---
+    if (nss || curp) {
+      let duplicateQuery = `SELECT id_subcontratista_principal, fecha_baja, nss, curp FROM Fuerza_Trabajo WHERE id_empresa = ? AND id_trabajador != ? AND (1=0`;
+      const duplicateParams = [idEmpresa, id_trabajador];
+
+      if (nss) {
+        duplicateQuery += ` OR nss = ?`;
+        duplicateParams.push(nss);
+      }
+      if (curp) {
+        duplicateQuery += ` OR curp = ?`;
+        duplicateParams.push(curp);
+      }
+      duplicateQuery += `)`;
+
+      const [duplicados] = await pool.query(duplicateQuery, duplicateParams);
 
       if (duplicados.length > 0) {
         const activo = duplicados.some(d => d.fecha_baja === null);
         if (activo) {
-          return NextResponse.json({ success: false, error: "Este NSS ya se encuentra activo en otro registro de la obra." }, { status: 400 });
+          return NextResponse.json({ success: false, error: "Este NSS o CURP ya se encuentra activo en otro registro de esta empresa." }, { status: 400 });
         }
         
         const mismaEmpresa = duplicados.some(d => d.id_subcontratista_principal === parseInt(id_subcontratista_principal));
         if (mismaEmpresa) {
-          return NextResponse.json({ success: false, error: "Este NSS ya estuvo registrado con esta empresa anteriormente. Solo se permite el reingreso con una contratista distinta." }, { status: 400 });
+          return NextResponse.json({ success: false, error: "Este trabajador ya estuvo registrado con esta subcontratista anteriormente en esta empresa." }, { status: 400 });
         }
       }
     }

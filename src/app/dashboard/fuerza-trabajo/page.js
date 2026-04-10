@@ -955,6 +955,7 @@ const handleDc3Submit = async (e) => {
                             </div>
                           )}
 
+                          {canManageFt && (
                           <div className="relative group flex items-center justify-center">
                             <button onClick={() => handleEditClick(t)} className="text-[var(--recal-blue)] dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 p-2 rounded-md transition-colors">
                               <Pencil className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -964,6 +965,7 @@ const handleDc3Submit = async (e) => {
                               <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-gray-800"></div>
                             </div>
                           </div>
+                          )}
 
                           
                           {!t.fecha_baja ? (

@@ -109,12 +109,14 @@ export async function POST(request) {
       return NextResponse.json({ error: mensajeError }, { status: 400 });
     }
 
+    const idEmpresa = request.headers.get('x-empresa-id');
+
     let queryExisten = `
       SELECT nss, nombre_trabajador, apellido_trabajador, id_subcontratista_principal, fecha_baja 
-      FROM Fuerza_Trabajo WHERE (
+      FROM Fuerza_Trabajo WHERE id_empresa = ? AND (
     `;
     const conditions = [];
-    const queryParams = [];
+    const queryParams = [idEmpresa];
 
     if (nssList.length > 0) {
       conditions.push(`nss IN (?)`);
@@ -170,6 +172,7 @@ export async function PUT(request) {
     const { trabajadores } = await request.json();
     
     const id_usuario_actual = request.headers.get('x-user-id');
+    const idEmpresa = request.headers.get('x-empresa-id') || 1;
 
     if (!id_usuario_actual) {
       return NextResponse.json({ error: "Usuario no identificado" }, { status: 401 });
@@ -193,8 +196,8 @@ export async function PUT(request) {
           idCuadrillaFinal = existe[0].id_subcontratista_ft;
         } else {
           const [nuevaCuadrilla] = await pool.query(
-            `INSERT INTO Subcontratistas_Fuerza_Trabajo (nombre, id_subcontratista_principal) VALUES (?, ?)`,
-            [t.nombre_cuadrilla, t.id_subcontratista_principal]
+            `INSERT INTO Subcontratistas_Fuerza_Trabajo (nombre, id_subcontratista_principal, id_empresa) VALUES (?, ?, ?)`,
+            [t.nombre_cuadrilla, t.id_subcontratista_principal, idEmpresa]
           );
           idCuadrillaFinal = nuevaCuadrilla.insertId;
         }
@@ -202,8 +205,8 @@ export async function PUT(request) {
 
       await pool.query(`
         INSERT INTO Fuerza_Trabajo 
-        (nombre_trabajador, apellido_trabajador, puesto_categoria, nss, fecha_ingreso_obra, fecha_alta_imss, origen, id_subcontratista_principal, id_subcontratista_ft, usuario_registro)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (nombre_trabajador, apellido_trabajador, puesto_categoria, nss, fecha_ingreso_obra, fecha_alta_imss, origen, id_subcontratista_principal, id_subcontratista_ft, usuario_registro, id_empresa)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         t.nombre_trabajador || '', 
         t.apellido_trabajador,     
@@ -214,7 +217,8 @@ export async function PUT(request) {
         t.origen, 
         t.id_subcontratista_principal, 
         idCuadrillaFinal,
-        id_usuario_actual 
+        id_usuario_actual,
+        idEmpresa
       ]);
     }
 

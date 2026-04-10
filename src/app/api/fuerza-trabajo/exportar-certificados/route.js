@@ -63,11 +63,22 @@ export async function GET(request) {
     const validar = searchParams.get('validar') === 'true';
     const omitirFaltantes = searchParams.get('omitirFaltantes') === 'true';
 
+    const idEmpresa = request.headers.get('x-empresa-id');
+    const userRol = request.headers.get('x-user-rol');
+
     // 1. Consultar médicos (solo si no es ruta de validación)
     let medicos = [];
     if (!validar) {
-        const [rowsMedicos] = await pool.query('SELECT * FROM Medicos_Empresa');
-        if (rowsMedicos.length === 0) return NextResponse.json({ success: false, error: 'Falta registrar médicos en la base de datos.' }, { status: 400 });
+        let medQuery = 'SELECT * FROM Medicos_Empresa WHERE bActivo = 1';
+        const medParams = [];
+
+        if (userRol !== 'Master' && idEmpresa) {
+            medQuery += ' AND id_empresa = ?';
+            medParams.push(idEmpresa);
+        }
+
+        const [rowsMedicos] = await pool.query(medQuery, medParams);
+        if (rowsMedicos.length === 0) return NextResponse.json({ success: false, error: 'Falta registrar médicos en la base de datos para tu empresa.' }, { status: 400 });
         medicos = rowsMedicos;
     }
 

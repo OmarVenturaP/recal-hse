@@ -24,8 +24,19 @@ const uploadImage = async (file, folder) => {
   }
 };
 
-export async function GET() {
+export async function GET(request) {
   try {
+    const idEmpresa = request.headers.get('x-empresa-id');
+    const userRol = request.headers.get('x-user-rol');
+
+    let whereClause = 'bActivo = 1';
+    const queryParams = [];
+
+    if (userRol !== 'Master' && idEmpresa) {
+      whereClause += ' AND id_empresa = ?';
+      queryParams.push(idEmpresa);
+    }
+
     const query = `
       SELECT 
         id_agente, 
@@ -34,10 +45,10 @@ export async function GET() {
         firma_agente,
         logo_agente 
       FROM Agentes_Capacitadores
-      WHERE bActivo = 1
+      WHERE ${whereClause}
       ORDER BY nombre_agente ASC
     `;
-    const [rows] = await pool.query(query);
+    const [rows] = await pool.query(query, queryParams);
     
     return NextResponse.json(rows);
   } catch (error) {
@@ -48,6 +59,7 @@ export async function GET() {
 
 export async function POST(request) {
   try {
+    const idEmpresa = request.headers.get('x-empresa-id');
     const formData = await request.formData();
     
     const nombre_agente = formData.get('nombre_agente');
@@ -61,11 +73,11 @@ export async function POST(request) {
     const firma_agente = await uploadImage(formData.get('firma_agente'), 'recal_hse_firmas');
 
     const queryInsert = `
-      INSERT INTO Agentes_Capacitadores (nombre_agente, registro_stps, logo_agente, firma_agente)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO Agentes_Capacitadores (nombre_agente, registro_stps, logo_agente, firma_agente, id_empresa)
+      VALUES (?, ?, ?, ?, ?)
     `;
     
-    const [result] = await pool.query(queryInsert, [nombre_agente, registro_stps, logo_agente, firma_agente]);
+    const [result] = await pool.query(queryInsert, [nombre_agente, registro_stps, logo_agente, firma_agente, idEmpresa || 1]);
 
     return NextResponse.json({ success: true, id: result.insertId });
 
@@ -77,11 +89,19 @@ export async function POST(request) {
 
 export async function PUT(request) {
   try {
+    const idEmpresa = request.headers.get('x-empresa-id');
+    const userRol = request.headers.get('x-user-rol');
     const formData = await request.formData();
     const id_agente = formData.get('id_agente');
     
     if (!id_agente) {
       return NextResponse.json({ error: "Falta el ID del agente." }, { status: 400 });
+    }
+
+    // Validar propiedad
+    if (userRol !== 'Master' && idEmpresa) {
+      const [verif] = await pool.query('SELECT 1 FROM Agentes_Capacitadores WHERE id_agente = ? AND id_empresa = ?', [id_agente, idEmpresa]);
+      if (verif.length === 0) return NextResponse.json({ error: "No tienes permisos para modificar este agente." }, { status: 403 });
     }
 
     const nombre_agente = formData.get('nombre_agente');
@@ -120,9 +140,19 @@ export async function PUT(request) {
 export async function DELETE(request) {
   try {
     const { id } = await request.json();
+    const idEmpresa = request.headers.get('x-empresa-id');
+    const userRol = request.headers.get('x-user-rol');
+
     if (!id) return NextResponse.json({ error: "Falta el ID del agente." }, { status: 400 });
 
-    await pool.query('UPDATE Agentes_Capacitadores SET bActivo = 0 WHERE id_agente = ?', [id]);
+    let authFilter = '';
+    const authParams = [id];
+    if (userRol !== 'Master' && idEmpresa) {
+      authFilter = ' AND id_empresa = ?';
+      authParams.push(idEmpresa);
+    }
+
+    await pool.query(`UPDATE Agentes_Capacitadores SET bActivo = 0 WHERE id_agente = ?${authFilter}`, authParams);
     
     return NextResponse.json({ success: true, mensaje: "Agente oculto correctamente." });
   } catch (error) {

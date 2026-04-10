@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Building2, UserCheck, GraduationCap, Plus, Search, Edit, Trash2, Loader2, Image as ImageIcon, X, Pencil, Users } from 'lucide-react';
+import { Building2, UserCheck, GraduationCap, Plus, Search, Edit, Trash2, Loader2, Image as ImageIcon, X, Pencil, Users, Stethoscope } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 export default function CatalogosPage() {
@@ -13,11 +13,13 @@ export default function CatalogosPage() {
   const [userRole, setUserRole] = useState(null);
   const [userDcPermission, setUserDcPermission] = useState(null);
   const [userFtPermission, setUserFtPermission] = useState(null);
+  const [userCertPermission, setUserCertPermission] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
 
   const [contratistas, setContratistas] = useState([]);
   const [agentes, setAgentes] = useState([]);
   const [cursos, setCursos] = useState([]);
+  const [medicos, setMedicos] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -41,8 +43,10 @@ export default function CatalogosPage() {
         
         if (resAuth.success) setUserRole(resAuth.user.rol);
         if (resUser.success && resUser.data.length > 0) {
-          setUserDcPermission(resUser.data[0].permisos_dc3);
-          setUserFtPermission(resUser.data[0].permisos_ft);
+          const u = resUser.data[0];
+          setUserDcPermission(u.permisos_dc3);
+          setUserFtPermission(u.permisos_ft);
+          setUserCertPermission(u.permisos_certificados);
         }
       } catch (error) {
         console.error("Error verificando permisos:", error);
@@ -54,8 +58,9 @@ export default function CatalogosPage() {
   }, []);
 
   const isAdmin = userRole === 'Admin' || userRole === 'Master';
-  const hasDc3Permission = userDcPermission === 1 || isAdmin;   // Admin y Master ven Agentes/Cursos
-  const canManageContratistas = isAdmin || userFtPermission === 1; // Admin, Master y permisos_ft ven Contratistas
+  const hasDc3Permission = userDcPermission === 1 || isAdmin;   
+  const canManageContratistas = isAdmin || userFtPermission === 1; 
+  const hasCertPermission = isAdmin || userCertPermission === 1;
 
   useEffect(() => {
     if (!authLoading) {
@@ -76,14 +81,16 @@ export default function CatalogosPage() {
   const cargarDatos = async () => {
     setLoading(true);
     try {
-      const [resC, resA, resCu] = await Promise.all([
+      const [resC, resA, resCu, resM] = await Promise.all([
         fetch('/api/catalogos/contratistas'),
         fetch('/api/catalogos/agentes'),
-        fetch('/api/catalogos/cursos')
+        fetch('/api/catalogos/cursos'),
+        fetch('/api/catalogos/medicos')
       ]);
       if (resC.ok) setContratistas(await resC.json());
       if (resA.ok) setAgentes(await resA.json());
       if (resCu.ok) setCursos(await resCu.json());
+      if (resM.ok) setMedicos(await resM.json());
     } catch (error) {
       console.error("Error cargando catálogos:", error);
     } finally {
@@ -185,7 +192,7 @@ export default function CatalogosPage() {
       }
 
       const method = editMode ? 'PUT' : 'POST';
-      const endpoint = `/api/catalogos/${modalType}s`; 
+      const endpoint = modalType === 'medico' ? '/api/catalogos/medicos' : `/api/catalogos/${modalType}s`; 
       
       const response = await fetch(endpoint, {
         method,
@@ -220,7 +227,8 @@ export default function CatalogosPage() {
     }).then(async (result) => {
       if (result.isConfirmed) {
         try {
-          const response = await fetch(`/api/catalogos/${type}s`, {
+          const endpoint = type === 'medico' ? '/api/catalogos/medicos' : `/api/catalogos/${type}s`;
+          const response = await fetch(endpoint, {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id })
@@ -417,6 +425,80 @@ export default function CatalogosPage() {
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700 mt-6">
             <button type="button" onClick={closeModal} className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">Cancelar</button>
             <button type="submit" className="px-4 py-2 text-white bg-purple-600 hover:bg-purple-700 rounded-md transition-colors">Guardar Curso</button>
+          </div>
+        </form>
+      );
+    }
+
+    if (modalType === 'medico') {
+      return (
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nombre del Médico *</label>
+              <input required type="text" name="nombre" value={formData.nombre || ''} onChange={handleInputChange} className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white uppercase" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Cédula Profesional *</label>
+                <input required type="text" name="cedula" value={formData.cedula || ''} onChange={handleInputChange} className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white uppercase" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Especialidad</label>
+                <input type="text" name="especialidad" value={formData.especialidad || ''} onChange={handleInputChange} className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white uppercase" />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Universidad</label>
+                <input type="text" name="universidad" value={formData.universidad || ''} onChange={handleInputChange} className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white uppercase" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ciudad</label>
+                <input type="text" name="ciudad" value={formData.ciudad || ''} onChange={handleInputChange} className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white uppercase" />
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700 mt-6">
+            <button type="button" onClick={closeModal} className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">Cancelar</button>
+            <button type="submit" className="px-4 py-2 text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors">Guardar Médico</button>
+          </div>
+        </form>
+      );
+    }
+
+    if (modalType === 'medico') {
+      return (
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nombre Completo del Médico *</label>
+              <input required type="text" name="nombre" value={formData.nombre || ''} onChange={handleInputChange} className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white uppercase" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Cédula Profesional *</label>
+                <input required type="text" name="cedula" value={formData.cedula || ''} onChange={handleInputChange} className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white uppercase" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Especialidad</label>
+                <input type="text" name="especialidad" value={formData.especialidad || ''} onChange={handleInputChange} className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white uppercase" />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Universidad</label>
+                <input type="text" name="universidad" value={formData.universidad || ''} onChange={handleInputChange} className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white uppercase" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ciudad</label>
+                <input type="text" name="ciudad" value={formData.ciudad || ''} onChange={handleInputChange} className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white uppercase" />
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700 mt-6">
+            <button type="button" onClick={closeModal} className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">Cancelar</button>
+            <button type="submit" className="px-4 py-2 text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors">Guardar Médico</button>
           </div>
         </form>
       );
@@ -720,6 +802,95 @@ export default function CatalogosPage() {
     );
   };
 
+  const renderMedicos = () => {
+    const filtered = medicos.filter(m => 
+      (m.nombre?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
+      (m.cedula?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      (m.especialidad?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+    );
+
+    const indexOfLastItem = currentPage * itemsPerPage;
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+    const currentItems = filtered.slice(indexOfFirstItem, indexOfLastItem);
+    const totalPages = Math.ceil(filtered.length / itemsPerPage);
+
+    return (
+      <div className="flex flex-col gap-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden transition-colors border border-gray-200 dark:border-gray-700">
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="relative w-full sm:w-96">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+            <input type="text" placeholder="Buscar médico por nombre, cédula o especialidad..." value={searchTerm} onChange={(e) => {setSearchTerm(e.target.value); setCurrentPage(1);}} className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700/50 text-gray-900 dark:text-gray-100 outline-none" />
+          </div>
+          <button onClick={() => openModal('medico')} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm">
+            <Plus className="h-5 w-5" /> Nuevo Médico
+          </button>
+        </div>
+
+        <div className="overflow-x-auto p-4 md:p-0">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+            <thead className="bg-gray-50 dark:bg-slate-900 hidden md:table-header-group">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Nombre del Médico</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Cédula</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Especialidad</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Universidad / Ciudad</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white dark:bg-slate-800 divide-y md:divide-y-0 md:divide-gray-200 dark:md:divide-slate-700 block md:table-row-group">
+              {currentItems.length === 0 ? (
+                <tr className="block md:table-row">
+                  <td colSpan="5" className="p-8 text-center text-gray-500 block md:table-cell">No se encontraron resultados.</td>
+                </tr>
+              ) : (
+                currentItems.map((medico) => (
+                  <tr key={medico.id_medico} className="block md:table-row border border-gray-200 dark:border-slate-700 md:border-none mb-4 md:mb-0 rounded-lg shadow-sm md:shadow-none p-4 md:p-0 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
+                    <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm font-bold md:font-medium text-red-700 dark:text-red-400 md:text-gray-900 md:dark:text-white border-b dark:border-slate-700 md:border-none">
+                      <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 text-xs uppercase">Médico:</span>{medico.nombre}
+                    </td>
+                    <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-600 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
+                      <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 text-xs uppercase">Cédula:</span>{medico.cedula}
+                    </td>
+                    <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-600 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
+                      <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 text-xs uppercase">Especialidad:</span>{medico.especialidad || 'N/A'}
+                    </td>
+                    <td className="flex flex-col md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-600 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
+                      <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 text-xs uppercase mb-1">Universidad / Ciudad:</span>
+                      <div className="flex flex-col text-right md:text-left text-xs">
+                        <div className="text-gray-600 dark:text-gray-300">{medico.universidad || 'S/N'}</div>
+                        <div className="text-gray-400 dark:text-gray-500">{medico.ciudad || ''}</div>
+                      </div>
+                    </td>
+                    <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-3 md:py-4 text-sm md:text-right border-none">
+                      <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 text-xs uppercase">Acciones:</span>
+                      <div className="flex justify-end gap-2">
+                        <button onClick={() => openModal('medico', medico)} className="text-blue-600 dark:text-blue-400 hover:text-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 p-2 rounded-md transition-colors"><Edit className="h-5 w-5" /></button>
+                        <button onClick={() => handleDelete('medico', medico.id_medico)} className="text-red-500 dark:text-red-400 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/30 p-2 rounded-md transition-colors"><Trash2 className="h-5 w-5" /></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between bg-white dark:bg-slate-800 px-4 py-3 border border-gray-200 dark:border-slate-700 rounded-lg shadow-sm gap-4 sm:gap-0 mt-4">
+          <div className="text-sm text-gray-700 dark:text-gray-300">
+            Mostrando <span className="font-bold">{indexOfFirstItem + 1}</span> a <span className="font-bold">{Math.min(indexOfLastItem, filtered.length)}</span> de <span className="font-bold">{filtered.length}</span> médicos
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-3 py-1 border border-gray-300 dark:border-slate-600 rounded-md disabled:opacity-50 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">Anterior</button>
+            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="px-3 py-1 border border-gray-300 dark:border-slate-600 rounded-md disabled:opacity-50 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">Siguiente</button>
+          </div>
+        </div>
+      )}
+      </div>
+    );
+  };
+
   if (authLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -769,6 +940,10 @@ export default function CatalogosPage() {
         {hasDc3Permission && (
           <button onClick={() => setActiveTab('cursos')} className={`flex items-center gap-2 px-4 py-3 font-medium transition-colors whitespace-nowrap ${activeTab === 'cursos' ? 'border-b-2 border-purple-600 text-purple-600 dark:border-purple-400 dark:text-purple-400' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}><GraduationCap className="h-5 w-5" /> Cursos DC3</button>
         )}
+
+        {hasCertPermission && (
+          <button onClick={() => setActiveTab('medicos')} className={`flex items-center gap-2 px-4 py-3 font-medium transition-colors whitespace-nowrap ${activeTab === 'medicos' ? 'border-b-2 border-red-600 text-red-600 dark:border-red-400 dark:text-red-400' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}><Stethoscope className="h-5 w-5" /> Médicos</button>
+        )}
       </div>
 
       {loading ? (
@@ -778,6 +953,7 @@ export default function CatalogosPage() {
           {activeTab === 'contratistas' && canManageContratistas && renderContratistas()}
           {activeTab === 'agentes' && hasDc3Permission && renderAgentes()}
           {activeTab === 'cursos' && hasDc3Permission && renderCursos()}
+          {activeTab === 'medicos' && hasCertPermission && renderMedicos()}
         </div>
       )}
         </div>
@@ -789,7 +965,7 @@ export default function CatalogosPage() {
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-3xl my-auto animate-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center p-4 md:p-6 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-900 z-10 rounded-t-2xl">
               <h2 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white">
-                {editMode ? 'Editar' : 'Nuevo'} {modalType === 'contratista' ? 'Contratista' : modalType === 'agente' ? 'Agente Capacitador' : 'Curso'}
+                {editMode ? 'Editar' : 'Nuevo'} {modalType === 'contratista' ? 'Contratista' : modalType === 'agente' ? 'Agente Capacitador' : modalType === 'medico' ? 'Médico' : 'Curso'}
               </h2>
               <button type="button" onClick={closeModal} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800">
                 <X className="h-6 w-6" />

@@ -19,7 +19,9 @@ export default function UsuariosPage() {
   
   const formInicial = {
     id_personal: null, nombre: '', cargo: '', correo: '', 
-    area: 'Seguridad', rol: 'Usuario', activo: 1, id_empresa: 1
+    area: 'Seguridad', rol: 'Usuario', activo: 1, id_empresa: 1,
+    permisos_ft: 0, permisos_certificados: 0, permisos_maquinaria: 0,
+    permisos_dc3: 0, permisos_informe: 0, permisos_citas: 0
   };
   const [formData, setFormData] = useState(formInicial);
 
@@ -63,7 +65,13 @@ export default function UsuariosPage() {
       area: usuario.area,
       rol: usuario.rol,
       activo: usuario.activo,
-      id_empresa: usuario.id_empresa || 1
+      id_empresa: usuario.id_empresa || 1,
+      permisos_ft: usuario.permisos_ft || 0,
+      permisos_certificados: usuario.permisos_certificados || 0,
+      permisos_maquinaria: usuario.permisos_maquinaria || 0,
+      permisos_dc3: usuario.permisos_dc3 || 0,
+      permisos_informe: usuario.permisos_informe || 0,
+      permisos_citas: usuario.permisos_citas || 0
     });
     setIsEditing(true);
     setIsModalOpen(true);
@@ -335,6 +343,33 @@ export default function UsuariosPage() {
                     </select>
                   </div>
                 )}
+              </div>
+
+              <div className="bg-gray-50 dark:bg-slate-900/50 p-4 rounded-xl border border-gray-200 dark:border-slate-700 mt-4 space-y-3">
+                <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 dark:border-slate-800 pb-2 flex items-center gap-2">
+                  <Shield className="h-4 w-4" /> Permisos Especiales
+                </h4>
+                <div className="grid grid-cols-2 gap-y-2 gap-x-4">
+                  {[
+                    { id: 'permisos_ft', label: 'Fuerza de Trabajo' },
+                    { id: 'permisos_dc3', label: 'Certificados y DC-3' },
+                    { id: 'permisos_maquinaria', label: 'Maquinaria' },
+                    { id: 'permisos_informe', label: 'Informes Seguridad' },
+                    { id: 'permisos_certificados', label: 'Gestión Médicos/Otros' },
+                    // Solo para RECAL (id_empresa === 1)
+                    ...(formData.id_empresa === 1 ? [{ id: 'permisos_citas', label: 'Citas Dossier [RECAL]' }] : [])
+                  ].map((perm) => (
+                    <label key={perm.id} className="flex items-center gap-2 cursor-pointer group">
+                      <input 
+                        type="checkbox" 
+                        checked={formData[perm.id] === 1}
+                        onChange={(e) => setFormData({...formData, [perm.id]: e.target.checked ? 1 : 0})}
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-600 dark:text-gray-300 group-hover:text-blue-600 transition-colors uppercase font-medium">{perm.label}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
 
               {!isEditing && (

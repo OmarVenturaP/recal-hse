@@ -9,6 +9,7 @@ export async function GET(request) {
     if (!id_subcontratista) {
       return NextResponse.json({ error: "Falta el ID del subcontratista principal" }, { status: 400 });
     }
+    const idEmpresa = request.headers.get('x-empresa-id');
 
     // Consulta las cuadrillas que pertenecen a este subcontratista
     const query = `
@@ -16,10 +17,11 @@ export async function GET(request) {
       FROM Subcontratistas_Fuerza_Trabajo 
       WHERE id_subcontratista_principal = ?
       AND bActivo = 1
+      AND id_empresa = ?
       ORDER BY nombre ASC
     `;
     
-    const [rows] = await pool.query(query, [id_subcontratista]);
+    const [rows] = await pool.query(query, [id_subcontratista, idEmpresa]);
 
     return NextResponse.json(rows);
   } catch (error) {

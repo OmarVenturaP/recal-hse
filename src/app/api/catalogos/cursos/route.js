@@ -1,8 +1,19 @@
 import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
 
-export async function GET() {
+export async function GET(request) {
   try {
+    const idEmpresa = request.headers.get('x-empresa-id');
+    const userRol = request.headers.get('x-user-rol');
+
+    let whereClause = 'c.bActivo = 1';
+    const queryParams = [];
+
+    if (userRol !== 'Master' && idEmpresa) {
+      whereClause += ' AND c.id_empresa = ?';
+      queryParams.push(idEmpresa);
+    }
+
     const query = `
       SELECT 
         c.id_curso, 
@@ -13,11 +24,11 @@ export async function GET() {
         a.nombre_agente 
       FROM Cursos_Capacitacion c
       LEFT JOIN Agentes_Capacitadores a ON c.id_agente = a.id_agente
-      WHERE c.bActivo = 1 
+      WHERE ${whereClause}
       ORDER BY c.nombre_curso ASC
     `;
 
-    const [rows] = await pool.query(query);
+    const [rows] = await pool.query(query, queryParams);
 
     return NextResponse.json(rows);
   } catch (error) {
@@ -28,6 +39,7 @@ export async function GET() {
 
 export async function POST(request) {
   try {
+    const idEmpresa = request.headers.get('x-empresa-id');
     const formData = await request.formData();
     
     const nombre_curso = formData.get('nombre_curso');
@@ -43,11 +55,11 @@ export async function POST(request) {
     }
 
     const queryInsert = `
-      INSERT INTO Cursos_Capacitacion (nombre_curso, duracion_horas, area_tematica, id_agente, bActivo)
-      VALUES (?, ?, ?, ?, 1)
+      INSERT INTO Cursos_Capacitacion (nombre_curso, duracion_horas, area_tematica, id_agente, bActivo, id_empresa)
+      VALUES (?, ?, ?, ?, 1, ?)
     `;
     
-    const [result] = await pool.query(queryInsert, [nombre_curso, duracion_horas, area_tematica, id_agente]);
+    const [result] = await pool.query(queryInsert, [nombre_curso, duracion_horas, area_tematica, id_agente, idEmpresa || 1]);
 
     return NextResponse.json({ success: true, id: result.insertId });
 
@@ -59,11 +71,19 @@ export async function POST(request) {
 
 export async function PUT(request) {
   try {
+    const idEmpresa = request.headers.get('x-empresa-id');
+    const userRol = request.headers.get('x-user-rol');
     const formData = await request.formData();
     const id_curso = formData.get('id_curso');
     
     if (!id_curso) {
       return NextResponse.json({ error: "Falta el ID del curso." }, { status: 400 });
+    }
+
+    // Validar propiedad
+    if (userRol !== 'Master' && idEmpresa) {
+      const [verif] = await pool.query('SELECT 1 FROM Cursos_Capacitacion WHERE id_curso = ? AND id_empresa = ?', [id_curso, idEmpresa]);
+      if (verif.length === 0) return NextResponse.json({ error: "No tienes permisos para modificar este curso." }, { status: 403 });
     }
 
     const nombre_curso = formData.get('nombre_curso');
@@ -97,9 +117,19 @@ export async function PUT(request) {
 export async function DELETE(request) {
   try {
     const { id } = await request.json();
+    const idEmpresa = request.headers.get('x-empresa-id');
+    const userRol = request.headers.get('x-user-rol');
+
     if (!id) return NextResponse.json({ error: "Falta el ID del curso." }, { status: 400 });
 
-    await pool.query('UPDATE Cursos_Capacitacion SET bActivo = 0 WHERE id_curso = ?', [id]);
+    let authFilter = '';
+    const authParams = [id];
+    if (userRol !== 'Master' && idEmpresa) {
+      authFilter = ' AND id_empresa = ?';
+      authParams.push(idEmpresa);
+    }
+
+    await pool.query(`UPDATE Cursos_Capacitacion SET bActivo = 0 WHERE id_curso = ?${authFilter}`, authParams);
     
     return NextResponse.json({ success: true, mensaje: "Curso oculto correctamente." });
   } catch (error) {
