@@ -178,9 +178,9 @@ export default function DashboardLayout({ children }) {
             <div className="relative group cursor-pointer">
               <div className="absolute -inset-1 bg-gradient-to-r from-blue-400 to-indigo-400 rounded-full blur opacity-20 group-hover:opacity-60 transition duration-500"></div>
               <img
-                src="https://res.cloudinary.com/ddl8myqbt/image/upload/v1772806608/circle-logo-recal_ibfgo7.png"
-                alt="Logo RECAL"
-                className={`relative rounded-full border-2 border-white/20 shadow-2xl transform transition-all duration-300 group-hover:scale-105 w-16 h-16 ${isCollapsed ? 'md:w-10 md:h-10' : ''}`}
+                src="https://res.cloudinary.com/ddl8myqbt/image/upload/q_auto/f_auto/v1775844681/logo-obras-os-docs_rkur0u.png"
+                alt="ObrasOS - DOCS"
+                className={`relative object-contain transform transition-all duration-300 group-hover:scale-105 ${isCollapsed ? 'w-10 h-10' : 'w-48 h-12 mb-2'}`}
               />
             </div>
             {/* Texto siempre visible en móvil, se oculta en desktop colapsado */}
@@ -251,6 +251,18 @@ export default function DashboardLayout({ children }) {
               </div>
             </div>
           )}
+        </div>
+
+        {/* Créditos discretos */}
+        <div className={`px-6 pb-2 transition-all duration-300 ${isCollapsed ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100'}`}>
+          <a 
+            href="https://servitec-tonala.vercel.app/" 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="text-[8px] font-black text-white/20 hover:text-[#4CFDFD] hover:drop-shadow-[0_0_5px_rgba(76,253,253,0.4)] transition-all duration-300 tracking-[0.3em] uppercase block text-center"
+          >
+            Powered by SERVITEC
+          </a>
         </div>
 
         {/* Botón de colapsar/expandir — solo desktop/tablet */}
