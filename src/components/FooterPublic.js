@@ -38,7 +38,7 @@ export default function FooterPublic() {
                 <li><Link href="/privacidad" className="text-slate-400 hover:text-blue-500 font-bold text-xs uppercase tracking-widest transition-colors">Privacidad</Link></li>
                 <li>
                   <a href="https://wa.me/529619326182" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-blue-500 font-bold text-xs uppercase tracking-widest group text-left">
-                    Soporte 24/7
+                    Soporte
                     <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
                   </a>
                 </li>
@@ -55,8 +55,8 @@ export default function FooterPublic() {
             </a>
           </span>
           <div className="flex gap-10">
-            <span className="text-[9px] font-black text-blue-500/50 uppercase tracking-[0.3em]">ObrasOS - DOCS</span>
-            <span className="text-[9px] font-black text-slate-400/50 uppercase tracking-[0.3em]">HSE Compliance</span>
+            <span className="text-[9px] font-black text-blue-500/50 uppercase tracking-[0.3em]"><a href="https://docs.obras-os.com">ObrasOS</a></span>
+            <span className="text-[9px] font-black text-slate-400/50 uppercase tracking-[0.3em]">CONTROL DOCUMENTAL</span>
           </div>
         </div>
       </div>

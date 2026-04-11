@@ -350,25 +350,35 @@ export default function UsuariosPage() {
                   <Shield className="h-4 w-4" /> Permisos Especiales
                 </h4>
                 <div className="grid grid-cols-2 gap-y-2 gap-x-4">
-                  {[
-                    { id: 'permisos_ft', label: 'Fuerza de Trabajo' },
-                    { id: 'permisos_dc3', label: 'Certificados y DC-3' },
-                    { id: 'permisos_maquinaria', label: 'Maquinaria' },
-                    { id: 'permisos_informe', label: 'Informes Seguridad' },
-                    { id: 'permisos_certificados', label: 'Gestión Médicos/Otros' },
-                    // Solo para RECAL (id_empresa === 1)
-                    ...(formData.id_empresa === 1 ? [{ id: 'permisos_citas', label: 'Citas Dossier [RECAL]' }] : [])
-                  ].map((perm) => (
-                    <label key={perm.id} className="flex items-center gap-2 cursor-pointer group">
-                      <input 
-                        type="checkbox" 
-                        checked={formData[perm.id] === 1}
-                        onChange={(e) => setFormData({...formData, [perm.id]: e.target.checked ? 1 : 0})}
-                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-gray-600 dark:text-gray-300 group-hover:text-blue-600 transition-colors uppercase font-medium">{perm.label}</span>
-                    </label>
-                  ))}
+                  {(() => {
+                    const empSel = empresas.find(e => e.id_empresa === formData.id_empresa);
+                    const pSel = empSel?.plan_suscripcion || 'Free';
+                    
+                    return [
+                      { id: 'permisos_ft', label: 'Fuerza de Trabajo', minPlan: 'Free' },
+                      { id: 'permisos_maquinaria', label: 'Maquinaria', minPlan: 'Free' },
+                      { id: 'permisos_certificados', label: 'Gestión Médicos/Otros', minPlan: 'Intermedio' },
+                      { id: 'permisos_informe', label: 'Informes Seguridad', minPlan: 'Total' },
+                      { id: 'permisos_dc3', label: 'Certificados y DC-3', minPlan: 'Total' },
+                      // Solo para RECAL (id_empresa === 1)
+                      ...(formData.id_empresa === 1 ? [{ id: 'permisos_citas', label: 'Citas Dossier [RECAL]', minPlan: 'Free' }] : [])
+                    ].filter(perm => {
+                      if (pSel === 'Total') return true;
+                      if (pSel === 'Intermedio') return perm.minPlan !== 'Total';
+                      if (pSel === 'Basico' || pSel === 'Free') return perm.minPlan === 'Free';
+                      return perm.minPlan === 'Free';
+                    }).map((perm) => (
+                      <label key={perm.id} className="flex items-center gap-2 cursor-pointer group">
+                        <input 
+                          type="checkbox" 
+                          checked={formData[perm.id] === 1}
+                          onChange={(e) => setFormData({...formData, [perm.id]: e.target.checked ? 1 : 0})}
+                          className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-600 dark:text-gray-300 group-hover:text-blue-600 transition-colors uppercase font-medium">{perm.label}</span>
+                      </label>
+                    ));
+                  })()}
                 </div>
               </div>
 

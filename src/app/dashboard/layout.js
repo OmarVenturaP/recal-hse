@@ -7,8 +7,9 @@ import BotonTema from '@/components/BotonTema';
 import { 
   LayoutDashboard, Tractor, Users, ClipboardList, 
   BookOpen, CalendarDays, ShieldCheck, LogOut, Menu, X, FileBarChart,
-  ChevronLeft, ChevronRight, Building
+  ChevronLeft, ChevronRight, Building, Lock
 } from 'lucide-react';
+import ModalPlanDetalles from '@/components/ModalPlanDetalles';
 
 export default function DashboardLayout({ children }) {
   const router = useRouter();
@@ -27,6 +28,8 @@ export default function DashboardLayout({ children }) {
   const [userName, setUserName] = useState('');
   const [userIdEmpresa, setUserIdEmpresa] = useState(null); // <-- NUEVO: Guardar Empresa
   const [userEmpresaNombre, setUserEmpresaNombre] = useState('RECAL ESTRUCTURAS'); // <-- NUEVO: Nombre
+  const [userPlan, setUserPlan] = useState('Free'); 
+  const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
 
   const [userDcPermission, setUserDcPermission] = useState(0);
   const [userFtPermission, setUserFtPermission] = useState(0);
@@ -61,6 +64,7 @@ export default function DashboardLayout({ children }) {
           setUserName(data.user.nombre);
           setUserIdEmpresa(data.user.id_empresa || 1); // <-- NUEVO: Leer id_empresa del token
           setUserEmpresaNombre(data.user.empresa_nombre || 'RECAL ESTRUCTURAS');
+          setUserPlan(data.user.plan_suscripcion || 'Free');
         }
       });
 
@@ -91,11 +95,24 @@ export default function DashboardLayout({ children }) {
   }, []);
 
   const isAdmin = userRol === 'Admin' || userRol === 'Master';
-  const hasDc3Permission = userDcPermission === 1 || isAdmin;
-  const hasFtPermission  = userFtPermission  === 1 || isAdmin;
-  const canSeeCatalogos  = isAdmin || hasFtPermission || hasDc3Permission;
-  const canSeeInformes   = userRol === 'Master' || userPermisoInforme === 1;
-  const canSeeCitas      = userRol === 'Master' || userIdEmpresa === 1; // Solo Master o Empresa Recal
+  const isMaster = userRol === 'Master';
+  
+  const isTotal = userPlan?.toLowerCase() === 'total';
+  const isIntermedio = userPlan?.toLowerCase() === 'intermedio';
+
+  // Disponibilidad por Plan (Techo de permisos)
+  const planAllowsFT = true; // En todos los planes
+  const planAllowsMaquinaria = true; // En todos los planes
+  const planAllowsCertificados = isIntermedio || isTotal || isMaster;
+  const planAllowsInformes = isTotal || isMaster;
+  const planAllowsDC3 = isTotal || isMaster;
+
+  // Permisos Combinados (Plan && Usuario)
+  const hasDc3Permission = planAllowsDC3 && (userDcPermission === 1 || isAdmin);
+  const hasFtPermission  = planAllowsFT && (userFtPermission  === 1 || isAdmin);
+  const canSeeCatalogos  = isAdmin || hasFtPermission || hasDc3Permission || (planAllowsCertificados && isAdmin);
+  const canSeeInformes   = planAllowsInformes && (userRol === 'Master' || userPermisoInforme === 1);
+  const canSeeCitas      = isMaster || (userIdEmpresa === 1); // RECAL bypass
 
   const closeSidebar = () => setIsSidebarOpen(false);
   const toggleCollapse = () => {
@@ -105,19 +122,29 @@ export default function DashboardLayout({ children }) {
   };
 
   // Componente de cada link del sidebar
-  const NavItem = ({ href, icon: Icon, label, isPurple = false }) => {
+  const NavItem = ({ href, icon: Icon, label, isPurple = false, isLocked = false }) => {
     const isActive = href === '/dashboard' ? pathname === href : pathname.startsWith(href);
     
+    const handleClick = (e) => {
+      if (isLocked) {
+        e.preventDefault();
+        setIsPlanModalOpen(true);
+      } else {
+        closeSidebar();
+      }
+    };
+
     return (
       <div className="relative group/nav">
         <Link 
-          href={href}
-          onClick={closeSidebar}
+          href={isLocked ? '#' : href}
+          onClick={handleClick}
           title={isCollapsed ? label : undefined}
           className={`
             flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-300 group relative overflow-hidden
             ${isCollapsed ? 'md:px-0 md:justify-center' : ''}
-            ${isActive 
+            ${isLocked ? 'opacity-50 grayscale cursor-pointer' : ''}
+            ${isActive && !isLocked
               ? (isPurple 
                   ? 'bg-purple-600/20 text-purple-300 shadow-[0_4px_20px_rgba(168,85,247,0.15)] border border-purple-500/30' 
                   : 'bg-white/10 text-white shadow-[0_4px_20px_rgba(255,255,255,0.08)] border border-white/20')
@@ -125,23 +152,31 @@ export default function DashboardLayout({ children }) {
             }
           `}
         >
-          <div className={`absolute inset-0 bg-gradient-to-r from-white/0 to-white/5 opacity-0 group-hover:opacity-100 transition-opacity ${isActive ? 'opacity-100' : ''}`}></div>
-          <Icon className={`w-5 h-5 relative z-10 flex-shrink-0 transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110 group-hover:rotate-3'} ${isPurple && isActive ? 'text-purple-400' : ''}`} />
+          <div className={`absolute inset-0 bg-gradient-to-r from-white/0 to-white/5 opacity-0 group-hover:opacity-100 transition-opacity ${isActive && !isLocked ? 'opacity-100' : ''}`}></div>
+          <Icon className={`w-5 h-5 relative z-10 flex-shrink-0 transition-transform duration-300 ${isActive && !isLocked ? 'scale-110' : 'group-hover:scale-110 group-hover:rotate-3'} ${isPurple && isActive ? 'text-purple-400' : ''}`} />
           
-          {/* Label: siempre visible en móvil, oculto en desktop si está colapsado */}
-          <span className={`font-medium relative z-10 tracking-wide text-sm whitespace-nowrap overflow-hidden transition-all duration-300 ${isActive ? 'font-bold' : ''} ${isCollapsed ? 'md:w-0 md:opacity-0' : 'w-auto opacity-100'}`}>
+          <span className={`font-medium relative z-10 tracking-wide text-sm whitespace-nowrap overflow-hidden transition-all duration-300 ${isActive && !isLocked ? 'font-bold' : ''} ${isCollapsed ? 'md:w-0 md:opacity-0' : 'w-auto opacity-100'}`}>
             {label}
           </span>
           
-          {/* Indicador activo: barra lateral siempre, barra inferior solo en desktop colapsado */}
-          {isActive && (
-            <div className={`absolute top-1/2 -translate-y-1/2 w-1.5 h-8 bg-blue-400 rounded-l-full animate-pulse shadow-[0_0_10px_rgba(96,165,250,0.8)] ${isCollapsed ? 'right-0 md:hidden' : 'right-0'}`}></div>
+          {isLocked && !isCollapsed && (
+            <Lock className="w-3.5 h-3.5 ml-auto relative z-10 text-blue-300/50" />
           )}
-          {isActive && isCollapsed && (
-            <div className="hidden md:block absolute bottom-0 left-1/2 -translate-x-1/2 h-1 w-6 bg-blue-400 rounded-t-full animate-pulse shadow-[0_0_10px_rgba(96,165,250,0.8)]"></div>
+
+          {isLocked && isCollapsed && (
+            <div className="absolute top-1 right-1">
+              <Lock className="w-2.5 h-2.5 text-blue-300/70" />
+            </div>
+          )}
+
+          {/* Indicador activo */}
+          {isActive && !isLocked && (
+            <div className={`absolute top-1/2 -translate-y-1/2 w-1.5 h-8 ${isTotal ? 'bg-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.6)]' : 'bg-blue-400 shadow-[0_0_10px_rgba(96,165,250,0.8)]'} rounded-l-full animate-pulse ${isCollapsed ? 'right-0 md:hidden' : 'right-0'}`}></div>
+          )}
+          {isActive && !isLocked && isCollapsed && (
+            <div className={`hidden md:block absolute bottom-0 left-1/2 -translate-x-1/2 h-1 w-6 ${isTotal ? 'bg-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.6)]' : 'bg-blue-400 shadow-[0_0_10px_rgba(96,165,250,0.8)]'} rounded-t-full animate-pulse`}></div>
           )}
         </Link>
-
       </div>
     );
   };
@@ -162,8 +197,10 @@ export default function DashboardLayout({ children }) {
         style={hasMounted ? { width: isSidebarOpen || !isCollapsed ? '288px' : '72px' } : { width: '288px' }}
         className={`
           fixed inset-y-0 left-0 z-50 shrink-0
-          bg-gradient-to-b from-[#145184] via-blue-900 to-indigo-950
-          text-white flex flex-col shadow-2xl border-r border-indigo-800/50
+          ${isTotal 
+            ? 'bg-gradient-to-b from-[#2a1e12] via-[#0f0d0b] to-[#050403] border-r border-amber-900/20' 
+            : 'bg-gradient-to-b from-[#145184] via-blue-900 to-indigo-950 border-r border-indigo-800/50'}
+          text-white flex flex-col shadow-2xl
           transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]
           md:relative
           ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
@@ -176,7 +213,7 @@ export default function DashboardLayout({ children }) {
         <div className={`flex items-center relative z-10 transition-all duration-300 justify-between p-6 md:p-8 ${isCollapsed ? 'md:justify-center md:p-4 md:pt-6' : 'md:justify-center'}`}>
           <div className="flex flex-col items-center">
             <div className="relative group cursor-pointer">
-              <div className="absolute -inset-1 bg-gradient-to-r from-blue-400 to-indigo-400 rounded-full blur opacity-20 group-hover:opacity-60 transition duration-500"></div>
+              <div className={`absolute -inset-1 ${isTotal ? 'bg-gradient-to-r from-amber-400 to-orange-400' : 'bg-gradient-to-r from-blue-400 to-indigo-400'} rounded-full blur opacity-20 group-hover:opacity-60 transition duration-500`}></div>
               <img
                 src="https://res.cloudinary.com/ddl8myqbt/image/upload/q_auto/f_auto/v1775844681/logo-obras-os-docs_rkur0u.png"
                 alt="ObrasOS - DOCS"
@@ -184,10 +221,10 @@ export default function DashboardLayout({ children }) {
               />
             </div>
             {/* Texto siempre visible en móvil, se oculta en desktop colapsado */}
-            <span className={`text-[10px] text-center font-black tracking-[0.2em] text-blue-200/50 mt-4 hidden md:block uppercase ${isCollapsed ? 'md:hidden' : ''}`}>{userEmpresaNombre}</span>
+            <span className={`text-[10px] text-center font-black tracking-[0.2em] ${isTotal ? 'text-amber-200/50' : 'text-blue-200/50'} mt-4 hidden md:block uppercase ${isCollapsed ? 'md:hidden' : ''}`}>{userEmpresaNombre}</span>
           </div>
           {/* Botón cerrar (solo móvil) */}
-          <button onClick={closeSidebar} className="md:hidden text-blue-300 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors">
+          <button onClick={closeSidebar} className={`md:hidden ${isTotal ? 'text-amber-200' : 'text-blue-300'} hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors`}>
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -200,24 +237,39 @@ export default function DashboardLayout({ children }) {
           </div>
           
           <NavItem href="/dashboard" icon={LayoutDashboard} label="Resumen Central" />
-          <NavItem href="/dashboard/maquinaria" icon={Tractor} label="Maquinaria y Equipo" />
-          <NavItem href="/dashboard/fuerza-trabajo" icon={Users} label="Fuerza de Trabajo" />
+          <NavItem href="/dashboard/maquinaria" icon={Tractor} label="Maquinaria y Equipo" isLocked={!planAllowsMaquinaria} />
+          <NavItem href="/dashboard/fuerza-trabajo" icon={Users} label="Fuerza de Trabajo" isLocked={!planAllowsFT} />
           
-          {canSeeInformes && (
-            <NavItem href="/dashboard/informes-seguridad" icon={FileBarChart} label="Informes Seguridad" />
-          )}
+          <NavItem 
+            href="/dashboard/informes-seguridad" 
+            icon={FileBarChart} 
+            label="Informes Seguridad" 
+            isLocked={!planAllowsInformes || !(isAdmin || userPermisoInforme === 1)} 
+            isPurple={isTotal} 
+          />
 
-          {(userArea === 'Seguridad' || userArea === 'Ambas') && (
-            <NavItem href="/dashboard/actividades" icon={ClipboardList} label="Actividades" />
+          {userIdEmpresa === 1 && (
+            <NavItem 
+              href="/dashboard/actividades" 
+              icon={ClipboardList} 
+              label="Actividades" 
+              isLocked={!(userArea === 'Seguridad' || userArea === 'Ambas')}
+            />
           )}
           
-          {canSeeCatalogos && (
-            <NavItem href="/dashboard/catalogos" icon={BookOpen} label="Catálogos" />
-          )}
+          <NavItem 
+            href="/dashboard/catalogos" 
+            icon={BookOpen} 
+            label="Catálogos" 
+            isLocked={!canSeeCatalogos}
+          />
           
-          {canSeeCitas && (
-            <NavItem href="/dashboard/citas" icon={CalendarDays} label="Citas Dossier" />
-          )}
+          <NavItem 
+            href="/dashboard/citas" 
+            icon={CalendarDays} 
+            label="Citas Dossier" 
+            isLocked={!(isMaster || (userIdEmpresa === 1))}
+          />
           
           {userRol === 'Master' && (
              <div className={`pt-6 mt-6 border-t border-white/10 ${isCollapsed ? 'border-t-0 pt-2 mt-2' : ''}`}>
@@ -246,7 +298,7 @@ export default function DashboardLayout({ children }) {
           {/* Avatar solo en desktop colapsado */}
           {isCollapsed && (
             <div className="hidden md:flex justify-center">
-              <div title={userName || 'Usuario'} className="w-9 h-9 rounded-full bg-blue-500/20 flex items-center justify-center border border-blue-400/30 text-blue-200 font-bold text-sm uppercase cursor-default">
+              <div title={userName || 'Usuario'} className={`w-9 h-9 rounded-full ${isTotal ? 'bg-amber-500/20 border-amber-400/30 text-amber-200' : 'bg-blue-500/20 border-blue-400/30 text-blue-200'} flex items-center justify-center font-bold text-sm uppercase cursor-default`}>
                 {userName ? userName[0] : 'U'}
               </div>
             </div>
@@ -268,7 +320,7 @@ export default function DashboardLayout({ children }) {
         {/* Botón de colapsar/expandir — solo desktop/tablet */}
         <button
           onClick={toggleCollapse}
-          className="hidden md:flex absolute -right-3.5 top-20 w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 border-2 border-indigo-800/60 items-center justify-center text-white shadow-lg hover:from-blue-400 hover:to-indigo-500 transition-all duration-200 z-[60]"
+          className={`hidden md:flex absolute -right-3.5 top-20 w-7 h-7 rounded-full bg-gradient-to-br ${isTotal ? 'from-amber-500 to-orange-600 border-amber-800/60' : 'from-blue-500 to-indigo-600 border-indigo-800/60'} border-2 items-center justify-center text-white shadow-lg ${isTotal ? 'hover:from-amber-400 hover:to-orange-500' : 'hover:from-blue-400 hover:to-indigo-500'} transition-all duration-200 z-[60]`}
           aria-label={isCollapsed ? 'Expandir sidebar' : 'Colapsar sidebar'}
         >
           {isCollapsed
@@ -317,6 +369,12 @@ export default function DashboardLayout({ children }) {
           {children}
         </main>
       </div>
+
+      <ModalPlanDetalles 
+        isOpen={isPlanModalOpen} 
+        onClose={() => setIsPlanModalOpen(false)} 
+        currentPlan={{ name: userPlan, empresaNombre: userEmpresaNombre }}
+      />
     </div>
   );
 }

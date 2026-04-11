@@ -25,6 +25,7 @@ const esMesAnterior = (fechaAltaStr, fechaInicioPeriodoStr) => {
 export default function FuerzaTrabajoPage() {
   const topRef = useRef(null); 
   const [userRole, setUserRole] = useState(null);
+  const [userPlan, setUserPlan] = useState('Free'); // NUEVO
   const [userFtPermission, setUserFtPermission] = useState(null); 
   const [userCertPermission, setUserCertPermission] = useState(null);
   const [userDcPermission, setUserDcPermission] = useState(null);
@@ -33,7 +34,10 @@ export default function FuerzaTrabajoPage() {
     fetch('/api/auth/me')
       .then(res => res.json())
       .then(data => {
-        if (data.success) setUserRole(data.user.rol);
+        if (data.success) {
+          setUserRole(data.user.rol);
+          setUserPlan(data.user.plan_suscripcion || 'Free');
+        }
       });
 
     fetch('/api/usuarios/me')
@@ -47,9 +51,14 @@ export default function FuerzaTrabajoPage() {
       });
   }, []);
 
-  const canManageFt = userFtPermission === 1 || userRole === 'Master';
-  const canManageCert = userCertPermission === 1 || userRole === 'Master';
-  const canManageDc3 = userDcPermission === 1 || userRole === 'Master';
+  const isMaster = userRole === 'Master';
+  const planAllowsFT = true;
+  const planAllowsDC3 = userPlan === 'Total' || isMaster;
+  const planAllowsCert = userPlan === 'Intermedio' || userPlan === 'Total' || isMaster;
+
+  const canManageFt = planAllowsFT && (userFtPermission === 1 || isMaster);
+  const canManageCert = planAllowsCert && (userCertPermission === 1 || isMaster);
+  const canManageDc3 = planAllowsDC3 && (userDcPermission === 1 || isMaster);
 
   const [trabajadores, setTrabajadores] = useState([]);
   const [loading, setLoading] = useState(true);

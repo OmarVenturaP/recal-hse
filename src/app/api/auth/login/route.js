@@ -14,7 +14,7 @@ export async function POST(request) {
     }
 
     const [users] = await pool.query(
-      `SELECT p.*, e.nombre_comercial as empresa_nombre 
+      `SELECT p.*, e.nombre_comercial as empresa_nombre, e.plan_suscripcion 
        FROM Personal_Area p
        LEFT JOIN cat_empresas e ON p.id_empresa = e.id_empresa
        WHERE p.correo = ? AND p.activo = TRUE`, 
@@ -49,6 +49,7 @@ export async function POST(request) {
       area: user.area,
       id_empresa: user.id_empresa, // <-- NUEVO: Agregado para soporte Multi-Tenant
       empresa_nombre: user.empresa_nombre, // <-- NUEVO: Nombre dinámico para la UI
+      plan_suscripcion: user.plan_suscripcion || 'Free',
       requiere_cambio: requiereCambio,
       permisos_citas: user.permisos_citas
     };

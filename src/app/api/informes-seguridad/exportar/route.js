@@ -65,7 +65,7 @@ export async function GET(request) {
     };
 
     // --- HOJA 1: PORTADA ---
-    ws1.getCell('C7').value = informe.num_reporte; 
+    ws1.getCell('C8').value = informe.num_reporte; 
     ws1.getCell('D9').value = "Línea K"; 
 
     const frentesUnicos = [...new Set(ft_rows.map(r => r.frente).filter(f => f && f.trim()))];

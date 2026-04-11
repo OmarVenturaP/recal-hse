@@ -202,9 +202,41 @@ export async function PUT(request, { params }) {
       }
     }
 
+
     return NextResponse.json({ success: true, message: "Informe actualizado correctamente" });
   } catch (error) {
     console.error("Error PUT informe:", error);
     return NextResponse.json({ error: "Error al actualizar informe" }, { status: 500 });
+  }
+}
+
+// =====================================================================
+// DELETE: Eliminar informe y todas sus dependencias
+// =====================================================================
+export async function DELETE(request, { params }) {
+  try {
+    const { id } = await params;
+    const idEmpresa = request.headers.get('x-empresa-id');
+    const userRole = request.headers.get('x-user-rol');
+
+    // 1. Validar existencia y propiedad
+    const [verif] = await pool.query(`SELECT id_empresa FROM informes_seguridad WHERE id_informe = ?`, [id]);
+    if (verif.length === 0) return NextResponse.json({ error: "Informe no encontrado" }, { status: 404 });
+    
+    if (userRole !== 'Master' && idEmpresa && verif[0].id_empresa && verif[0].id_empresa.toString() !== idEmpresa.toString()) {
+      return NextResponse.json({ error: "No autorizado para eliminar este informe" }, { status: 403 });
+    }
+
+    // 2. Transacción de eliminación manual (ordenada por integridad)
+    await pool.query(`DELETE FROM informes_ubicaciones WHERE id_informe = ?`, [id]);
+    await pool.query(`DELETE FROM informes_seguridad_ft WHERE id_informe = ?`, [id]);
+    await pool.query(`DELETE FROM informes_fotos WHERE id_informe = ?`, [id]);
+    await pool.query(`DELETE FROM informes_desviaciones WHERE id_informe = ?`, [id]);
+    await pool.query(`DELETE FROM informes_seguridad WHERE id_informe = ?`, [id]);
+
+    return NextResponse.json({ success: true, message: "Informe eliminado correctamente" });
+  } catch (error) {
+    console.error("Error DELETE informe:", error);
+    return NextResponse.json({ error: "Error al eliminar informe" }, { status: 500 });
   }
 }

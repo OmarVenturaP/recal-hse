@@ -65,6 +65,7 @@ export default function InformesSeguridad() {
 
   // Auth y Permisos
   const [userRole, setUserRole] = useState(null);
+  const [userPlan, setUserPlan] = useState('Free');
   const [userPermisoInforme, setUserPermisoInforme] = useState(0);
   const [userId, setUserId] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -118,6 +119,7 @@ export default function InformesSeguridad() {
         if (resAuth.success) {
           setUserRole(resAuth.user.rol);
           setUserId(resAuth.user.id);
+          setUserPlan(resAuth.user.plan_suscripcion || 'Free');
         }
         if (resUser.success && resUser.data?.length > 0) {
           setUserPermisoInforme(resUser.data[0].permisos_informe || 0);
@@ -128,7 +130,9 @@ export default function InformesSeguridad() {
     loadAuth();
   }, []);
 
-  const canManage = userRole === 'Master' || userPermisoInforme === 1;
+  const isMaster = userRole === 'Master';
+  const planAllows = userPlan === 'Total' || isMaster;
+  const canManage = planAllows && (isMaster || userPermisoInforme === 1);
 
   // =====================================================================
   // CARGA DE DATOS
@@ -522,6 +526,40 @@ export default function InformesSeguridad() {
     }
   };
 
+  const handleDelete = async (inf) => {
+    const { isConfirmed } = await Swal.fire({
+      title: '¿Eliminar informe?',
+      text: `Estás a punto de eliminar el reporte N° ${inf.num_reporte} de ${inf.subcontratista}. Esta acción no se puede deshacer.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#dc2626',
+    });
+
+    if (isConfirmed) {
+      try {
+        const res = await fetch(`/api/informes-seguridad/${inf.id_informe}`, {
+          method: 'DELETE',
+          headers: { 
+            'x-user-id': userId || '1',
+            'x-user-rol': userRole || '',
+            'x-empresa-id': userId || '' 
+          }
+        });
+        const data = await res.json();
+        if (data.success) {
+          Swal.fire('Eliminado', data.message, 'success');
+          fetchInformes();
+        } else {
+          Swal.fire('Error', data.error || 'No se pudo eliminar', 'error');
+        }
+      } catch (e) {
+        Swal.fire('Error', 'Error de conexión', 'error');
+      }
+    }
+  };
+
   const fmtDate = (d) => {
     if (!d) return '';
     return new Date(d).toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -640,6 +678,13 @@ export default function InformesSeguridad() {
                           ) : (
                             <Download className="w-4 h-4" />
                           )}
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(inf)}
+                          className="p-2 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors" 
+                          title="Eliminar Informe"
+                        >
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </td>

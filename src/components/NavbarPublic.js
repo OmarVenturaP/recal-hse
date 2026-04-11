@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { ArrowRight } from 'lucide-react';
 
 export default function NavbarPublic() {
   const [scrolled, setScrolled] = useState(false);
+  const pathname = usePathname();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -14,6 +16,8 @@ export default function NavbarPublic() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  const isHome = pathname === '/';
 
   return (
     <nav className={`fixed top-0 w-full z-50 transition-all duration-500 ${
@@ -34,6 +38,26 @@ export default function NavbarPublic() {
             <span className={`text-[9px] font-bold uppercase tracking-[0.3em] font-sans transition-colors ${scrolled ? 'text-blue-600' : 'text-blue-300'}`}>Control Documental</span>
           </div>
         </Link>
+        
+        {/* NAVEGACIÓN DIRECTA (Desktop) */}
+        <div className="hidden md:flex items-center gap-8">
+          {[
+            { label: 'Módulos', href: '#modulos' },
+            { label: 'SAAS', href: '#saas' },
+            { label: 'Planes', href: '#precios' },
+            { label: 'Demo', href: '#demo' },
+          ].map((item) => (
+            <Link 
+              key={item.label}
+              href={isHome ? item.href : `/${item.href}`}
+              className={`text-xs font-black uppercase tracking-[0.2em] transition-all hover:text-blue-500 ${
+                scrolled ? 'text-slate-600' : 'text-blue-100 hover:text-white'
+              }`}
+            >
+              {item.label}
+            </Link>
+          ))}
+        </div>
 
         <div className="flex items-center gap-4">
           <Link 

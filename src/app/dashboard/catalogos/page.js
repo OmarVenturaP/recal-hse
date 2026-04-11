@@ -11,6 +11,7 @@ export default function CatalogosPage() {
   const itemsPerPage = 8;
   
   const [userRole, setUserRole] = useState(null);
+  const [userPlan, setUserPlan] = useState('Free');
   const [userDcPermission, setUserDcPermission] = useState(null);
   const [userFtPermission, setUserFtPermission] = useState(null);
   const [userCertPermission, setUserCertPermission] = useState(null);
@@ -41,7 +42,10 @@ export default function CatalogosPage() {
           fetch('/api/usuarios/me').then(r => r.json())
         ]);
         
-        if (resAuth.success) setUserRole(resAuth.user.rol);
+        if (resAuth.success) {
+          setUserRole(resAuth.user.rol);
+          setUserPlan(resAuth.user.plan_suscripcion || 'Free');
+        }
         if (resUser.success && resUser.data.length > 0) {
           const u = resUser.data[0];
           setUserDcPermission(u.permisos_dc3);
@@ -57,10 +61,16 @@ export default function CatalogosPage() {
     checkAuth();
   }, []);
 
-  const isAdmin = userRole === 'Admin' || userRole === 'Master';
-  const hasDc3Permission = userDcPermission === 1 || isAdmin;   
-  const canManageContratistas = isAdmin || userFtPermission === 1; 
-  const hasCertPermission = isAdmin || userCertPermission === 1;
+  const isMaster = userRole === 'Master';
+  const isAdmin = userRole === 'Admin' || isMaster;
+
+  const planAllowsFT = true;
+  const planAllowsDC3 = userPlan === 'Total' || isMaster;
+  const planAllowsCert = userPlan === 'Intermedio' || userPlan === 'Total' || isMaster;
+
+  const hasDc3Permission = planAllowsDC3 && (userDcPermission === 1 || isAdmin);   
+  const canManageContratistas = planAllowsFT && (isAdmin || userFtPermission === 1); 
+  const hasCertPermission = planAllowsCert && (isAdmin || userCertPermission === 1);
 
   useEffect(() => {
     if (!authLoading) {

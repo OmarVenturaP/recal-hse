@@ -31,14 +31,14 @@ export async function POST(request) {
     if (userRol !== 'Master') return NextResponse.json({ error: 'Acceso denegado.' }, { status: 403 });
 
     const body = await request.json();
-    const { nombre_comercial, rfc } = body;
+    const { nombre_comercial, rfc, plan_suscripcion } = body;
 
-    if (!nombre_comercial) {
-      return NextResponse.json({ error: 'El nombre comercial es obligatorio.' }, { status: 400 });
+    if (!nombre_comercial || !plan_suscripcion) {
+      return NextResponse.json({ error: 'El nombre comercial y el plan son obligatorios.' }, { status: 400 });
     }
 
-    const query = `INSERT INTO cat_empresas (nombre_comercial, rfc) VALUES (?, ?)`;
-    const [result] = await pool.query(query, [nombre_comercial, rfc || null]);
+    const query = `INSERT INTO cat_empresas (nombre_comercial, rfc, plan_suscripcion) VALUES (?, ?, ?)`;
+    const [result] = await pool.query(query, [nombre_comercial, rfc || null, plan_suscripcion]);
 
     return NextResponse.json({ success: true, id_empresa: result.insertId });
   } catch (error) {
@@ -53,14 +53,14 @@ export async function PUT(request) {
     if (userRol !== 'Master') return NextResponse.json({ error: 'Acceso denegado.' }, { status: 403 });
 
     const body = await request.json();
-    const { id_empresa, nombre_comercial, rfc } = body;
+    const { id_empresa, nombre_comercial, rfc, plan_suscripcion } = body;
 
-    if (!id_empresa || !nombre_comercial) {
+    if (!id_empresa || !nombre_comercial || !plan_suscripcion) {
       return NextResponse.json({ error: 'Datos incompletos.' }, { status: 400 });
     }
 
-    const query = `UPDATE cat_empresas SET nombre_comercial = ?, rfc = ? WHERE id_empresa = ?`;
-    await pool.query(query, [nombre_comercial, rfc || null, id_empresa]);
+    const query = `UPDATE cat_empresas SET nombre_comercial = ?, rfc = ?, plan_suscripcion = ? WHERE id_empresa = ?`;
+    await pool.query(query, [nombre_comercial, rfc || null, plan_suscripcion, id_empresa]);
 
     return NextResponse.json({ success: true, mensaje: "Actualizado correctamente" });
   } catch (error) {

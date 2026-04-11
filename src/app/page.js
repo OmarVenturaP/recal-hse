@@ -188,7 +188,7 @@ export default function LandingPage() {
                 </div>
                 <h4 className="text-4xl font-black text-slate-900 dark:text-white mb-4 tracking-tighter">Fuerza de Trabajo</h4>
                 <p className="text-slate-500 dark:text-slate-400 text-lg max-w-lg leading-relaxed mb-10 font-medium">
-                  Control estricto de accesos, gestión de programas DC-3 y monitoreo de altas para toda la plantilla de subcontratistas.
+                  Control estricto de personal, importación, exportación de programas, generación de constancias DC-3 de agentes capacitadores certificados y monitoreo de altas para toda la plantilla de subcontratistas.
                 </p>
                 <div className="flex gap-4">
                   <div className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs font-black uppercase tracking-widest border border-blue-100 dark:border-blue-800">
@@ -212,7 +212,7 @@ export default function LandingPage() {
                 <div>
                   <h4 className="text-4xl font-black mb-4 tracking-tighter">Maquinaria</h4>
                   <p className="text-indigo-100/70 text-lg leading-relaxed font-medium">
-                    Optimización de activos móviles mediante bitácoras y calendarios de mantenimiento preventivo.
+                    Gestión de Maquinaria y exportación de programas de utilización, mantenimiento e inspecciones.
                   </p>
                 </div>
                 <Link href="/login" className="flex items-center gap-2 text-sm font-black uppercase tracking-widest group/btn border-b-2 border-white/20 pb-1 hover:border-white transition-colors">
@@ -232,7 +232,7 @@ export default function LandingPage() {
                 </div>
                 <h4 className="text-4xl font-black text-white mb-4 tracking-tighter uppercase">Salud Lab.</h4>
                 <p className="text-slate-400 text-lg leading-relaxed font-medium">
-                  Gestión de médicos certificados, aptitudes físicas y seguimiento clínico especializado para el personal de obra.
+                  Gestión de médicos certificados y expedición de certificados para personal de obra.
                 </p>
               </div>
             </div>
@@ -268,8 +268,8 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* 4. SECCIÓN DE VALOR AGREGADO */}
-      <section className="bg-slate-100 dark:bg-slate-900/50 py-24 border-y border-slate-200 dark:border-slate-800 overflow-hidden">
+      {/* 4. SECCIÓN DE VALOR AGREGADO (Arquitectura SAAS) */}
+      <section id="saas" className="bg-slate-100 dark:bg-slate-900/50 py-24 border-y border-slate-200 dark:border-slate-800 overflow-hidden">
         <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
           <Reveal>
             <div className="relative">
@@ -342,9 +342,13 @@ export default function LandingPage() {
             <div className="group relative bg-white dark:bg-slate-900 rounded-[2.5rem] p-10 border border-slate-200 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-800 transition-all duration-500 flex flex-col h-full shadow-lg hover:shadow-2xl">
               <div className="mb-8">
                 <h4 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-widest mb-2">Básico</h4>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-black text-slate-900 dark:text-white">$899</span>
-                  <span className="text-slate-500 text-sm font-bold uppercase tracking-widest">MXN / Mes</span>
+                <div className="flex flex-col">
+                  <span className="text-slate-400 line-through text-lg decoration-red-500/50">$999</span>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-4xl font-black text-slate-900 dark:text-white">$499</span>
+                    <span className="text-slate-500 dark:text-slate-400 text-sm font-bold lowercase tracking-normal">/mes</span>
+                    <span className="text-blue-600 dark:text-blue-400 text-xs font-black uppercase tracking-tighter ml-1">¡OFERTA!</span>
+                  </div>
                 </div>
               </div>
               
@@ -363,7 +367,7 @@ export default function LandingPage() {
               </ul>
 
               <a 
-                href="https://wa.me/529619326182?text=Hola!%20Me%20interesa%20contratar%20el%20Plan%20Básico%20de%20ObrasOS%20($899)"
+                href="https://wa.me/529619326182?text=Hola!%20Me%20interesa%20contratar%20la%20OFERTA%20del%20Plan%20Básico%20de%20ObrasOS%20($499)"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full py-4 px-6 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-black uppercase tracking-widest text-center hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
@@ -382,9 +386,13 @@ export default function LandingPage() {
               
               <div className="mb-8">
                 <h4 className="text-xl font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-2">Intermedio</h4>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-black text-slate-900 dark:text-white">$1,799</span>
-                  <span className="text-slate-500 text-sm font-bold uppercase tracking-widest">MXN / Mes</span>
+                <div className="flex flex-col">
+                  <span className="text-blue-300 dark:text-blue-700 line-through text-lg decoration-white/50">$1,999</span>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-4xl font-black text-white">$1,199</span>
+                    <span className="text-blue-200/60 text-sm font-bold lowercase tracking-normal">/mes</span>
+                    <span className="text-yellow-300 text-xs font-black uppercase tracking-tighter ml-1">¡OFERTA!</span>
+                  </div>
                 </div>
               </div>
 
@@ -392,9 +400,10 @@ export default function LandingPage() {
                 {[
                   'Todo lo del plan Básico',
                   'Acceso a Certificados Médicos',
-                  'Panel de Usuario Ambiental',
+                  'Panel de usuario Ambiental',
+                  'Backup semanal de datos',
                   'Gestión de Inspecciones',
-                  'Soporte via correo'
+                  'Guia avanzada'
                 ].map((feature, i) => (
                   <li key={i} className="flex items-start gap-3 text-slate-600 dark:text-slate-400 font-medium">
                     <Check className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
@@ -404,7 +413,7 @@ export default function LandingPage() {
               </ul>
 
               <a 
-                href="https://wa.me/529619326182?text=Hola!%20Me%20interesa%20contratar%20el%20Plan%20Intermedio%20de%20ObrasOS%20($1,799)"
+                href="https://wa.me/529619326182?text=Hola!%20Me%20interesa%20contratar%20la%20OFERTA%20del%20Plan%20Intermedio%20de%20ObrasOS%20($1,199)"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full py-4 px-6 rounded-2xl bg-blue-600 text-white font-black uppercase tracking-widest text-center shadow-xl shadow-blue-500/20 hover:bg-blue-700 transition-colors"
@@ -422,9 +431,13 @@ export default function LandingPage() {
                   <h4 className="text-xl font-black text-white uppercase tracking-widest">Total</h4>
                   <ShieldCheck className="w-5 h-5 text-emerald-400" />
                 </div>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-black text-white">$2,499</span>
-                  <span className="text-slate-400 text-sm font-bold uppercase tracking-widest">MXN / Mes</span>
+                <div className="flex flex-col">
+                  <span className="text-slate-500 line-through text-lg decoration-emerald-500/50">$2,999</span>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-4xl font-black text-white">$1,999</span>
+                    <span className="text-slate-500 text-sm font-bold lowercase tracking-normal">/mes</span>
+                    <span className="text-emerald-400 text-xs font-black uppercase tracking-tighter ml-1">¡OFERTA!</span>
+                  </div>
                 </div>
               </div>
 
@@ -433,9 +446,8 @@ export default function LandingPage() {
                   'Todo lo del plan Intermedio',
                   'Informes de Seguridad',
                   'Gestión Automática DC3',
-                  'Landing Page Gratis durante la membresia',
-                  'Backup Diario de Datos',
-                  'Soporte Prioritario'
+                  'Backup diario de Datos',
+                  'Guia y Soporte Prioritario'
                 ].map((feature, i) => (
                   <li key={i} className="flex items-start gap-3 text-slate-400 font-medium">
                     <Check className="w-5 h-5 text-emerald-400 mt-0.5 shrink-0" />
@@ -445,7 +457,7 @@ export default function LandingPage() {
               </ul>
 
               <a 
-                href="https://wa.me/529619326182?text=Hola!%20Me%20interesa%20contratar%20el%20Plan%20Total%20de%20ObrasOS%20($2,499)"
+                href="https://wa.me/529619326182?text=Hola!%20Me%20interesa%20contratar%20la%20OFERTA%20del%20Plan%20Total%20de%20ObrasOS%20($1,999)"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full py-4 px-6 rounded-2xl bg-white text-slate-900 font-black uppercase tracking-widest text-center hover:bg-blue-50 transition-colors"
@@ -460,7 +472,7 @@ export default function LandingPage() {
 
 
       {/* 5. SECCIÓN CALL TO ACTION (CTA) CON VIDEO LOOP */}
-      <section className="relative py-32 px-6 overflow-hidden min-h-[600px] flex items-center justify-center">
+      <section id="demo" className="relative py-32 px-6 overflow-hidden min-h-[600px] flex items-center justify-center">
         {/* VIDEO BACKGROUND LOOP */}
         <div className="absolute inset-0 z-0">
           <div className="absolute inset-0 bg-blue-900/60 dark:bg-blue-950/80 z-10 backdrop-blur-sm"></div>
@@ -516,17 +528,6 @@ export default function LandingPage() {
 
       <FooterPublic />
 
-      <style jsx global>{`
-        @keyframes marquee {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-        .animate-marquee {
-          display: flex;
-          width: max-content;
-          animation: marquee 35s linear infinite;
-        }
-      `}</style>
     </div>
   );
 }

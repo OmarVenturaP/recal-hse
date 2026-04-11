@@ -15,7 +15,7 @@ export default function EmpresasPage() {
   const [isEditing, setIsEditing] = useState(false);
   
   const formInicial = {
-    id_empresa: null, nombre_comercial: '', rfc: ''
+    id_empresa: null, nombre_comercial: '', rfc: '', plan_suscripcion: 'Free'
   };
   const [formData, setFormData] = useState(formInicial);
 
@@ -49,7 +49,8 @@ export default function EmpresasPage() {
     setFormData({
       id_empresa: emp.id_empresa,
       nombre_comercial: emp.nombre_comercial,
-      rfc: emp.rfc || ''
+      rfc: emp.rfc || '',
+      plan_suscripcion: emp.plan_suscripcion || 'Free'
     });
     setIsEditing(true);
     setIsModalOpen(true);
@@ -138,6 +139,7 @@ export default function EmpresasPage() {
                 <thead className="bg-gray-50 dark:bg-slate-900 hidden md:table-header-group">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Empresa</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Plan</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Estado</th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Acciones</th>
                   </tr>
@@ -156,6 +158,21 @@ export default function EmpresasPage() {
                           <div className="font-bold text-gray-900 dark:text-gray-200">{emp.nombre_comercial}</div>
                           <div className="text-xs text-blue-600 dark:text-blue-400">{emp.rfc || 'Sin RFC'}</div>
                         </div>
+                      </td>
+
+                      <td className="flex justify-between md:table-cell px-2 md:px-6 py-2 md:py-4 border-b md:border-none">
+                        <span className="md:hidden font-bold text-gray-500 text-sm">Plan:</span>
+                        <span className={`px-2 py-1 text-xs font-bold rounded-full border ${
+                          emp.plan_suscripcion === 'Total' 
+                            ? 'bg-amber-50 text-amber-700 border-amber-200 shadow-sm shadow-amber-100' 
+                            : emp.plan_suscripcion === 'Intermedio'
+                            ? 'bg-blue-50 text-blue-700 border-blue-200'
+                            : emp.plan_suscripcion === 'Basico'
+                            ? 'bg-slate-50 text-slate-700 border-slate-200'
+                            : 'bg-gray-50 text-gray-600 border-gray-200'
+                        }`}>
+                          {emp.plan_suscripcion ? emp.plan_suscripcion.toUpperCase() : 'FREE'}
+                        </span>
                       </td>
 
                       <td className="flex justify-between md:table-cell px-2 md:px-6 py-2 md:py-4 border-b md:border-none">
@@ -206,6 +223,17 @@ export default function EmpresasPage() {
               <label className="block text-sm font-medium mb-1 dark:text-white">RFC</label>
               <input type="text" className="w-full bg-transparent border rounded p-2 dark:text-white uppercase" 
                 value={formData.rfc} onChange={e => setFormData({...formData, rfc: e.target.value.toUpperCase()})} />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1 dark:text-white">Plan de Suscripción *</label>
+              <select required className="w-full bg-transparent border rounded p-2 dark:text-white dark:bg-slate-800"
+                value={formData.plan_suscripcion} onChange={e => setFormData({...formData, plan_suscripcion: e.target.value})}>
+                <option value="Free">Free / Demo</option>
+                <option value="Basico">Básico</option>
+                <option value="Intermedio">Intermedio</option>
+                <option value="Total">Total (Premium)</option>
+              </select>
             </div>
 
             <div className="pt-4 flex justify-end space-x-3 mt-6 border-t">
