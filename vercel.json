@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/admin/backup?secret=RECAL_HSE_CRON_2026",
+      "schedule": "0 0 * * *"
+    }
+  ]
+}

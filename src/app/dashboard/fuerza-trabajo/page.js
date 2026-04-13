@@ -753,7 +753,7 @@ const handleDc3Submit = async (e) => {
           
           {(canManageDc3 || canManageCert) && (
             <button onClick={() => { setShowSuaModal(true); setSuaFase(1); }} className="flex-1 sm:flex-none justify-center bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
-              <span className="mr-1 sm:mr-2">📄</span> Importar SUA
+              <span className="mr-1 sm:mr-2">📄</span> Importar CURP (SUA)
             </button>
           )}
           

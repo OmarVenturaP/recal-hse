@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import bcrypt from 'bcryptjs';
+import { usuarioSchema, patchPasswordSchema } from '@/lib/validations/usuarios';
 
 // GET: Obtener todos los usuarios (Solo para Master)
 export async function GET(request) {
@@ -10,11 +11,6 @@ export async function GET(request) {
     if (rolUsuarioActual !== 'Master') {
       return NextResponse.json({ success: false, error: "Acceso denegado. Solo nivel Master." }, { status: 403 });
     }
-
-    // --- MIGRACIÓN SILENCIOSA ---
-    try {
-      await pool.query('ALTER TABLE Personal_Area ADD COLUMN permisos_citas TINYINT DEFAULT 0 AFTER permisos_informe');
-    } catch (e) { /* Columna ya existe u otro error insignificante */ }
 
     const query = `
       SELECT 
@@ -43,10 +39,17 @@ export async function POST(request) {
     }
 
     const body = await request.json();
+    
+    // Validación con Zod
+    const validation = usuarioSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json({ success: false, error: validation.error.errors[0].message }, { status: 400 });
+    }
+
     const { 
       nombre, cargo, correo, area, rol, id_empresa,
       permisos_ft, permisos_certificados, permisos_maquinaria, permisos_dc3, permisos_informe, permisos_citas 
-    } = body;
+    } = validation.data;
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash("RecalHSE", salt);
@@ -59,7 +62,7 @@ export async function POST(request) {
       VALUES (?, ?, ?, ?, ?, ?, 1, 1, ?, ?, ?, ?, ?, ?, ?)
     `;
     await pool.query(query, [
-      nombre, cargo, correo, hashedPassword, area, rol, id_empresa || 1,
+      nombre, cargo, correo, hashedPassword, area, rol, id_empresa,
       permisos_ft || 0, permisos_certificados || 0, permisos_maquinaria || 0, permisos_dc3 || 0, permisos_informe || 0, permisos_citas || 0
     ]);
 
@@ -83,10 +86,21 @@ export async function PUT(request) {
     }
 
     const body = await request.json();
+    
+    // Validación con Zod
+    const validation = usuarioSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json({ success: false, error: validation.error.errors[0].message }, { status: 400 });
+    }
+
     const { 
       id_personal, nombre, cargo, correo, area, rol, activo, id_empresa,
       permisos_ft, permisos_certificados, permisos_maquinaria, permisos_dc3, permisos_informe, permisos_citas
-    } = body;
+    } = validation.data;
+
+    if (!id_personal) {
+      return NextResponse.json({ success: false, error: "ID de personal es requerido" }, { status: 400 });
+    }
 
     const query = `
       UPDATE Personal_Area 
@@ -95,7 +109,7 @@ export async function PUT(request) {
       WHERE id_personal = ?
     `;
     await pool.query(query, [
-      nombre, cargo, correo, area, rol, activo, id_empresa || 1,
+      nombre, cargo, correo, area, rol, activo ?? 1, id_empresa,
       permisos_ft || 0, permisos_certificados || 0, permisos_maquinaria || 0, permisos_dc3 || 0, permisos_informe || 0, permisos_citas || 0,
       id_personal
     ]);
@@ -113,7 +127,22 @@ export async function PUT(request) {
 // PATCH: Restaurar contraseña
 export async function PATCH(request) {
   try {
-    const { id_personal } = await request.json();
+    const rolUsuarioActual = request.headers.get('x-user-rol');
+    
+    // BLINDAJE: Solo Master puede restaurar contraseñas
+    if (rolUsuarioActual !== 'Master') {
+      return NextResponse.json({ success: false, error: "Acceso denegado." }, { status: 403 });
+    }
+
+    const body = await request.json();
+    
+    // Validación con Zod
+    const validation = patchPasswordSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json({ success: false, error: validation.error.errors[0].message }, { status: 400 });
+    }
+
+    const { id_personal } = validation.data;
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash("RecalHSE", salt);
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
+import { trabajadorSchema, patchTrabajadorSchema } from '@/lib/validations/fuerza-trabajo';
 
 export async function GET(request) {
   try {
@@ -8,17 +9,25 @@ export async function GET(request) {
     const fechaInicio = searchParams.get('fechaInicio');
     const fechaFin = searchParams.get('fechaFin');
     const busqueda = searchParams.get('busqueda');
-    const ordenPor = searchParams.get('ordenPor') || 'fecha_ingreso_obra';
-    const ordenDireccion = searchParams.get('ordenDireccion') || 'DESC';
+    
+    // BLINDAJE: Allowlist para evitar Inyección SQL en ORDER BY
+    const allowedSortFields = ['fecha_ingreso_obra', 'nombre_trabajador', 'apellido_trabajador', 'nss', 'id_trabajador'];
+    const ordenPor = allowedSortFields.includes(searchParams.get('ordenPor')) ? searchParams.get('ordenPor') : 'fecha_ingreso_obra';
+    const ordenDireccion = ['ASC', 'DESC'].includes(searchParams.get('ordenDireccion')?.toUpperCase()) ? searchParams.get('ordenDireccion').toUpperCase() : 'DESC';
 
     const idEmpresa = request.headers.get('x-empresa-id');
     const userRol = request.headers.get('x-user-rol');
 
+    // AISLAMIENTO: No permitir consultas sin ID de empresa si no es Master
+    if (userRol !== 'Master' && !idEmpresa) {
+        return NextResponse.json({ success: false, error: "Identificador de empresa faltante" }, { status: 400 });
+    }
+
     let whereClause = "WHERE 1=1";
     const queryParams = [];
 
-    // Lógica Multi-Tenant: Si NO es Master, limitamos la vista a su propia empresa
-    if (userRol !== 'Master' && idEmpresa) {
+    // Lógica Multi-Tenant estricta
+    if (userRol !== 'Master') {
       whereClause += " AND f.id_empresa = ?";
       queryParams.push(idEmpresa);
     }
@@ -68,12 +77,23 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { numero_empleado, nombre_trabajador, apellido_trabajador, puesto_categoria, nss, curp, fecha_ingreso_obra, fecha_alta_imss, origen, id_subcontratista_ft, id_subcontratista_principal } = body;
+    
+    // Validación con Zod
+    const validation = trabajadorSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json({ success: false, error: validation.error.errors[0].message }, { status: 400 });
+    }
+
+    const { 
+        numero_empleado, nombre_trabajador, apellido_trabajador, puesto_categoria, nss, curp, 
+        fecha_ingreso_obra, fecha_alta_imss, origen, id_subcontratista_ft, id_subcontratista_principal 
+    } = validation.data;
+
     const id_usuario_actual = request.headers.get('x-user-id');
     const idEmpresa = request.headers.get('x-empresa-id');
-    const userRol = request.headers.get('x-user-rol');
 
     if (!id_usuario_actual) return NextResponse.json({ error: "Usuario no identificado" }, { status: 401 });
+    if (!idEmpresa) return NextResponse.json({ error: "Empresa no identificada" }, { status: 400 });
 
     // --- REGLA DE NEGOCIO: VALIDACIÓN DE NSS Y CURP ---
     if (nss || curp) {
@@ -104,7 +124,6 @@ export async function POST(request) {
         }
       }
     }
-    // -------------------------------------------
 
     const query = `
       INSERT INTO Fuerza_Trabajo 
@@ -112,7 +131,7 @@ export async function POST(request) {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const [result] = await pool.query(query, [
-      numero_empleado, nombre_trabajador, apellido_trabajador || null, puesto_categoria, nss, curp || null, fecha_ingreso_obra, fecha_alta_imss || null, origen, id_subcontratista_ft || null, id_subcontratista_principal || null, id_usuario_actual, idEmpresa || 1 
+      numero_empleado, nombre_trabajador, apellido_trabajador || null, puesto_categoria, nss, curp || null, fecha_ingreso_obra, fecha_alta_imss || null, origen, id_subcontratista_ft || null, id_subcontratista_principal || null, id_usuario_actual, idEmpresa 
     ]);
 
     return NextResponse.json({ success: true, id: result.insertId });
@@ -126,12 +145,24 @@ export async function POST(request) {
 export async function PUT(request) {
   try {
     const body = await request.json();
-    const { id_trabajador, numero_empleado, nombre_trabajador, apellido_trabajador, puesto_categoria, nss, curp, fecha_ingreso_obra, fecha_alta_imss, origen, id_subcontratista_ft, id_subcontratista_principal } = body;
+    
+    // Validación con Zod
+    const validation = trabajadorSchema.safeParse(body);
+    if (!validation.success) {
+        return NextResponse.json({ success: false, error: validation.error.errors[0].message }, { status: 400 });
+    }
+
+    const { 
+        id_trabajador, numero_empleado, nombre_trabajador, apellido_trabajador, puesto_categoria, nss, curp, 
+        fecha_ingreso_obra, fecha_alta_imss, origen, id_subcontratista_ft, id_subcontratista_principal 
+    } = validation.data;
+
     const id_usuario_actual = request.headers.get('x-user-id');
     const idEmpresa = request.headers.get('x-empresa-id');
     const userRol = request.headers.get('x-user-rol');
     
     if (!id_usuario_actual) return NextResponse.json({ error: "Usuario no identificado" }, { status: 401 });
+    if (!id_trabajador) return NextResponse.json({ error: "ID de trabajador faltante" }, { status: 400 });
 
     // --- REGLA DE NEGOCIO: VALIDACIÓN DE NSS Y CURP AL ACTUALIZAR ---
     if (nss || curp) {
@@ -174,7 +205,7 @@ export async function PUT(request) {
     let query = `UPDATE Fuerza_Trabajo SET ${updateFields} WHERE id_trabajador=?`;
     queryParams.push(id_trabajador);
 
-    // Seguridad: Un usuario normal solo puede actualizar de su empresa
+    // AISLAMIENTO: Un usuario normal solo puede actualizar de su empresa
     if (userRol !== 'Master' && idEmpresa) {
       query += ` AND id_empresa=?`;
       queryParams.push(idEmpresa);
@@ -192,16 +223,20 @@ export async function PUT(request) {
 export async function PATCH(request) {
   try {
     const body = await request.json();
-    const { id_trabajador, fecha_baja, bActivo } = body; // Añadido bActivo
+    
+    // Validación con Zod
+    const validation = patchTrabajadorSchema.safeParse(body);
+    if (!validation.success) {
+        return NextResponse.json({ success: false, error: validation.error.errors[0].message }, { status: 400 });
+    }
+
+    const { id_trabajador, fecha_baja, bActivo } = validation.data;
     const id_usuario_actual = request.headers.get('x-user-id');
     const idEmpresa = request.headers.get('x-empresa-id');
     const userRol = request.headers.get('x-user-rol');
 
     if (!id_usuario_actual) {
       return NextResponse.json({ error: "Usuario no identificado" }, { status: 401 });
-    }
-    if (!id_trabajador) {
-      return NextResponse.json({ error: "Falta ID de trabajador" }, { status: 400 });
     }
 
     let authFilter = "";

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Tractor, Users, CalendarDays, BookOpen, Clock, Activity, Zap, ShieldCheck, FileBarChart, Crown, Lock } from 'lucide-react';
+import { Tractor, Users, CalendarDays, BookOpen, Clock, Activity, Zap, ShieldCheck, FileBarChart, Crown, Lock, Database, Loader2 } from 'lucide-react';
+import Swal from 'sweetalert2';
 import Link from 'next/link';
 import ModalPlanDetalles from '@/components/ModalPlanDetalles';
 
@@ -12,6 +13,7 @@ export default function DashboardHome() {
   const [userPerms, setUserPerms] = useState({ ft: 0, dc3: 0, informe: 0 });
   const [greeting, setGreeting] = useState('');
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
+  const [isBackingUp, setIsBackingUp] = useState(false);
 
   useEffect(() => {
     // Generar saludo basado en la hora local
@@ -72,6 +74,35 @@ export default function DashboardHome() {
   const getInitials = (name) => {
     if (!name) return 'U';
     return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+  };
+  
+  const handleManualBackup = async () => {
+    try {
+      setIsBackingUp(true);
+      
+      const res = await fetch('/api/admin/backup');
+      const data = await res.json();
+      
+      if (data.success) {
+        Swal.fire({
+          title: '¡Respaldo Exitoso!',
+          text: 'La base de datos se ha respaldado y enviado a tu correo.',
+          icon: 'success',
+          confirmButtonColor: '#2563eb',
+        });
+      } else {
+        throw new Error(data.error || 'No se pudo realizar el respaldo');
+      }
+    } catch (error) {
+      Swal.fire({
+        title: 'Error',
+        text: error.message,
+        icon: 'error',
+        confirmButtonColor: '#ef4444',
+      });
+    } finally {
+      setIsBackingUp(false);
+    }
   };
 
   // ---- LOGICA DE PLANES ----
@@ -233,6 +264,31 @@ export default function DashboardHome() {
         <div className="flex items-center gap-3 mb-8 px-2">
           <Activity className={`w-7 h-7 ${isTotalDash ? 'text-amber-600' : 'text-[var(--recal-blue)]'} dark:text-blue-400`} />
           <h2 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight">Módulos Activos</h2>
+          
+          {/* Botón de Respaldo Manual exclusivamente para Master */}
+          {isMasterDash && (
+            <button
+              onClick={handleManualBackup}
+              disabled={isBackingUp}
+              className={`ml-auto flex items-center gap-2 px-6 py-2.5 rounded-2xl font-bold transition-all duration-300 shadow-lg ${
+                isBackingUp 
+                ? 'bg-gray-400 cursor-not-allowed' 
+                : 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-slate-700 hover:shadow-blue-200/50 hover:-translate-y-0.5'
+              }`}
+            >
+              {isBackingUp ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Procesando...</span>
+                </>
+              ) : (
+                <>
+                  <Database className="w-5 h-5" />
+                  <span>Generar Respaldo</span>
+                </>
+              )}
+            </button>
+          )}
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
