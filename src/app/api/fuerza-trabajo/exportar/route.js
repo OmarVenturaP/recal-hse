@@ -67,11 +67,19 @@ export async function GET(request) {
 
     // --- NUEVO: SI ES MODO VALIDACIÓN, RETORNAMOS LOS FALTANTES ---
     if (esValidacion) {
-      const faltantes = rows
+      const sinCuadrilla = rows
         .filter(r => !r.nombre_cuadrilla)
         .map(r => `${r.apellido_trabajador || ''} ${r.nombre_trabajador || ''}`.trim());
       
-      return NextResponse.json({ faltantes });
+      const sinCategoria = rows
+        .filter(r => r.puesto_categoria === 'POR DEFINIR')
+        .map(r => `${r.apellido_trabajador || ''} ${r.nombre_trabajador || ''}`.trim());
+      
+      return NextResponse.json({ 
+        faltantes: sinCuadrilla, // Mantenemos compatible por si acaso
+        sinCuadrilla,
+        sinCategoria
+      });
     }
 
     // --- FLUJO NORMAL DE EXPORTACIÓN EXCEL ---

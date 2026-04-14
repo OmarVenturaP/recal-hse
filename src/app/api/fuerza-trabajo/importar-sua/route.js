@@ -11,77 +11,111 @@ export async function POST(request) {
       return NextResponse.json({ error: "No se envió ningún archivo" }, { status: 400 });
     }
 
-    // Leer el archivo como buffer
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Extraer texto del PDF
     const data = await pdf(buffer);
     const text = data.text;
 
-    // Segmentar el texto por líneas para asociar NSS con CURP
-    const lines = text.split('\n');
-    const extractos = [];
+    // --- MOTOR DE EXTRACCIÓN POR ANCLAJE (ANCHOR-BASED) ---
+    const nssRegexGlobal = /(\d{2}-\d{2}-\d{2}-\d{4}-\d{1})|(\d{11})/g;
+    const nssMatches = [...text.matchAll(nssRegexGlobal)];
+    const curpRegex = /[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z\d]{2}/;
     
-    // RegEx para NSS (Soporta guiones ej: 00-00-00-0000-0)
-    const nssRegex = /\d{2}-\d{2}-\d{2}-\d{4}-\d{1}/g;
-    const nssRegexSimple = /\d{11}/g;
-    const curpRegex = /[A-Z]{4}\d{6}[H,M][A-Z]{5}[A-Z0-9]{2}/g;
+    // Blacklist extendida de cabeceras
+    const blacklist = [
+        "REGISTRO PATRONAL", "RFC", "FOLIO", "DÍAS", "DIAS", "SALARIO", "CUOTA",
+        "TAPACHULA", "CHIAPAS", "UBICACIÓN", "UBICACION", "CLAVE", "UNIDAD", 
+        "FISCAL", "PÁGINA", "PAGINA", "AUTODETERMINACION", "INSTITUTO", "MEXICANO",
+        "SEGURO", "SOCIAL", "SISTEMA", "SUA", "CÉDULA", "DETERMINACIÓN", "MENSUAL",
+        "MES", "AÑO", "REGISTRO", "PATRÓN", "DOMICILIO", "ACTIVIDAD", "BAJA", "ALTA", "MODIF",
+        "ENFERMEDADES", "MATERNIDAD", "SUMAS", "TOTAL", "CUOTAS", "PROCESO", "PERÍODO"
+    ];
 
-    // Escaneo profundo por líneas
-    for (let line of lines) {
-      // Buscamos todos los posibles NSS y CURPs en la misma línea
-      const nssMatches = line.match(/\d{2}-\d{2}-\d{2}-\d{4}-\d{1}/) || line.match(/\d{11}/);
-      const curpMatch = line.match(/[A-Z]{4}\d{6}[H,M][A-Z]{5}[A-Z0-9]{2}/);
+    const extractos = [];
+    for (let i = 0; i < nssMatches.length; i++) {
+        const match = nssMatches[i];
+        const startIndex = match.index;
+        const nssVal = match[0].replace(/-/g, '');
+        
+        const nextNssIndex = nssMatches[i+1] ? nssMatches[i+1].index : text.length;
+        // Ventana limitada para evitar saltar al siguiente trabajador
+        const rowWindow = text.substring(startIndex, Math.min(nextNssIndex, startIndex + 500));
 
-      if (nssMatches && curpMatch) {
-        // Normalizar NSS (quitar guiones para búsqueda en BD)
-        const nssLimpio = nssMatches[0].replace(/-/g, '');
-        extractos.push({
-          nss: nssLimpio,
-          curp: curpMatch[0]
-        });
-      }
+        const curpInRow = rowWindow.match(curpRegex);
+        if (curpInRow) {
+            const curpVal = curpInRow[0];
+            
+            // Aislar nombre limpiando NSS y CURP del bloque
+            let nameArea = rowWindow
+                .replace(match[0], ' ')
+                .replace(curpVal, ' ')
+                .replace(/\n/g, ' ')
+                .replace(/[0-9\-\/\\.,:|%=+*]/g, ' ');
+
+            // Limpieza de blacklist
+            blacklist.forEach(term => {
+                const regexTerm = new RegExp(`\\b${term}\\b`, 'gi');
+                nameArea = nameArea.replace(regexTerm, ' ');
+            });
+
+            // Capturar la secuencia de mayúsculas más probable
+            const nameMatch = nameArea.match(/[A-ZÑÁÉÍÓÚ]{3,}(?:\s+[A-ZÑÁÉÍÓÚ]{2,})+/);
+            let nombre = nameMatch ? nameMatch[0].trim() : nameArea.replace(/\s+/g, ' ').trim();
+
+            if (nombre.length > 5 && !blacklist.some(b => nombre.toUpperCase().includes(b))) {
+                extractos.push({ nss: nssVal, curp: curpVal, nombre });
+            }
+        }
     }
 
     if (extractos.length === 0) {
-      return NextResponse.json({ 
-        success: false, 
-        message: "No se encontraron pares válidos de NSS y CURP en el documento. Asegúrate de que es un PDF original del SUA." 
-      });
+      return NextResponse.json({ success: false, message: "No se encontraron datos de trabajadores legibles." });
     }
 
-    // Cruce con Base de Datos
-    const sugerencias = [];
+    const idEmpresa = request.headers.get('x-empresa-id');
+
+    // Resultados finales
+    const nuevos = [];
+    const actualizaciones = [];
     
     for (const item of extractos) {
       const [rows] = await pool.query(
         `SELECT id_trabajador, numero_empleado, nombre_trabajador, apellido_trabajador, curp as curp_actual 
          FROM Fuerza_Trabajo 
-         WHERE nss = ? AND bActivo = 1`,
-        [item.nss]
+         WHERE nss = ? AND id_empresa = ? AND fecha_baja IS NULL`,
+        [item.nss, idEmpresa]
       );
 
       if (rows.length > 0) {
         const trabajador = rows[0];
         // Solo sugerir si no tiene CURP o si la del PDF es diferente
         if (!trabajador.curp_actual || trabajador.curp_actual !== item.curp) {
-          sugerencias.push({
+          actualizaciones.push({
             id_trabajador: trabajador.id_trabajador,
             numero_empleado: trabajador.numero_empleado,
-            nombre: `${trabajador.nombre_trabajador} ${trabajador.apellido_trabajador || ''}`,
+            nombre_db: `${trabajador.nombre_trabajador} ${trabajador.apellido_trabajador || ''}`.trim(),
+            nombre_sua: item.nombre,
             nss: item.nss,
-            curp_actual: trabajador.curp_actual || 'SIN REGISTRO',
-            curp_nuevo: item.curp
+            curp_db: trabajador.curp_actual || 'SIN REGISTRO',
+            curp_sua: item.curp
           });
         }
+      } else {
+        // ES NUEVO
+        nuevos.push({
+            nombre: item.nombre,
+            nss: item.nss,
+            curp: item.curp
+        });
       }
     }
 
     return NextResponse.json({ 
       success: true, 
-      count: sugerencias.length, 
-      data: sugerencias 
+      nuevosCount: nuevos.length,
+      actCount: actualizaciones.length,
+      data: { nuevos, actualizaciones }
     });
 
   } catch (error) {
@@ -93,26 +127,62 @@ export async function POST(request) {
 // Endpoint para aplicar los cambios seleccionados
 export async function PUT(request) {
   try {
-    const { trabajadores } = await request.json();
+    const { nuevos, actualizaciones, id_subcontratista_principal } = await request.json();
     const id_usuario_actual = request.headers.get('x-user-id');
+    const idEmpresa = request.headers.get('x-empresa-id');
 
-    if (!trabajadores || !Array.isArray(trabajadores)) {
-      return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
+    if (!id_usuario_actual || !idEmpresa) {
+        return NextResponse.json({ error: "No se identificó al usuario o la empresa" }, { status: 401 });
     }
 
-    console.log(`Iniciando actualización masiva de ${trabajadores.length} CURPs...`);
-
-    for (const t of trabajadores) {
-      await pool.query(
-        "UPDATE Fuerza_Trabajo SET curp = ?, usuario_actualizacion = ? WHERE id_trabajador = ?",
-        [t.curp_nuevo, id_usuario_actual, t.id_trabajador]
-      );
+    // 1. Procesar Actualizaciones (Solo CURP)
+    if (actualizaciones && actualizaciones.length > 0) {
+      for (const t of actualizaciones) {
+        await pool.query(
+          "UPDATE Fuerza_Trabajo SET curp = ?, usuario_actualizacion = ? WHERE id_trabajador = ? AND id_empresa = ?",
+          [t.curp_sua, id_usuario_actual, t.id_trabajador, idEmpresa]
+        );
+      }
     }
 
-    return NextResponse.json({ success: true, message: `${trabajadores.length} CURPs actualizados correctamente.` });
+    // 2. Procesar Nuevos (Insertar con datos pendientes)
+    if (nuevos && nuevos.length > 0) {
+        for (const n of nuevos) {
+            const query = `
+                INSERT INTO Fuerza_Trabajo 
+                (numero_empleado, nombre_trabajador, apellido_trabajador, puesto_categoria, nss, curp, fecha_ingreso_obra, fecha_alta_imss, origen, usuario_registro, id_empresa, id_subcontratista_principal) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `;
+            // Fecha por defecto: 2 días antes de hoy
+            const d = new Date();
+            d.setDate(d.getDate() - 2);
+            const fechaDefault = d.toISOString().split('T')[0];
+            
+            await pool.query(query, [
+                '', 
+                '', 
+                n.nombre, 
+                'POR DEFINIR', 
+                n.nss, 
+                n.curp, 
+                fechaDefault, 
+                fechaDefault, 
+                'Local', 
+                id_usuario_actual, 
+                idEmpresa,
+                id_subcontratista_principal
+            ]);
+        }
+    }
+
+    return NextResponse.json({ 
+        success: true, 
+        message: `Importación finalizada: ${nuevos?.length || 0} nuevos registrados, ${actualizaciones?.length || 0} actualizados.` 
+    });
 
   } catch (error) {
-    console.error("Error al actualizar CURPs masivamente:", error);
+    console.error("Error al procesar importación SUA:", error);
     return NextResponse.json({ error: "Error al guardar los cambios" }, { status: 500 });
   }
 }
+

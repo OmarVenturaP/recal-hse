@@ -114,7 +114,8 @@ export default function FuerzaTrabajoPage() {
   const [showSuaModal, setShowSuaModal] = useState(false);
   const [suaFile, setSuaFile] = useState(null);
   const [suaLoading, setSuaLoading] = useState(false);
-  const [suaPreview, setSuaPreview] = useState([]);
+  const [suaPreview, setSuaPreview] = useState({ nuevos: [], actualizaciones: [] });
+  const [suaSubcontratista, setSuaSubcontratista] = useState('');
   const [suaFase, setSuaFase] = useState(1); // 1: Upload, 2: Preview
 
   const [isDc3ModalOpen, setIsDc3ModalOpen] = useState(false);
@@ -310,21 +311,35 @@ export default function FuerzaTrabajoPage() {
       const res = await fetch(valUrl);
       const data = await res.json();
 
-      // 2. Si detecta trabajadores sin cuadrilla, mostramos el Alert
-      if (data.faltantes && data.faltantes.length > 0) {
-        // Limitamos a 10 para no saturar el SweetAlert si son muchos
-        const listaMostrar = data.faltantes.slice(0, 10).join('<br>');
-        const mensajeExtra = data.faltantes.length > 10 ? '<br><i>...y otros más</i>' : '';
+      // 2. Si detecta trabajadores sin cuadrilla o sin categoría, mostramos el Alert
+      if ((data.sinCuadrilla && data.sinCuadrilla.length > 0) || (data.sinCategoria && data.sinCategoria.length > 0)) {
+        let warnHtml = '';
+        
+        if (data.sinCuadrilla && data.sinCuadrilla.length > 0) {
+          const lista = data.sinCuadrilla.slice(0, 5).join('<br> • ');
+          warnHtml += `<div class="text-left mb-4 px-2 py-3 bg-orange-50 rounded-lg border border-orange-200">
+            <p class="font-black text-orange-800 text-xs mb-1 uppercase tracking-tighter">⚠️ PERSONAL SIN CUADRILLA (${data.sinCuadrilla.length})</p>
+            <p class="text-[11px] text-orange-700 leading-tight">• ${lista}${data.sinCuadrilla.length > 5 ? '<br>...entre otros' : ''}</p>
+          </div>`;
+        }
+
+        if (data.sinCategoria && data.sinCategoria.length > 0) {
+          const lista = data.sinCategoria.slice(0, 5).join('<br> • ');
+          warnHtml += `<div class="text-left mb-4 px-2 py-3 bg-red-50 rounded-lg border border-red-200">
+            <p class="font-black text-red-800 text-xs mb-1 uppercase tracking-tighter">⚠️ PUESTOS POR DEFINIR (${data.sinCategoria.length})</p>
+            <p class="text-[11px] text-red-700 leading-tight">• ${lista}${data.sinCategoria.length > 5 ? '<br>...entre otros' : ''}</p>
+          </div>`;
+        }
 
         Swal.fire({
-          title: '⚠️ PERSONAL SIN CUADRILLA',
-          html: `Hay trabajadores activos en este periodo que <b>NO tienen cuadrilla asignada</b>:<br><br><b>${listaMostrar}</b>${mensajeExtra}<br><br>Si continúas, aparecerán con "N/A" en el Excel. ¿Deseas exportar de todos modos?`,
+          title: 'DATOS PENDIENTES',
+          html: `Detectamos inconsistencias en el personal activo que deseas exportar:<br><br>${warnHtml}Si continúas, estos registros aparecerán incompletos en el Excel. ¿Deseas exportar de todos modos?`,
           icon: 'warning',
           showCancelButton: true,
           confirmButtonColor: '#3085d6',
           cancelButtonColor: '#d33',
-          confirmButtonText: 'Sí, exportar',
-          cancelButtonText: 'Cancelar y revisar'
+          confirmButtonText: 'Sí, exportar lo que hay',
+          cancelButtonText: 'Cancelar y corregir'
         }).then((result) => {
           if (result.isConfirmed) {
             abrirRutaExportacionExcel();
@@ -460,6 +475,10 @@ export default function FuerzaTrabajoPage() {
   const handleSuaUpload = async (e) => {
     e.preventDefault();
     if (!suaFile) return;
+    if (!suaSubcontratista) {
+      Swal.fire('Atención', 'Por favor selecciona la contratista a la que pertenecen estos trabajadores.', 'warning');
+      return;
+    }
 
     setSuaLoading(true);
     const formData = new FormData();
@@ -473,8 +492,8 @@ export default function FuerzaTrabajoPage() {
       const result = await res.json();
 
       if (result.success) {
-        if (result.data.length === 0) {
-          Swal.fire('Información', 'No se encontraron CURPs nuevas para actualizar en este archivo.', 'info');
+        if (result.data.nuevos.length === 0 && result.data.actualizaciones.length === 0) {
+          Swal.fire('Información', 'No se encontraron datos nuevos para procesar en este archivo.', 'info');
         } else {
           setSuaPreview(result.data);
           setSuaFase(2);
@@ -496,10 +515,13 @@ export default function FuerzaTrabajoPage() {
       const res = await fetch('/api/fuerza-trabajo/importar-sua', {
         method: 'PUT',
         headers: { 
-          'Content-Type': 'application/json',
-          'x-user-id': '1' // Temporal, idealmente viene del context
+          'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ trabajadores: suaPreview }),
+        body: JSON.stringify({ 
+           nuevos: suaPreview.nuevos, 
+           actualizaciones: suaPreview.actualizaciones,
+           id_subcontratista_principal: suaSubcontratista
+        }),
       });
       const data = await res.json();
 
@@ -518,6 +540,28 @@ export default function FuerzaTrabajoPage() {
     } finally {
       setSuaLoading(false);
     }
+  };
+
+  const handleUpdateSuaName = (type, index, newName) => {
+    const data = { ...suaPreview };
+    if (type === 'nuevo') {
+      data.nuevos[index].nombre = newName;
+    } else {
+      data.actualizaciones[index].nombre_sua = newName;
+    }
+    setSuaPreview(data);
+  };
+
+  const handleRemoveSuaNuevo = (index) => {
+    const nuevos = [...suaPreview.nuevos];
+    nuevos.splice(index, 1);
+    setSuaPreview({ ...suaPreview, nuevos });
+  };
+
+  const handleRemoveSuaActualizacion = (index) => {
+    const actualizaciones = [...suaPreview.actualizaciones];
+    actualizaciones.splice(index, 1);
+    setSuaPreview({ ...suaPreview, actualizaciones });
   };
 
   const handleBajaClick = (id) => {
@@ -753,7 +797,7 @@ const handleDc3Submit = async (e) => {
           
           {(canManageDc3 || canManageCert) && (
             <button onClick={() => { setShowSuaModal(true); setSuaFase(1); }} className="flex-1 sm:flex-none justify-center bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
-              <span className="mr-1 sm:mr-2">📄</span> Importar CURP (SUA)
+              <span className="mr-1 sm:mr-2">📄</span> Importar SUA
             </button>
           )}
           
@@ -912,6 +956,11 @@ const handleDc3Submit = async (e) => {
                             {faltaCurp && <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-600 text-white dark:bg-red-900/30 dark:text-white">FALTA CURP</span>}
                             {hayCurp && <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-green-600 text-white dark:bg-green-900/30 dark:text-white">CURP</span>}
                             {!t.id_subcontratista_ft && <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-600 text-white dark:bg-red-900/30 dark:text-white">FALTA CUADRILLA</span>}
+                            {t.puesto_categoria === 'POR DEFINIR' && (
+                               <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-amber-500 text-white dark:bg-amber-900/40 dark:text-amber-300 animate-pulse border border-amber-600/20">
+                                 ⚠️ PUESTO PENDIENTE
+                               </span>
+                             )}
                           </div>
                         </div>
                       </td>
@@ -1426,7 +1475,7 @@ const handleDc3Submit = async (e) => {
               <div>
                 <h3 className="text-2xl font-black flex items-center gap-3">
                   <span className="bg-white/20 p-2 rounded-xl">📄</span>
-                  Actualización Masiva CURP (SUA)
+                  Actualización Masiva SUA
                 </h3>
                 <p className="text-sky-100 text-sm font-medium mt-1">Sincroniza expedientes con información oficial del IMSS</p>
               </div>
@@ -1469,6 +1518,20 @@ const handleDc3Submit = async (e) => {
                       </div>
                     </label>
 
+                    <div className="mt-6 text-left space-y-2">
+                        <label className="text-xs font-black text-gray-500 uppercase tracking-widest pl-2">Selecciona la Contratista Destino</label>
+                        <select 
+                          value={suaSubcontratista}
+                          onChange={(e) => setSuaSubcontratista(e.target.value)}
+                          className="w-full bg-white dark:bg-slate-800 border-2 border-gray-200 dark:border-slate-700 rounded-2xl py-4 px-6 text-sm font-bold focus:border-sky-500 outline-none transition-all shadow-sm"
+                        >
+                          <option value="">Seleccionar contratista...</option>
+                          {catPrincipales.map(sub => (
+                            <option key={sub.id_subcontratista} value={sub.id_subcontratista}>{sub.razon_social}</option>
+                          ))}
+                        </select>
+                    </div>
+
                     {suaFile && (
                       <button 
                         type="submit" 
@@ -1484,71 +1547,157 @@ const handleDc3Submit = async (e) => {
                 <div className="space-y-6">
                   <div className="flex justify-between items-end">
                     <div>
-                      <p className="text-2xl font-black text-gray-800 dark:text-white">Sugerencias de Actualización</p>
-                      <p className="text-gray-500 font-medium">Se detectaron {suaPreview.length} trabajadores con CURP disponible en el PDF.</p>
+                      <p className="text-2xl font-black text-gray-800 dark:text-white">Relación de Datos Detectados</p>
+                      <p className="text-gray-500 font-medium">
+                        Se detectaron {suaPreview.nuevos.length} nuevos y {suaPreview.actualizaciones.length} actualizaciones.
+                      </p>
                     </div>
                     <button 
-                      onClick={() => setSuaFase(1)}
+                      onClick={() => { setSuaFase(1); setSuaFile(null); }}
                       className="text-sky-600 font-bold hover:underline"
                     >
                       Cargar otro archivo
                     </button>
                   </div>
 
-                  <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 overflow-hidden shadow-sm">
-                    <div className="max-h-[350px] overflow-y-auto">
-                      <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-800">
-                        <thead className="bg-gray-50 dark:bg-slate-800 sticky top-0">
-                          <tr>
-                            <th className="px-6 py-4 text-left text-xs font-black text-gray-500 uppercase tracking-wider">Trabajador</th>
-                            <th className="px-6 py-4 text-left text-xs font-black text-gray-500 uppercase tracking-wider">NSS</th>
-                            <th className="px-6 py-4 text-left text-xs font-black text-gray-500 uppercase tracking-wider">CURP Actual</th>
-                            <th className="px-6 py-4 text-left text-xs font-black text-sky-600 uppercase tracking-wider">CURP Encontrada</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
-                          {suaPreview.map((item, idx) => (
-                            <tr key={idx} className="hover:bg-sky-50/30 dark:hover:bg-sky-900/10 transition-colors">
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm font-bold text-gray-900 dark:text-white">{item.nombre}</div>
-                                <div className="text-[10px] text-gray-400">Empl: {item.numero_empleado || 'S/N'}</div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400 font-mono">
-                                {item.nss}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <span className={`px-2 py-1 rounded-md text-[10px] font-bold ${item.curp_actual === 'SIN REGISTRO' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'}`}>
-                                  {item.curp_actual}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-md text-[10px] font-black font-mono border border-green-200 dark:border-green-800/50">
-                                  {item.curp_nuevo}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                  <div className="space-y-6 max-h-[450px] overflow-y-auto pr-2 custom-scrollbar">
+                    {/* SECCIÓN 1: NUEVOS REGISTROS */}
+                    {suaPreview.nuevos.length > 0 && (
+                        <div className="bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800/50 rounded-2xl overflow-hidden shadow-sm">
+                            <div className="bg-emerald-600 px-6 py-3 text-white flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-lg">🆕</span>
+                                    <span className="text-xs font-black uppercase tracking-widest">Personal Nuevo para Registrar</span>
+                                </div>
+                                <span className="bg-white/20 px-3 py-1 rounded-full text-xs font-bold">{suaPreview.nuevos.length}</span>
+                            </div>
+                            <table className="min-w-full divide-y divide-emerald-50 dark:divide-emerald-900/10">
+                                <thead className="bg-emerald-50/50 dark:bg-emerald-900/10">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-[10px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">Nombre en SUA</th>
+                                        <th className="px-6 py-3 text-left text-[10px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">NSS</th>
+                                        <th className="px-6 py-3 text-left text-[10px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">CURP</th>
+                                        <th className="px-6 py-3 text-center text-[10px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-emerald-50 dark:divide-emerald-900/10">
+                                    {suaPreview.nuevos.map((item, idx) => (
+                                        <tr key={`new-${idx}`} className="hover:bg-emerald-50/30 dark:hover:bg-emerald-900/5 transition-colors">
+                                            <td className="px-6 py-3">
+                                                <input 
+                                                  type="text" 
+                                                  value={item.nombre} 
+                                                  onChange={(e) => handleUpdateSuaName('nuevo', idx, e.target.value.toUpperCase())}
+                                                  className="w-full bg-transparent border-b border-emerald-200 focus:border-emerald-500 outline-none text-sm font-bold text-gray-800 dark:text-gray-200"
+                                                />
+                                            </td>
+                                            <td className="px-6 py-3 text-xs text-gray-500 dark:text-gray-400 font-mono">{item.nss}</td>
+                                            <td className="px-6 py-3 text-xs text-gray-500 dark:text-gray-400 font-mono tracking-tighter">{item.curp}</td>
+                                            <td className="px-6 py-3 text-center">
+                                                <button 
+                                                    onClick={() => handleRemoveSuaNuevo(idx)}
+                                                    className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                                    title="Quitar de la lista"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+
+                    {/* SECCIÓN 2: ACTUALIZACIONES DE CURP */}
+                    {suaPreview.actualizaciones.length > 0 && (
+                        <div className="bg-white dark:bg-slate-900 border border-sky-200 dark:border-sky-800/50 rounded-2xl overflow-hidden shadow-sm">
+                            <div className="bg-sky-600 px-6 py-3 text-white flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-lg">🔄</span>
+                                    <span className="text-xs font-black uppercase tracking-widest">Sugerencias de Actualización</span>
+                                </div>
+                                <span className="bg-white/20 px-3 py-1 rounded-full text-xs font-bold">{suaPreview.actualizaciones.length}</span>
+                            </div>
+                            <table className="min-w-full divide-y divide-sky-50 dark:divide-sky-900/10">
+                                <thead className="bg-sky-50/50 dark:bg-sky-900/10">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-[10px] font-black text-sky-700 dark:text-sky-400 uppercase tracking-wider">Trabajador Actual</th>
+                                        <th className="px-6 py-3 text-left text-[10px] font-black text-sky-700 dark:text-sky-400 uppercase tracking-wider">NSS</th>
+                                        <th className="px-6 py-3 text-left text-[10px] font-black text-sky-700 dark:text-sky-400 uppercase tracking-wider text-center">CURP Actual</th>
+                                        <th className="px-6 py-3 text-left text-[10px] font-black text-sky-600 uppercase tracking-wider text-center">Nueva CURP</th>
+                                        <th className="px-6 py-3 text-center text-[10px] font-black text-sky-700 dark:text-sky-400 uppercase tracking-wider">Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-sky-50 dark:divide-sky-900/10">
+                                    {suaPreview.actualizaciones.map((item, idx) => (
+                                        <tr key={`upd-${idx}`} className="hover:bg-sky-50/30 dark:hover:bg-sky-900/5 transition-colors">
+                                            <td className="px-6 py-3">
+                                                <p className="text-sm font-bold text-gray-800 dark:text-gray-200 mb-1">{item.nombre_sua}</p>
+                                                <div className="flex items-center gap-1.5">
+                                                  <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded">En Sistema: {item.nombre_db}</span>
+                                                  <span className="text-[10px] text-gray-400">ID: {item.numero_empleado || 'S/N'}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-3 text-xs text-gray-500 font-mono">{item.nss}</td>
+                                            <td className="px-6 py-3 text-center">
+                                                {item.curp_db === 'SIN REGISTRO' ? (
+                                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black bg-red-100 text-red-600 border border-red-200 uppercase tracking-tighter whitespace-nowrap">
+                                                    <span className="w-1 h-1 rounded-full bg-red-500 mr-1 animate-pulse"></span>
+                                                    Sin Registro
+                                                  </span>
+                                                ) : (
+                                                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                                    {item.curp_db}
+                                                  </span>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-3 text-center">
+                                                <span className="inline-flex items-center px-2.5 py-1 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-lg text-[10px] font-black font-mono border border-emerald-200 dark:border-emerald-800/50 shadow-sm shadow-emerald-500/10">
+                                                    {item.curp_sua}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-3 text-center">
+                                                <button 
+                                                    onClick={() => handleRemoveSuaActualizacion(idx)}
+                                                    className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                                    title="Quitar de la lista"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                  </div>
+
+                  <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-2xl p-4 flex gap-4 items-start">
+                    <span className="text-xl">⚠️</span>
+                    <div className="text-[11px] text-amber-800 dark:text-amber-300 leading-tight">
+                        <b>Nota sobre nuevos registros:</b> Se incluirán con puesto "POR DEFINIR" y número de empleado vacío. Deberás completar sus fechas de ingreso y alta IMSS manualmente desde el panel de edición.
                     </div>
                   </div>
 
-                  <div className="flex gap-4">
+                  <div className="flex gap-4 pt-4 border-t border-gray-100 dark:border-slate-700">
                     <button 
                       onClick={() => setShowSuaModal(false)}
-                      className="flex-1 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 text-gray-700 dark:text-gray-200 font-bold py-4 rounded-2xl transition-colors"
+                      className="flex-1 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 font-bold py-4 rounded-2xl transition-colors"
                     >
-                      Descartar Todo
+                      Cancelar
                     </button>
                     <button 
                       onClick={handleConfirmSuaUpdate}
                       disabled={suaLoading}
-                      className="flex-[2] bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 rounded-2xl shadow-xl shadow-indigo-500/30 transition-all flex items-center justify-center gap-2"
+                      className="flex-[2] bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-700 hover:to-indigo-700 text-white font-black py-4 rounded-2xl shadow-xl shadow-sky-500/20 transition-all flex items-center justify-center gap-2 transform active:scale-95 disabled:opacity-50"
                     >
-                      {suaLoading ? 'Guardando cambios...' : `Actualizar ${suaPreview.length} Registros`}
+                      {suaLoading ? 'Guardando cambios...' : 'Confirmar Importación Masiva'}
                     </button>
                   </div>
                 </div>
+
               )}
             </div>
           </div>
