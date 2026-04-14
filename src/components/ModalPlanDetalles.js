@@ -26,7 +26,7 @@ const ModalPlanDetalles = ({ isOpen, onClose, currentPlan }) => {
     },
     {
       name: 'Intermedio',
-      price: '$1199',
+      price: '$1499',
       oldPrice: '$1,999',
       color: 'bg-indigo-50 text-indigo-700 border-indigo-200',
       badge: 'bg-indigo-100 text-indigo-800',

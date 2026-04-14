@@ -107,7 +107,7 @@ export default function UsuariosPage() {
   const handleResetPassword = async (id, nombre) => {
     Swal.fire({
       title: '¿Restaurar contraseña?',
-      text: `La contraseña de ${nombre} volverá a ser "RecalHSE" y el sistema le pedirá cambiarla en su próximo ingreso.`,
+      text: `La contraseña de ${nombre} volverá a ser "ObrasOS" y el sistema le pedirá cambiarla en su próximo ingreso.`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#3085d6',
@@ -384,7 +384,7 @@ export default function UsuariosPage() {
 
               {!isEditing && (
                 <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded mt-4 text-sm text-blue-800 dark:text-blue-300 border border-blue-100 dark:border-blue-800/50">
-                  <span className="font-bold">Nota:</span> Al crear el usuario, se le asignará la contraseña genérica <strong>RecalHSE</strong>. El sistema le obligará a cambiarla la primera vez que ingrese.
+                  <span className="font-bold">Nota:</span> Al crear el usuario, se le asignará la contraseña genérica <strong>ObrasOS</strong>. El sistema le obligará a cambiarla la primera vez que ingrese.
                 </div>
               )}
 

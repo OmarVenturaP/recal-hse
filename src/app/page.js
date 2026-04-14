@@ -389,7 +389,7 @@ export default function LandingPage() {
                 <div className="flex flex-col">
                   <span className="text-blue-300 dark:text-blue-700 line-through text-lg decoration-white/50">$1,999</span>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-black text-white">$1,199</span>
+                    <span className="text-4xl font-black text-white">$1,499</span>
                     <span className="text-blue-200/60 text-sm font-bold lowercase tracking-normal">/mes</span>
                     <span className="text-yellow-300 text-xs font-black uppercase tracking-tighter ml-1">¡OFERTA!</span>
                   </div>
@@ -413,7 +413,7 @@ export default function LandingPage() {
               </ul>
 
               <a 
-                href="https://wa.me/529619326182?text=Hola!%20Me%20interesa%20contratar%20la%20OFERTA%20del%20Plan%20Intermedio%20de%20ObrasOS%20($1,199)"
+                href="https://wa.me/529619326182?text=Hola!%20Me%20interesa%20contratar%20la%20OFERTA%20del%20Plan%20Intermedio%20de%20ObrasOS%20($1,499)"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full py-4 px-6 rounded-2xl bg-blue-600 text-white font-black uppercase tracking-widest text-center shadow-xl shadow-blue-500/20 hover:bg-blue-700 transition-colors"

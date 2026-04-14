@@ -52,7 +52,7 @@ export async function POST(request) {
     } = validation.data;
 
     const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash("RecalHSE", salt);
+    const hashedPassword = await bcrypt.hash("ObrasOS", salt);
 
     const query = `
       INSERT INTO Personal_Area (
@@ -144,7 +144,7 @@ export async function PATCH(request) {
 
     const { id_personal } = validation.data;
     const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash("RecalHSE", salt);
+    const hashedPassword = await bcrypt.hash("ObrasOS", salt);
 
     const query = `
       UPDATE Personal_Area 
@@ -153,7 +153,7 @@ export async function PATCH(request) {
     `;
     await pool.query(query, [hashedPassword, id_personal]);
 
-    return NextResponse.json({ success: true, mensaje: "Contraseña restaurada a RecalHSE" });
+    return NextResponse.json({ success: true, mensaje: "Contraseña restaurada a ObrasOS" });
   } catch (error) {
     console.error("Error restaurando password:", error);
     return NextResponse.json({ success: false, error: "Error interno en BD" }, { status: 500 });
