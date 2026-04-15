@@ -338,16 +338,16 @@ export async function GET(request) {
       if (fotos.length > 0) {
         const totalGroups = Math.ceil(fotos.length / 3);
         const requiredRows = totalGroups * rowsPerGroup;
-        const baseCapacity = 38; // Espacio nativo desde Fila 55 hasta 93
+        const baseCapacity = 38; // Espacio nativo desde Fila 56 hasta 94
         if (requiredRows > baseCapacity) {
            extraRowsToInsert = requiredRows - baseCapacity;
-           // Insertamos celdas en blanco justo arriba del bloque de firmas (Fila 94 nativa)
-           ws3.spliceRows(94, 0, ...Array(extraRowsToInsert).fill([]));
+           // Insertamos celdas en blanco justo arriba del bloque de firmas (Fila 95 nativa)
+           ws3.spliceRows(95, 0, ...Array(extraRowsToInsert).fill([]));
         }
       }
 
-      // 2. Colocar las firmas en su lugar oficial desplazado (nativamente en fila 95 y 96)
-      const targetSigRow = 95 + extraRowsToInsert;
+      // 2. Colocar las firmas en su lugar oficial desplazado (nativamente en fila 96 y 97)
+      const targetSigRow = 96 + extraRowsToInsert;
       if (supervisores.length > 0) ws3.getCell(`B${targetSigRow}`).value = supervisores[0].nombre;
       if (residentes.length > 0) ws3.getCell(`C${targetSigRow}`).value = (residentes.find(p=>p.categoria.toUpperCase().includes('RESIDENTE')) || residentes[0]).nombre;
 
@@ -371,7 +371,7 @@ export async function GET(request) {
             }
         };
         
-        let imgRow = 56;
+        let imgRow = 57;
         if (fotos.length === 4) {
           // --- Layout especial: 2 fotos por fila (cols C-E y G-I) ---
           for (let i = 0; i < fotos.length; i += 2) {

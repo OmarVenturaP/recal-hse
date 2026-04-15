@@ -53,6 +53,11 @@ export async function middleware(request) {
       // Clonamos los headers (cabeceras) de la petición original
       const requestHeaders = new Headers(request.headers);
       
+      // BLINDAJE ANTI-SPOOFING: Eliminamos explícitamente cualquier cabecera inyectada desde el cliente
+      requestHeaders.delete('x-user-id');
+      requestHeaders.delete('x-user-rol');
+      requestHeaders.delete('x-empresa-id');
+      
       requestHeaders.set('x-user-id', payload.id_usuario || payload.id);
       requestHeaders.set('x-user-rol', payload.rol);
       requestHeaders.set('x-empresa-id', payload.id_empresa || ''); // <-- NUEVO: Inyección del ID de tenant

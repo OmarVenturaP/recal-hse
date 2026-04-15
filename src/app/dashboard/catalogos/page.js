@@ -932,7 +932,7 @@ export default function CatalogosPage() {
     );
   }
 
-  const isDemoEnv = userEmail === 'demo@obrasos.com' || userRole === 'Master';
+  const isDemoEnv = userEmail === 'demo@obrasos.com';
 
   if (isDemoEnv) {
     return (
