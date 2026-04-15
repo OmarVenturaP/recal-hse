@@ -10,6 +10,7 @@ import {
   ChevronLeft, ChevronRight, Building, Lock
 } from 'lucide-react';
 import ModalPlanDetalles from '@/components/ModalPlanDetalles';
+import DemoSystem from '@/components/DemoSystem';
 
 export default function DashboardLayout({ children }) {
   const router = useRouter();
@@ -24,6 +25,7 @@ export default function DashboardLayout({ children }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const [userRol, setUserRol] = useState(null);
+  const [userEmail, setUserEmail] = useState('');
   const [userArea, setUserArea] = useState(null);
   const [userName, setUserName] = useState('');
   const [userIdEmpresa, setUserIdEmpresa] = useState(null); // <-- NUEVO: Guardar Empresa
@@ -40,6 +42,7 @@ export default function DashboardLayout({ children }) {
     try {
       const res = await fetch('/api/auth/logout', { method: 'POST' });
       if (res.ok) {
+        localStorage.removeItem('hse_demo_virtual_storage'); // Limpieza senior de datos demo
         router.push('/login');
       }
     } catch (error) {
@@ -60,6 +63,7 @@ export default function DashboardLayout({ children }) {
       .then(data => {
         if (data.success) {
           setUserRol(data.user.rol);
+          setUserEmail(data.user.correo || '');
           setUserArea(data.user.area);
           setUserName(data.user.nombre);
           setUserIdEmpresa(data.user.id_empresa || 1); // <-- NUEVO: Leer id_empresa del token
@@ -94,11 +98,12 @@ export default function DashboardLayout({ children }) {
     };
   }, []);
 
-  const isAdmin = userRol === 'Admin' || userRol === 'Master';
-  const isMaster = userRol === 'Master';
+  const isDemo = userEmail === 'demo@obrasos.com';
+  const isAdmin = userRol === 'Admin' || userRol === 'Master' || isDemo;
+  const isMaster = userRol === 'Master' || isDemo;
   
-  const isTotal = userPlan?.toLowerCase() === 'total';
-  const isIntermedio = userPlan?.toLowerCase() === 'intermedio';
+  const isTotal = userPlan?.toLowerCase() === 'total' || isDemo;
+  const isIntermedio = userPlan?.toLowerCase() === 'intermedio' || isDemo;
 
   // Disponibilidad por Plan (Techo de permisos)
   const planAllowsFT = true; // En todos los planes
@@ -111,7 +116,7 @@ export default function DashboardLayout({ children }) {
   const hasDc3Permission = planAllowsDC3 && (userDcPermission === 1 || isAdmin);
   const hasFtPermission  = planAllowsFT && (userFtPermission  === 1 || isAdmin);
   const canSeeCatalogos  = isAdmin || hasFtPermission || hasDc3Permission || (planAllowsCertificados && isAdmin);
-  const canSeeInformes   = planAllowsInformes && (userRol === 'Master' || userPermisoInforme === 1);
+  const canSeeInformes   = planAllowsInformes && (isMaster || userPermisoInforme === 1);
   const canSeeCitas      = isMaster || (userIdEmpresa === 1); // RECAL bypass
 
   const closeSidebar = () => setIsSidebarOpen(false);
@@ -182,7 +187,8 @@ export default function DashboardLayout({ children }) {
   };
 
   return (
-    <div className="flex h-screen bg-[#f5f7fa] dark:bg-slate-900 relative overflow-hidden font-sans">
+    <DemoSystem userEmail={userEmail} onUpgradeClick={() => setIsPlanModalOpen(true)}>
+      <div className="flex h-screen bg-[#f5f7fa] dark:bg-slate-900 relative overflow-hidden font-sans">
       
       {/* Overlay clickeable móvil */}
       {isSidebarOpen && (
@@ -264,12 +270,13 @@ export default function DashboardLayout({ children }) {
             isLocked={!canSeeCatalogos}
           />
           
-          <NavItem 
-            href="/dashboard/citas" 
-            icon={CalendarDays} 
-            label="Citas Dossier" 
-            isLocked={!(isMaster || (userIdEmpresa === 1))}
-          />
+          {userIdEmpresa === 1 && !isDemo && (
+            <NavItem 
+              href="/dashboard/citas" 
+              icon={CalendarDays} 
+              label="Citas Dossier" 
+            />
+          )}
           
           {userRol === 'Master' && (
              <div className={`pt-6 mt-6 border-t border-white/10 ${isCollapsed ? 'border-t-0 pt-2 mt-2' : ''}`}>
@@ -376,5 +383,6 @@ export default function DashboardLayout({ children }) {
         currentPlan={{ name: userPlan, empresaNombre: userEmpresaNombre }}
       />
     </div>
+    </DemoSystem>
   );
 }

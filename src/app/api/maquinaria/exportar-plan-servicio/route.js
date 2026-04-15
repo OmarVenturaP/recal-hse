@@ -88,6 +88,12 @@ export async function GET(request) {
 
       if (maquina.fecha_baja) {
         row.getCell('L').value = 'N/A POR BAJA';
+      } else if (maquina.fecha_proximo_mantenimiento) {
+        const date = new Date(maquina.fecha_proximo_mantenimiento);
+        const dia = String(date.getUTCDate()).padStart(2, '0');
+        const mesStr = String(date.getUTCMonth() + 1).padStart(2, '0');
+        const anioStr = date.getUTCFullYear();
+        row.getCell('L').value = `MANTENIMIENTO: ${dia}/${mesStr}/${anioStr}`;
       } else if (maquina.intervalo_mantenimiento) {
         row.getCell('L').value = `CADA ${maquina.intervalo_mantenimiento} HORAS DE TRABAJO`;
       } else {

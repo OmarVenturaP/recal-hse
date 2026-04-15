@@ -23,6 +23,12 @@ export async function GET(request) {
         return NextResponse.json({ success: false, error: "Identificador de empresa faltante" }, { status: 400 });
     }
 
+    // --- MIGRACIÓN SILENCIOSA DE FECHAS DE TRAZABILIDAD ---
+    try {
+      try { await pool.query(`ALTER TABLE Fuerza_Trabajo ADD COLUMN fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP`); } catch(e) {}
+      try { await pool.query(`ALTER TABLE Fuerza_Trabajo ADD COLUMN ultima_modificacion DATETIME`); } catch(e) {}
+    } catch (e) { /* Ignorar errores de migración */ }
+
     let whereClause = "WHERE 1=1";
     const queryParams = [];
 
@@ -149,7 +155,9 @@ export async function PUT(request) {
     // Validación con Zod
     const validation = trabajadorSchema.safeParse(body);
     if (!validation.success) {
-        return NextResponse.json({ success: false, error: validation.error.errors[0].message }, { status: 400 });
+        console.error("ZOD ERROR DETAILS:", JSON.stringify(validation.error.format(), null, 2));
+        const firstError = validation.error.issues?.[0]?.message || validation.error.errors?.[0]?.message || "Error de validación en los campos";
+        return NextResponse.json({ success: false, error: firstError }, { status: 400 });
     }
 
     const { 
@@ -194,7 +202,7 @@ export async function PUT(request) {
       }
     }
 
-    let updateFields = `numero_empleado=?, nombre_trabajador=?, apellido_trabajador=?, puesto_categoria=?, nss=?, curp=?, fecha_ingreso_obra=?, fecha_alta_imss=?, origen=?, id_subcontratista_ft=?, id_subcontratista_principal=?, usuario_actualizacion=?`;
+    let updateFields = `numero_empleado=?, nombre_trabajador=?, apellido_trabajador=?, puesto_categoria=?, nss=?, curp=?, fecha_ingreso_obra=?, fecha_alta_imss=?, origen=?, id_subcontratista_ft=?, id_subcontratista_principal=?, usuario_actualizacion=?, ultima_modificacion=NOW()`;
     let queryParams = [numero_empleado, nombre_trabajador, apellido_trabajador || null, puesto_categoria, nss, curp || null, fecha_ingreso_obra, fecha_alta_imss || null, origen, id_subcontratista_ft || null, id_subcontratista_principal || null, id_usuario_actual];
 
     if (body.tiene_baja) {
@@ -247,13 +255,13 @@ export async function PATCH(request) {
     }
 
     if (bActivo !== undefined) {
-      const query = `UPDATE Fuerza_Trabajo SET bActivo = ?, usuario_actualizacion = ? WHERE id_trabajador = ?${authFilter}`;
+      const query = `UPDATE Fuerza_Trabajo SET bActivo = ?, usuario_actualizacion = ?, ultima_modificacion = NOW() WHERE id_trabajador = ?${authFilter}`;
       await pool.query(query, [bActivo, id_usuario_actual, id_trabajador, ...authParams]);
       return NextResponse.json({ success: true, mensaje: "Estado actualizado" });
     } 
     // Lógica original de Baja
     else if (fecha_baja) {
-      const query = `UPDATE Fuerza_Trabajo SET fecha_baja = ?, usuario_actualizacion = ? WHERE id_trabajador = ?${authFilter}`;
+      const query = `UPDATE Fuerza_Trabajo SET fecha_baja = ?, usuario_actualizacion = ?, ultima_modificacion = NOW() WHERE id_trabajador = ?${authFilter}`;
       await pool.query(query, [fecha_baja, id_usuario_actual, id_trabajador, ...authParams]);
       return NextResponse.json({ success: true, mensaje: "Trabajador dado de baja correctamente" });
     } else {

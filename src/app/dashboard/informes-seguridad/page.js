@@ -65,6 +65,7 @@ export default function InformesSeguridad() {
 
   // Auth y Permisos
   const [userRole, setUserRole] = useState(null);
+  const [userEmail, setUserEmail] = useState('');
   const [userPlan, setUserPlan] = useState('Free');
   const [userPermisoInforme, setUserPermisoInforme] = useState(0);
   const [userId, setUserId] = useState(null);
@@ -119,6 +120,7 @@ export default function InformesSeguridad() {
         if (resAuth.success) {
           setUserRole(resAuth.user.rol);
           setUserId(resAuth.user.id);
+          setUserEmail(resAuth.user.correo || resAuth.user.email || '');
           setUserPlan(resAuth.user.plan_suscripcion || 'Free');
         }
         if (resUser.success && resUser.data?.length > 0) {
@@ -131,6 +133,7 @@ export default function InformesSeguridad() {
   }, []);
 
   const isMaster = userRole === 'Master';
+  const isDemo = userEmail === 'demo@obrasos.com';
   const planAllows = userPlan === 'Total' || isMaster;
   const canManage = planAllows && (isMaster || userPermisoInforme === 1);
 
@@ -445,8 +448,32 @@ export default function InformesSeguridad() {
   // =====================================================================
   const handleSave = async (e) => {
     e.preventDefault();
-    if (!formData.num_reporte || !formData.id_subcontratista || !formData.periodo_inicio || !formData.periodo_fin) {
-      return Swal.fire('Campos requeridos', 'Completa todos los campos obligatorios.', 'warning');
+    // Validación: Todas las filas presentes deben tener un nombre de Frente
+    const allRowsHaveFrente = ftRows.every(r => r.frente && r.frente.trim() !== '');
+    const hasAtLeastOneRow = ftRows.length > 0;
+
+    if (!formData.num_reporte || !formData.id_subcontratista || !formData.periodo_inicio || !formData.periodo_fin || !allRowsHaveFrente || !hasAtLeastOneRow) {
+      const msg = !allRowsHaveFrente 
+        ? 'Todos los frentes agregados en la matriz deben tener un nombre asignado.' 
+        : 'Completa todos los campos obligatorios.';
+      
+      return Swal.fire({
+        title: 'Campos requeridos',
+        text: msg,
+        icon: 'warning',
+        customClass: { container: '!z-[99999]' }
+      });
+    }
+
+    // NUEVA VALIDACIÓN: Descripción de fotos obligatoria
+    const fotosSinDescripcion = (formData.fotos || []).some(f => !f.descripcion || f.descripcion.trim() === '');
+    if (fotosSinDescripcion) {
+      return Swal.fire({
+        title: 'Descripción obligatoria',
+        text: 'Todas las evidencias fotográficas deben tener una descripción asignada para evitar guardar datos en blanco.',
+        icon: 'warning',
+        customClass: { container: '!z-[99999]' }
+      });
     }
 
     setSaving(true);
@@ -486,14 +513,29 @@ export default function InformesSeguridad() {
       const data = await res.json();
 
       if (data.success) {
-        Swal.fire('Guardado', data.message, 'success');
+        Swal.fire({
+          title: 'Guardado',
+          text: data.message,
+          icon: 'success',
+          customClass: { container: '!z-[99999]' }
+        });
         setIsModalOpen(false);
         fetchInformes();
       } else {
-        Swal.fire('Error', data.error || 'Error al guardar', 'error');
+        Swal.fire({
+          title: 'Error',
+          text: data.error || 'Error al guardar',
+          icon: 'error',
+          customClass: { container: '!z-[99999]' }
+        });
       }
     } catch (e) {
-      Swal.fire('Error', 'Error de conexión', 'error');
+      Swal.fire({
+        title: 'Error',
+        text: 'Error de conexión',
+        icon: 'error',
+        customClass: { container: '!z-[99999]' }
+      });
     } finally { setSaving(false); }
   };
 
@@ -506,6 +548,13 @@ export default function InformesSeguridad() {
         const errData = await res.json();
         return Swal.fire('Error', errData.error || 'Error al exportar', 'error');
       }
+
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const data = await res.json();
+        if (data.demoBlocked) return;
+      }
+
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       
@@ -688,6 +737,31 @@ export default function InformesSeguridad() {
                         </button>
                       </div>
                     </td>
+
+                    {/* Trazabilidad (Solo Master Real) */}
+                    {isMaster && !isDemo && (
+                      <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 border-b dark:border-slate-700 md:border-none">
+                        <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 text-sm">Trazabilidad:</span>
+                        <div className="flex flex-col items-end md:items-start gap-1 max-w-[65%] md:max-w-none">
+                          {inf.creado_por_nombre ? (
+                            <span className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 px-2 py-0.5 rounded text-[10px] font-bold border border-green-200 dark:border-green-800 flex-wrap break-words inline-block" title="Registrado por">
+                              Agregó: {inf.creado_por_nombre}
+                              {inf.fecha_creacion && ` el ${new Date(inf.fecha_creacion).toLocaleDateString('es-MX')}`}
+                            </span>
+                          ) : (
+                            <span className="bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-400 px-2 py-0.5 rounded text-[10px] font-bold border border-gray-200 dark:border-slate-600 flex-wrap break-words inline-block" title="Registrado por Sistema">
+                              Agregó: S/N
+                            </span>
+                          )}
+                          {inf.actualizado_por_nombre && (
+                            <span className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 px-2 py-0.5 rounded text-[10px] font-bold border border-yellow-200 dark:border-yellow-800 flex-wrap break-words inline-block" title="Modificado por">
+                              Modificó: {inf.actualizado_por_nombre}
+                              {inf.ultima_modificacion && ` el ${new Date(inf.ultima_modificacion).toLocaleDateString('es-MX')}`}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

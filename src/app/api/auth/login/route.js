@@ -51,7 +51,8 @@ export async function POST(request) {
       empresa_nombre: user.empresa_nombre, // <-- NUEVO: Nombre dinámico para la UI
       plan_suscripcion: user.plan_suscripcion || 'Free',
       requiere_cambio: requiereCambio,
-      permisos_citas: user.permisos_citas
+      permisos_citas: user.permisos_citas,
+      correo: user.correo
     };
 
     const token = await new SignJWT(payload)

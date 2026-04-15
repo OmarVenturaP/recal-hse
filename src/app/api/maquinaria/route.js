@@ -23,6 +23,13 @@ export async function GET(request) {
     const [userRows] = await pool.query('SELECT area FROM Personal_Area WHERE id_personal = ?', [id_usuario_actual]);
     const areaUsuario = userRows.length > 0 ? userRows[0].area : 'Ambas';
 
+    // --- MIGRACIÓN SILENCIOSA DE FECHAS DE TRAZABILIDAD ---
+    try {
+      try { await pool.query(`ALTER TABLE Maquinaria_Equipo ADD COLUMN fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP`); } catch(e) { console.error("Error fecha_creacion:", e.message); }
+      try { await pool.query(`ALTER TABLE Maquinaria_Equipo CHANGE COLUMN fecha_modificacion ultima_modificacion DATETIME`); } catch(e) { console.error("Error change ultima_modificacion:", e.message); }
+      try { await pool.query(`ALTER TABLE Maquinaria_Equipo ADD COLUMN ultima_modificacion DATETIME`); } catch(e) { console.error("Error add ultima_modificacion:", e.message); }
+    } catch (e) { /* Ignorar errores de migración */ }
+
     const { searchParams } = new URL(request.url);
     const idSubcontratista = searchParams.get('subcontratista');
     const mes = searchParams.get('mes');
@@ -75,7 +82,7 @@ export async function GET(request) {
     const query = `
       SELECT 
         m.id_maquinaria, m.num_economico, m.tipo, m.marca, m.anio, m.modelo, m.color, m.serie, m.placa, m.area,
-        m.horometro AS horometro_actual, m.intervalo_mantenimiento, m.fecha_ingreso_obra, m.fecha_baja, m.imagen_url,
+        m.horometro AS horometro_actual, m.intervalo_mantenimiento, m.fecha_proximo_mantenimiento, m.fecha_ingreso_obra, m.fecha_baja, m.imagen_url,
         m.id_subcontratista,
         s.razon_social AS nombre_subcontratista,
         (SELECT MAX(fecha_mantenimiento) FROM Historial_Mantenimiento WHERE id_maquinaria = m.id_maquinaria) AS ultima_fecha_mantenimiento,
@@ -139,7 +146,8 @@ export async function POST(request) {
     const intervalo_mantenimiento = extractField('intervalo_mantenimiento');
     const fecha_ingreso_obra = extractField('fecha_ingreso_obra'); 
     const id_subcontratista = extractField('id_subcontratista');
-    const area = extractField('area'); // <--- NUEVO CAMPO CAPTURADO
+    const area = extractField('area'); 
+    const fecha_proximo_mantenimiento = extractField('fecha_proximo_mantenimiento');
 
     // Validaciones de obligatoriedad (Tipo, Marca, Año, Fecha, Contratista y Área)
     if (!tipo || !marca || !anio || !fecha_ingreso_obra || !id_subcontratista || !area) {
@@ -180,13 +188,13 @@ export async function POST(request) {
     // Inyectamos el campo 'area' e 'id_empresa' en el INSERT
     const query = `
       INSERT INTO Maquinaria_Equipo 
-      (num_economico, tipo, marca, anio, modelo, color, serie, placa, horometro, intervalo_mantenimiento, fecha_ingreso_obra, id_subcontratista, area, imagen_url, usuario_registro, id_empresa) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (num_economico, tipo, marca, anio, modelo, color, serie, placa, horometro, intervalo_mantenimiento, fecha_proximo_mantenimiento, fecha_ingreso_obra, id_subcontratista, area, imagen_url, usuario_registro, id_empresa) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     
     const [result] = await pool.query(query, [
       num_economico, tipo, marca, anio, modelo, color, serie, placa, horometro, 
-      intervalo_mantenimiento, fecha_ingreso_obra, id_subcontratista, area, imagen_url, id_usuario_actual, idEmpresa || 1
+      intervalo_mantenimiento, fecha_proximo_mantenimiento, fecha_ingreso_obra, id_subcontratista, area, imagen_url, id_usuario_actual, idEmpresa || 1
     ]);
 
     return NextResponse.json({ success: true, id: result.insertId, imagen_url });
@@ -221,7 +229,8 @@ export async function PUT(request) {
     const intervalo_mantenimiento = extractField('intervalo_mantenimiento');
     const fecha_ingreso_obra = extractField('fecha_ingreso_obra'); 
     const id_subcontratista = extractField('id_subcontratista');
-    const area = extractField('area'); // <--- NUEVO CAMPO CAPTURADO
+    const area = extractField('area'); 
+    const fecha_proximo_mantenimiento = extractField('fecha_proximo_mantenimiento');
 
     if (!tipo || !marca || !anio || !fecha_ingreso_obra || !id_subcontratista || !area) {
       return NextResponse.json({ success: false, error: "Los campos Tipo, Marca, Año, Fecha de Ingreso, Área y Contratista son obligatorios." }, { status: 400 });
@@ -262,10 +271,10 @@ export async function PUT(request) {
 
     let query = `
       UPDATE Maquinaria_Equipo 
-      SET num_economico=?, tipo=?, marca=?, anio=?, modelo=?, color=?, serie=?, placa=?, horometro=?, intervalo_mantenimiento=?, fecha_ingreso_obra=?, id_subcontratista=?, area=?, imagen_url=?, usuario_actualizacion=?
+      SET num_economico=?, tipo=?, marca=?, anio=?, modelo=?, color=?, serie=?, placa=?, horometro=?, intervalo_mantenimiento=?, fecha_proximo_mantenimiento=?, fecha_ingreso_obra=?, id_subcontratista=?, area=?, imagen_url=?, usuario_actualizacion=?, ultima_modificacion=NOW()
       WHERE id_maquinaria=?
     `;
-    let qParams = [num_economico, tipo, marca, anio, modelo, color, serie, placa, horometro, intervalo_mantenimiento, fecha_ingreso_obra, id_subcontratista, area, imagen_url, id_usuario_actual, id_maquinaria];
+    let qParams = [num_economico, tipo, marca, anio, modelo, color, serie, placa, horometro, intervalo_mantenimiento, fecha_proximo_mantenimiento, fecha_ingreso_obra, id_subcontratista, area, imagen_url, id_usuario_actual, id_maquinaria];
 
     if (userRol !== 'Master' && idEmpresa) {
       query += ` AND id_empresa=?`;
@@ -299,7 +308,7 @@ export async function PATCH(request) {
     
     if (!id_maquinaria || !fecha_baja) return NextResponse.json({ error: "Faltan datos" }, { status: 400 });
 
-    let query = `UPDATE Maquinaria_Equipo SET fecha_baja = ?, usuario_actualizacion = ?, bActivo = 0 WHERE id_maquinaria = ?`;
+    let query = `UPDATE Maquinaria_Equipo SET fecha_baja = ?, usuario_actualizacion = ?, bActivo = 0, ultima_modificacion = NOW() WHERE id_maquinaria = ?`;
     let qParams = [fecha_baja, id_usuario_actual, id_maquinaria];
 
     if (userRol !== 'Master' && idEmpresa) {

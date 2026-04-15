@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Building2, UserCheck, GraduationCap, Plus, Search, Edit, Trash2, Loader2, Image as ImageIcon, X, Pencil, Users, Stethoscope } from 'lucide-react';
+import { Building2, UserCheck, GraduationCap, Plus, Search, Edit, Trash2, Loader2, Image as ImageIcon, X, Pencil, Users, Stethoscope, Sparkles, Lock, ShieldAlert } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 export default function CatalogosPage() {
@@ -15,6 +15,7 @@ export default function CatalogosPage() {
   const [userDcPermission, setUserDcPermission] = useState(null);
   const [userFtPermission, setUserFtPermission] = useState(null);
   const [userCertPermission, setUserCertPermission] = useState(null);
+  const [userEmail, setUserEmail] = useState('');
   const [authLoading, setAuthLoading] = useState(true);
 
   const [contratistas, setContratistas] = useState([]);
@@ -43,8 +44,10 @@ export default function CatalogosPage() {
         ]);
         
         if (resAuth.success) {
+          const email = resAuth.user.correo || resAuth.user.email || '';
           setUserRole(resAuth.user.rol);
           setUserPlan(resAuth.user.plan_suscripcion || 'Free');
+          setUserEmail(email);
         }
         if (resUser.success && resUser.data.length > 0) {
           const u = resUser.data[0];
@@ -920,9 +923,80 @@ export default function CatalogosPage() {
     );
   }
 
+  if (authLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh]">
+        <Loader2 className="h-10 w-10 text-blue-600 animate-spin" />
+        <p className="mt-4 text-gray-500 animate-pulse font-medium">Verificando credenciales...</p>
+      </div>
+    );
+  }
+
+  const isDemoEnv = userEmail === 'demo@obrasos.com' || userRole === 'Master';
+
+  if (isDemoEnv) {
+    return (
+      <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="bg-white dark:bg-slate-800 rounded-[2.5rem] p-8 md:p-16 shadow-2xl border border-gray-100 dark:border-slate-700 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 dark:bg-blue-900/20 rounded-full -mr-16 -mt-16"></div>
+          
+          <div className="relative z-10 space-y-8">
+            <div className="space-y-4">
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full text-[10px] font-black uppercase tracking-widest">
+                <Lock className="w-3 h-3" /> Acceso Restringido en Demo
+              </div>
+              <h2 className="text-4xl md:text-5xl font-black text-gray-900 dark:text-white leading-tight">
+                Gestión <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-500">Maestra de Catálogos</span>
+              </h2>
+              <div className="h-1.5 w-20 bg-blue-600 rounded-full"></div>
+            </div>
+
+            <div className="prose prose-blue dark:prose-invert max-w-none">
+              <p className="text-xl text-gray-600 dark:text-gray-300 leading-relaxed">
+                El módulo de catálogos es el **centro de inteligencia** de la plataforma, donde se define la identidad corporativa y los estándares de seguridad que alimentan a todos los demás módulos.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+              <div className="p-6 bg-gray-50 dark:bg-slate-900/50 rounded-3xl border border-gray-100 dark:border-slate-800 group hover:border-blue-200 dark:hover:border-blue-900/50 transition-colors">
+                <div className="w-12 h-12 bg-white dark:bg-slate-800 rounded-2xl shadow-sm flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  <Building2 className="w-6 h-6 text-blue-600" />
+                </div>
+                <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Entidades y Subcontratistas</h4>
+                <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+                  Administre logos, firmas digitales de representantes legales y razones sociales. Esta información se inyecta automáticamente en sus DC-3 y dossiers de seguridad.
+                </p>
+              </div>
+
+              <div className="p-6 bg-gray-50 dark:bg-slate-900/50 rounded-3xl border border-gray-100 dark:border-slate-800 group hover:border-green-200 dark:hover:border-green-900/50 transition-colors">
+                <div className="w-12 h-12 bg-white dark:bg-slate-800 rounded-2xl shadow-sm flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  <UserCheck className="w-6 h-6 text-green-600" />
+                </div>
+                <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Agentes y Capacitación</h4>
+                <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+                  Registre instructores con registro STPS y médicos autorizados. Vital para la validez legal de las competencias laborales emitidas por el sistema.
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-6 border-t border-gray-100 dark:border-slate-800">
+              <div className="flex gap-3">
+                <span className="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl text-xs font-black uppercase tracking-tighter">Plan Intermedio</span>
+                <span className="px-4 py-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-xl text-xs font-black uppercase tracking-tighter">Plan Total</span>
+              </div>
+              <p className="text-xs text-gray-400 font-medium italic">
+                * Para proteger la integridad de los datos maestros, este módulo está deshabilitado en el Modo Demo.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
-    <div className="max-w-[100rem] mx-auto p-4 md:p-6 lg:p-8 space-y-6 animate-in fade-in duration-500">
+      <div className="p-4 md:p-8 space-y-8 animate-in fade-in duration-500">
       <div className="bg-white/90 dark:bg-slate-800/80 backdrop-blur-xl rounded-[2.5rem] p-6 lg:p-8 shadow-xl shadow-gray-200/50 dark:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.6)] border border-white/80 dark:border-slate-700/50">
         
         {/* HERO BENTO HEADER */}

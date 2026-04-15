@@ -72,7 +72,7 @@ export default function MaquinariaPage() {
   const formInicial = {
     num_economico: '', tipo: '', marca: '', anio: '', modelo: '', 
     color: '', serie: '', placa: '', horometro: '', 
-    intervalo_mantenimiento: '', fecha_ingreso_obra: '', id_subcontratista: '',
+    intervalo_mantenimiento: '', fecha_proximo_mantenimiento: '', fecha_ingreso_obra: '', id_subcontratista: '',
     area: 'seguridad', 
     imagen_url_actual: ''
   };
@@ -264,6 +264,7 @@ export default function MaquinariaPage() {
       anio: m.anio || '', modelo: m.modelo || '', color: m.color || '', 
       serie: m.serie || '', placa: m.placa || '', horometro: m.horometro_actual || '', 
       intervalo_mantenimiento: m.intervalo_mantenimiento || '', 
+      fecha_proximo_mantenimiento: m.fecha_proximo_mantenimiento ? formatForInput(m.fecha_proximo_mantenimiento) : '',
       fecha_ingreso_obra: formatForInput(m.fecha_ingreso_obra), 
       id_subcontratista: m.id_subcontratista || '', 
       area: m.area || 'seguridad',
@@ -337,14 +338,50 @@ export default function MaquinariaPage() {
     } catch (error) { Swal.fire('Error', 'Problema de conexión al guardar el servicio', 'error'); } finally { setSaving(false); }
   };
 
-  const renderBadge = (estado, horasRestantes) => {
-    if (estado === 'N/A') return <span className="text-gray-400 dark:text-gray-500 text-xs">No aplica</span>;
+  const renderBadge = (m) => {
+    // PRIORIDAD 1: Fecha de Próximo Mantenimiento (Equipo Menor)
+    if (m.fecha_proximo_mantenimiento) {
+      const fechaProx = new Date(m.fecha_proximo_mantenimiento);
+      const hoy = new Date();
+      // Ajustar hoy para ignorar horas para comparación pura de fechas si se desea, 
+      // pero aquí comparamos contra el periodo de exportación si existe
+      const mesFiltro = parseInt(exportMes) - 1;
+      const anioFiltro = parseInt(exportAnio);
+      const fechaReferencia = new Date(anioFiltro, mesFiltro, 1);
+      
+      const esVencido = fechaProx < fechaReferencia;
+      const esMesActual = fechaProx.getMonth() === mesFiltro && fechaProx.getFullYear() === anioFiltro;
+
+      if (esVencido) {
+        return (
+          <span className="px-2 py-1 inline-flex text-xs leading-5 font-bold rounded-full shadow-sm bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 animate-pulse">
+            Vencido ({formatDDMMYYYY(m.fecha_proximo_mantenimiento)})
+          </span>
+        );
+      }
+      if (esMesActual) {
+        return (
+          <span className="px-2 py-1 inline-flex text-xs leading-5 font-bold rounded-full shadow-sm bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300">
+            Requiere Mante. ({formatDDMMYYYY(m.fecha_proximo_mantenimiento)})
+          </span>
+        );
+      }
+      return (
+        <span className="px-2 py-1 inline-flex text-xs leading-5 font-bold rounded-full shadow-sm bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+          Programado ({formatDDMMYYYY(m.fecha_proximo_mantenimiento)})
+        </span>
+      );
+    }
+
+    // PRIORIDAD 2: Mantenimiento por Horas (Maquinaria Pesada)
+    if (m.estado_mantenimiento === 'N/A') return <span className="text-gray-400 dark:text-gray-500 text-xs">No aplica</span>;
     let colorClass = "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
-    if (estado === 'Vencido') colorClass = "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 animate-pulse";
-    else if (estado === 'Próximo') colorClass = "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300";
+    if (m.estado_mantenimiento === 'Vencido') colorClass = "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 animate-pulse";
+    else if (m.estado_mantenimiento === 'Próximo') colorClass = "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300";
+    
     return (
       <span className={`px-2 py-1 inline-flex text-xs leading-5 font-bold rounded-full shadow-sm ${colorClass}`}>
-        {estado === 'Vencido' ? `Vencido por ${Math.abs(horasRestantes)} hrs` : `Faltan ${horasRestantes} hrs`}
+        {m.estado_mantenimiento === 'Vencido' ? `Vencido por ${Math.abs(m.horas_restantes)} hrs` : `Faltan ${m.horas_restantes} hrs`}
       </span>
     );
   };
@@ -442,9 +479,12 @@ export default function MaquinariaPage() {
             <button onClick={handleExportarUtilizacion} className="flex-1 sm:flex-none justify-center bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
               <span className="mr-1">📊</span> <span className="hidden sm:inline">Utilización</span><span className="sm:hidden">Util</span>
             </button>
-            <a href={`/api/maquinaria/exportar-plan-servicio?${userArea === 'ambiental' ? `mes=${exportMes}&anio=${exportAnio}` : `mes=${exportMes}&anio=${exportAnio}`}&area_usuario=${userArea}`} target="_blank" className="flex-1 sm:flex-none justify-center bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
+            <button 
+              onClick={() => window.open(`/api/maquinaria/exportar-plan-servicio?${userArea === 'ambiental' ? `mes=${exportMes}&anio=${exportAnio}` : `mes=${exportMes}&anio=${exportAnio}`}&area_usuario=${userArea}`, '_blank')} 
+              className="flex-1 sm:flex-none justify-center bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center"
+            >
               <span className="mr-1">🛠️</span> <span className="hidden sm:inline">Servicio</span><span className="sm:hidden">Serv</span>
-            </a>
+            </button>
           </div>
           
           {canManageMaquinaria && (
@@ -471,7 +511,7 @@ export default function MaquinariaPage() {
           <select className="w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 shadow-sm focus:ring-[var(--recal-blue)] outline-none sm:text-sm" 
             value={filtroSub} onChange={(e) => setFiltroSub(e.target.value)}>
             <option value="">Todo el equipo en obra...</option>
-            {catPrincipales.map(empresa => <option key={empresa.id_subcontratista} value={empresa.id_subcontratista}>{empresa.razon_social}</option>)}
+            {catPrincipales && catPrincipales.map(empresa => <option key={empresa.id_subcontratista} value={empresa.id_subcontratista}>{empresa.razon_social}</option>)}
           </select>
         </div>
         <div className="md:col-span-1 flex items-end">
@@ -578,7 +618,7 @@ export default function MaquinariaPage() {
                         {m.fecha_baja ? (
                           <span className="px-2 inline-flex text-xs font-semibold rounded-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-300">Baja: {formatDDMMYYYY(m.fecha_baja)}</span>
                         ) : (
-                          renderBadge(m.estado_mantenimiento, m.horas_restantes)
+                          renderBadge(m)
                         )}
                       </div>
                     </td>
@@ -642,6 +682,7 @@ export default function MaquinariaPage() {
                           {m.creador ? (
                             <span className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 px-2 py-0.5 rounded text-[10px] font-bold border border-green-200 dark:border-green-800 w-max" title="Registrado por">
                               Agregó: {m.creador}
+                              {m.fecha_creacion && ` el ${new Date(m.fecha_creacion).toLocaleDateString('es-MX')}`}
                             </span>
                           ) : (
                             <span className="bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-400 px-2 py-0.5 rounded text-[10px] font-bold border border-gray-200 dark:border-slate-600 w-max" title="Registrado por Master">
@@ -651,6 +692,7 @@ export default function MaquinariaPage() {
                           {m.modificador && (
                             <span className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 px-2 py-0.5 rounded text-[10px] font-bold border border-yellow-200 dark:border-yellow-800 w-max" title="Modificado por">
                               Modificó: {m.modificador}
+                              {m.ultima_modificacion && ` el ${new Date(m.ultima_modificacion).toLocaleDateString('es-MX')}`}
                             </span>
                           )}
                         </div>

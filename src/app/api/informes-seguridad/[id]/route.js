@@ -107,12 +107,14 @@ export async function PUT(request, { params }) {
     }
 
     // 3. UPDATE informe principal
+    const usuario_actualizacion = request.headers.get('x-user-id') || null;
     await pool.query(
       `UPDATE informes_seguridad SET
         num_reporte = ?, id_subcontratista = ?, subcontratista = ?, mes_anio = ?,
-        periodo_inicio = ?, periodo_fin = ?, hh_semana_anterior = ?, hh_semana_actual = ?
+        periodo_inicio = ?, periodo_fin = ?, hh_semana_anterior = ?, hh_semana_actual = ?,
+        usuario_actualizacion = ?, ultima_modificacion = NOW()
        WHERE id_informe = ?`,
-      [num_reporte, id_subcontratista, subcontratista, mes_anio, periodo_inicio, periodo_fin, hh_semana_anterior, hh_semana_actual, id]
+      [num_reporte, id_subcontratista, subcontratista, mes_anio, periodo_inicio, periodo_fin, hh_semana_anterior, hh_semana_actual, usuario_actualizacion, id]
     );
 
     // 4. DELETE + re-INSERT ubicaciones

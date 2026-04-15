@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const trabajadorSchema = z.object({
   id_trabajador: z.number().optional(),
-  numero_empleado: z.string().min(1, "Número de empleado es obligatorio"),
+  numero_empleado: z.string().optional().nullable(),
   nombre_trabajador: z.string().min(1, "Nombre es obligatorio"),
   apellido_trabajador: z.string().optional().nullable(),
   puesto_categoria: z.string().min(1, "Puesto/Categoría es obligatorio"),

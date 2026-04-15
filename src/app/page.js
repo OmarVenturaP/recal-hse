@@ -134,6 +134,16 @@ export default function LandingPage() {
                   <span className="hidden md:inline">Explorar los </span> Módulos
                   <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </button>
+                <a 
+                  href="/login"
+                  className="w-full sm:w-auto px-10 py-4 rounded-2xl bg-blue-600/20 backdrop-blur-md border border-white/20 text-white text-lg font-black shadow-2xl hover:bg-blue-600/40 transition-all flex items-center justify-center gap-2 group transform active:scale-95"
+                >
+                  <span className="relative flex h-3 w-3 mr-1">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                  </span>
+                  Acceso Live Demo
+                </a>
               </div>
             </div>
           </Reveal>
@@ -470,6 +480,72 @@ export default function LandingPage() {
         </div>
       </section>
 
+
+      {/* 5. SECCIÓN LIVE DEMO (NUEVO) */}
+      <section id="demo-live" className="py-24 px-6 relative overflow-hidden bg-slate-50 dark:bg-slate-900/40">
+        <div className="max-w-7xl mx-auto">
+          <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-[4rem] p-12 md:p-20 text-white relative overflow-hidden shadow-2xl">
+            {/* Decoración */}
+            <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+            <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-400/20 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2"></div>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center relative z-10">
+              <Reveal>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-blue-100 text-[10px] font-black tracking-[0.2em] mb-6 uppercase">
+                  Acceso Inmediato
+                </div>
+                <h2 className="text-4xl md:text-6xl font-black tracking-tighter mb-6 leading-[0.9]">
+                  Prueba la Experiencia <br/> <span className="text-blue-200">Sin Compromisos</span>
+                </h2>
+                <p className="text-xl text-blue-100/80 mb-8 font-medium leading-relaxed">
+                  Accede a nuestro entorno de demostración y experimenta la potencia de ObrasOS en tiempo real. Agrega personal, gestiona maquinaria y visualiza reportes sin necesidad de registro.
+                </p>
+                <div className="flex flex-wrap gap-4 mb-8">
+                  <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 flex-1 min-w-[200px]">
+                    <span className="block text-[10px] uppercase font-black tracking-widest text-blue-200 mb-1">Correo Demo</span>
+                    <span className="text-lg font-bold">demo@obrasos.com</span>
+                  </div>
+                  <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 flex-1 min-w-[200px]">
+                    <span className="block text-[10px] uppercase font-black tracking-widest text-blue-200 mb-1">Contraseña</span>
+                    <span className="text-lg font-bold">ObrasOS</span>
+                  </div>
+                </div>
+                <Link 
+                  href="/login" 
+                  className="inline-flex items-center gap-3 px-8 py-4 bg-white text-blue-700 rounded-2xl font-black uppercase tracking-widest hover:bg-blue-50 transition-all shadow-xl"
+                >
+                  Entrar al Demo <ChevronRight className="w-5 h-5" />
+                </Link>
+              </Reveal>
+
+              <Reveal delay={200}>
+                <div className="bg-white/10 backdrop-blur-sm rounded-[3rem] p-8 border border-white/10 shadow-inner">
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-4 p-4 bg-white/5 rounded-2xl border border-white/5">
+                      <div className="w-12 h-12 bg-blue-400/20 rounded-xl flex items-center justify-center text-blue-200">
+                        <Zap className="w-6 h-6" />
+                      </div>
+                      <p className="text-sm font-bold text-blue-50 leading-tight">Interactúa con datos reales ya precargados en el sistema.</p>
+                    </div>
+                    <div className="flex items-center gap-4 p-4 bg-white/5 rounded-2xl border border-white/5">
+                      <div className="w-12 h-12 bg-emerald-400/20 rounded-xl flex items-center justify-center text-emerald-200">
+                        <FileBarChart className="w-6 h-6" />
+                      </div>
+                      <p className="text-sm font-bold text-blue-50 leading-tight">Visualiza vistas previas de alta fidelidad de todos los reportes.</p>
+                    </div>
+                    <div className="flex items-center gap-4 p-4 bg-white/5 rounded-2xl border border-white/5">
+                      <div className="w-12 h-12 bg-purple-400/20 rounded-xl flex items-center justify-center text-purple-200">
+                        <Users className="w-6 h-6" />
+                      </div>
+                      <p className="text-sm font-bold text-blue-50 leading-tight">Si tienes dudas, ¡contáctanos con total confianza!</p>
+                    </div>
+                  </div>
+                </div>
+              </Reveal>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* 5. SECCIÓN CALL TO ACTION (CTA) CON VIDEO LOOP */}
       <section id="demo" className="relative py-32 px-6 overflow-hidden min-h-[600px] flex items-center justify-center">

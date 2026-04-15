@@ -12,13 +12,20 @@ export async function GET(request) {
     const idEmpresa = request.headers.get('x-empresa-id');
     const userRole = request.headers.get('x-user-rol');
 
-    // --- MIGRACIÓN SILENCIOSA TIEMPO EXTRA ---
+    // --- MIGRACIÓN SILENCIOSA TIEMPO EXTRA Y TRAZABILIDAD ---
     try {
       const dias = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
       for (const d of dias) {
         try { await pool.query(`ALTER TABLE informes_seguridad_ft ADD COLUMN ext_hr_${d} DECIMAL(10,2) DEFAULT 0 AFTER per_${d}`); } catch(e) {}
         try { await pool.query(`ALTER TABLE informes_seguridad_ft ADD COLUMN ext_per_${d} INT DEFAULT 0 AFTER ext_hr_${d}`); } catch(e) {}
       }
+      // Trazabilidad y Homologación de columnas
+      try { await pool.query(`ALTER TABLE informes_seguridad CHANGE COLUMN creado_por usuario_registro INT`); } catch(e) {}
+      try { await pool.query(`ALTER TABLE informes_seguridad CHANGE COLUMN actualizado_por usuario_actualizacion INT`); } catch(e) {}
+      try { await pool.query(`ALTER TABLE informes_seguridad ADD COLUMN usuario_actualizacion INT AFTER usuario_registro`); } catch(e) {}
+      try { await pool.query(`ALTER TABLE informes_seguridad CHANGE COLUMN fecha_modificacion ultima_modificacion DATETIME`); } catch(e) {}
+      try { await pool.query(`ALTER TABLE informes_seguridad ADD COLUMN ultima_modificacion DATETIME AFTER usuario_actualizacion`); } catch(e) {}
+      try { await pool.query(`ALTER TABLE informes_seguridad ADD COLUMN fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP`); } catch(e) {}
     } catch (e) { /* Ignorar errores de migración */ }
 
     // Sub-endpoint: calcular hh_semana_anterior para un reporte nuevo
@@ -31,17 +38,17 @@ export async function GET(request) {
         return NextResponse.json({ success: true, hh_semana_anterior: 0 });
       }
 
-      let query = `SELECT hh_semana_actual FROM informes_seguridad WHERE mes_anio = ? AND id_subcontratista = ? AND num_reporte = ?`;
-      const params = [mes, idSub, numReporte - 1];
+      let query = `SELECT COALESCE(SUM(hh_semana_actual), 0) as hh_acumulada FROM informes_seguridad WHERE mes_anio = ? AND id_subcontratista = ? AND num_reporte < ?`;
+      const params = [mes, idSub, numReporte];
 
       if (userRole !== 'Master' && idEmpresa) {
         query += ` AND id_empresa = ?`;
         params.push(idEmpresa);
       }
 
-      const [prev] = await pool.query(query + " LIMIT 1", params);
+      const [prev] = await pool.query(query, params);
 
-      const hh = prev.length > 0 ? parseFloat(prev[0].hh_semana_actual) : 0;
+      const hh = prev.length > 0 ? parseFloat(prev[0].hh_acumulada) : 0;
       return NextResponse.json({ success: true, hh_semana_anterior: hh });
     }
 
@@ -61,11 +68,15 @@ export async function GET(request) {
 
     const [rows] = await pool.query(
       `SELECT i.*,
+        u1.nombre as creado_por_nombre,
+        u2.nombre as actualizado_por_nombre,
         (SELECT COALESCE(SUM(ft.total_hh_semana), 0) 
          FROM informes_seguridad_ft ft WHERE ft.id_informe = i.id_informe) as hh_total,
         (SELECT GROUP_CONCAT(u.pk_referencia SEPARATOR ', ')
          FROM informes_ubicaciones u WHERE u.id_informe = i.id_informe) as ubicaciones
        FROM informes_seguridad i
+       LEFT JOIN Personal_Area u1 ON i.usuario_registro = u1.id_personal
+       LEFT JOIN Personal_Area u2 ON i.usuario_actualizacion = u2.id_personal
        ${whereClause}
        ORDER BY i.subcontratista ASC, i.num_reporte ASC`,
       queryParams
@@ -98,13 +109,12 @@ export async function POST(request) {
     let hh_semana_anterior = 0;
     if (parseInt(num_reporte) > 1) {
       const [prev] = await pool.query(
-        `SELECT hh_semana_actual FROM informes_seguridad 
-         WHERE mes_anio = ? AND id_subcontratista = ? AND num_reporte = ? AND id_empresa = ?
-         LIMIT 1`,
-        [mes_anio, id_subcontratista, parseInt(num_reporte) - 1, id_empresa]
+        `SELECT SUM(hh_semana_actual) as hh_acumulada FROM informes_seguridad 
+         WHERE mes_anio = ? AND id_subcontratista = ? AND num_reporte < ? AND id_empresa = ?`,
+        [mes_anio, id_subcontratista, parseInt(num_reporte), id_empresa]
       );
-      if (prev.length > 0) {
-        hh_semana_anterior = parseFloat(prev[0].hh_semana_actual);
+      if (prev.length > 0 && prev[0].hh_acumulada !== null) {
+        hh_semana_anterior = parseFloat(prev[0].hh_acumulada);
       }
     }
 

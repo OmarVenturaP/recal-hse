@@ -87,7 +87,7 @@ export default function LoginPage() {
               value={correo}
               onChange={(e) => setCorreo(e.target.value)}
               className="w-full bg-gray-50/50 dark:bg-slate-900/50 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 text-gray-900 dark:text-white placeholder-gray-400 px-4 py-3 outline-none transition-all"
-              placeholder="tu@recalhse.com"
+              placeholder="tu@correo.com"
             />
           </div>
 
@@ -112,6 +112,25 @@ export default function LoginPage() {
             {loading ? 'INGRESANDO...' : 'ENTRAR AL SISTEMA'}
           </button>
         </form>
+
+        {/* MODO DEMO HELPER */}
+        <div className="mt-10 p-4 bg-indigo-50/50 dark:bg-indigo-900/20 rounded-2xl border border-indigo-100 dark:border-indigo-800/30 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
+            <svg className="w-12 h-12 text-indigo-600" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9l6 4.5-6 4.5z"/></svg>
+          </div>
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400 mb-3 ml-1">Acceso Demo Gratuito</p>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between text-xs bg-white/50 dark:bg-slate-900/50 p-2 rounded-lg border border-white dark:border-slate-800">
+              <span className="text-gray-500 font-bold uppercase tracking-tighter">Usuario:</span>
+              <span className="font-mono font-bold text-indigo-700 dark:text-indigo-300">demo@obrasos.com</span>
+            </div>
+            <div className="flex items-center justify-between text-xs bg-white/50 dark:bg-slate-900/50 p-2 rounded-lg border border-white dark:border-slate-800">
+              <span className="text-gray-500 font-bold uppercase tracking-tighter">Password:</span>
+              <span className="font-mono font-bold text-indigo-700 dark:text-indigo-300">demoObrasOS</span>
+            </div>
+          </div>
+          <p className="mt-3 text-[10px] text-indigo-500/60 font-medium italic text-center">Navega y prueba todas las funciones del sistema.</p>
+        </div>
 
       </div>
       </div>

@@ -310,6 +310,7 @@ export default function FuerzaTrabajoPage() {
       
       const res = await fetch(valUrl);
       const data = await res.json();
+      if (data.demoBlocked) return; // Demo: el modal de preview ya se mostró
 
       // 2. Si detecta trabajadores sin cuadrilla o sin categoría, mostramos el Alert
       if ((data.sinCuadrilla && data.sinCuadrilla.length > 0) || (data.sinCategoria && data.sinCategoria.length > 0)) {
@@ -413,12 +414,12 @@ export default function FuerzaTrabajoPage() {
 
   const handleEditClick = (trabajador) => {
     setFormData({
-      numero_empleado: trabajador.numero_empleado || '',
-      nombre_trabajador: trabajador.nombre_trabajador || '',
-      apellido_trabajador: trabajador.apellido_trabajador || '',
-      puesto_categoria: trabajador.puesto_categoria,
-      nss: trabajador.nss || '',
-      curp: trabajador.curp || '',
+      numero_empleado: trabajador.numero_empleado ? String(trabajador.numero_empleado) : '',
+      nombre_trabajador: trabajador.nombre_trabajador ? String(trabajador.nombre_trabajador) : '',
+      apellido_trabajador: trabajador.apellido_trabajador ? String(trabajador.apellido_trabajador) : '',
+      puesto_categoria: trabajador.puesto_categoria ? String(trabajador.puesto_categoria) : '',
+      nss: trabajador.nss ? String(trabajador.nss) : '',
+      curp: trabajador.curp ? String(trabajador.curp) : '',
       fecha_ingreso_obra: formatForInput(trabajador.fecha_ingreso_obra),
       fecha_alta_imss: formatForInput(trabajador.fecha_alta_imss),
       origen: trabajador.origen,
@@ -589,7 +590,7 @@ export default function FuerzaTrabajoPage() {
     setFechaFin(getDateString(hoy));
   };
 
-  const cuadrillasFiltradas = catCuadrillas.filter(c => c.id_subcontratista_principal == formData.id_subcontratista_principal);
+  const cuadrillasFiltradas = (catCuadrillas || []).filter(c => c.id_subcontratista_principal == formData.id_subcontratista_principal);
 
   const handleGenerarCertificadosMasivo = async () => {
     if (!fechaInicio || !fechaFin) {
@@ -603,6 +604,7 @@ export default function FuerzaTrabajoPage() {
       
       const res = await fetch(valUrl);
       const data = await res.json();
+      if (data.demoBlocked) return; // Demo: el modal de preview ya se mostró
       
       if (data.faltantes && data.faltantes.length > 0) {
           Swal.fire({
@@ -695,6 +697,17 @@ const handleDc3Submit = async (e) => {
       const response = await fetch(url);
       
       if (response.ok) {
+        // En modo Demo, el interceptor devuelve un JSON con demoBlocked: true
+        // Primero verificamos el tipo de contenido antes de procesar como blob
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const jsonData = await response.json();
+          if (jsonData.demoBlocked) {
+            setIsDc3ModalOpen(false);
+            return;
+          }
+        }
+
         // 1. Intentamos extraer el nombre del archivo desde los headers del backend
         const disposition = response.headers.get('Content-Disposition');
         let fileName = `DC3_${dc3Trabajador.nombre_trabajador}.docx`;
@@ -832,7 +845,7 @@ const handleDc3Submit = async (e) => {
           <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Contratista</label>
           <select className="w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md shadow-sm focus:ring-[var(--recal-blue)] p-2 sm:text-sm outline-none" value={filtroSub} onChange={(e) => setFiltroSub(e.target.value)}>
             <option value="">Todas...</option>
-            {catPrincipales.map(empresa => (<option key={empresa.id_subcontratista} value={empresa.id_subcontratista}>{empresa.razon_social}</option>))}
+            {(catPrincipales || []).map(empresa => (<option key={empresa.id_subcontratista} value={empresa.id_subcontratista}>{empresa.razon_social}</option>))}
           </select>
         </div>
         <div className="md:col-span-1 flex flex-col gap-2">
@@ -1050,6 +1063,7 @@ const handleDc3Submit = async (e) => {
                               {t.creador ? (
                                 <span className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 px-2 py-0.5 rounded text-[10px] font-bold border border-green-200 dark:border-green-800 flex-wrap break-words inline-block" title="Registrado por">
                                   Agregó: {t.creador}
+                                  {t.fecha_creacion && ` el ${new Date(t.fecha_creacion).toLocaleDateString('es-MX')}`}
                                 </span>
                               ) : (
                                 <span className="bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-400 px-2 py-0.5 rounded text-[10px] font-bold border border-gray-200 dark:border-slate-600 flex-wrap break-words inline-block" title="Registrado por Master">
@@ -1059,6 +1073,7 @@ const handleDc3Submit = async (e) => {
                               {t.modificador && (
                                 <span className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 px-2 py-0.5 rounded text-[10px] font-bold border border-yellow-200 dark:border-yellow-800 flex-wrap break-words inline-block" title="Modificado por">
                                   Modificó: {t.modificador}
+                                  {t.ultima_modificacion && ` el ${new Date(t.ultima_modificacion).toLocaleDateString('es-MX')}`}
                                 </span>
                               )}
                             </div>
@@ -1136,7 +1151,7 @@ const handleDc3Submit = async (e) => {
                     onChange={e => setFormData({...formData, puesto_categoria: e.target.value})}
                   >
                     <option value="" className="dark:bg-slate-800">Seleccione un puesto...</option>
-                    {catPuestos.map((puesto, index) => (
+                    {(catPuestos || []).map((puesto, index) => (
                       <option key={index} value={puesto} className="dark:bg-slate-800">{puesto}</option>
                     ))}
                   </select>

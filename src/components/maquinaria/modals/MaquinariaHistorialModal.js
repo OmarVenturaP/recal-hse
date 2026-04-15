@@ -62,10 +62,10 @@ export default function MaquinariaHistorialModal({
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
                 {historial.length === 0 ? (
-                  <tr><td colSpan="4" className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400 italic">No hay registros.</td></tr>
+                  <tr key="no-data"><td colSpan="4" className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400 italic">No hay registros.</td></tr>
                 ) : (
-                  historial.map((h) => (
-                    <tr key={h.id_mantenimiento} className="hover:bg-gray-50 dark:hover:bg-slate-700/50">
+                  historial.map((h, i) => (
+                    <tr key={h.id_mantenimiento || i} className="hover:bg-gray-50 dark:hover:bg-slate-700/50">
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200 font-medium">{formatDDMMYYYY(h.fecha_mantenimiento)}</td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm"><span className={`px-2 py-1 rounded text-xs font-bold ${h.tipo_mantenimiento === 'Preventivo' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' : 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300'}`}>{h.tipo_mantenimiento}</span></td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-center font-mono text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-slate-900/50">{h.horometro_mantenimiento !== null ? `${h.horometro_mantenimiento} hrs` : 'N/A'}</td>

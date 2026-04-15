@@ -8,14 +8,6 @@ const ModalPlanDetalles = ({ isOpen, onClose, currentPlan }) => {
 
   const plans = [
     {
-      name: 'Free',
-      price: 'Gratis',
-      color: 'bg-slate-100 text-slate-600 border-slate-200',
-      badge: 'bg-slate-200 text-slate-700',
-      icon: <Zap className="w-5 h-5" />,
-      features: ['Funciones Demo', 'Visualización limitada', 'Soporte base']
-    },
-    {
       name: 'Basico',
       price: '$499',
       oldPrice: '$999',
@@ -59,7 +51,7 @@ const ModalPlanDetalles = ({ isOpen, onClose, currentPlan }) => {
       />
       
       {/* Modal Content */}
-      <div className="relative w-full max-w-4xl bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 animate-in zoom-in-95 duration-300">
+      <div className="relative w-full max-w-5xl bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 animate-in zoom-in-95 duration-300">
         
         {/* Header */}
         <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-start bg-slate-50/50 dark:bg-slate-800/50">
@@ -76,7 +68,7 @@ const ModalPlanDetalles = ({ isOpen, onClose, currentPlan }) => {
         </div>
 
         {/* Planes Grid */}
-        <div className="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {plans.map((plan) => {
             const isCurrent = currentPlan.name.toLowerCase() === plan.name.toLowerCase();
             

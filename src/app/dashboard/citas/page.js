@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Plus, CheckCircle2, AlertCircle, XCircle, Clock, Info } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Plus, CheckCircle2, AlertCircle, XCircle, Clock, Info, ShieldAlert } from 'lucide-react';
 import Swal from 'sweetalert2';
 import DaySummaryModal from '@/components/citas/DaySummaryModal';
 import CitaModalForm from '@/components/citas/CitaModalForm';
@@ -37,8 +37,11 @@ export default function CitasDossierPage() {
 
   const [userRole, setUserRole] = useState(null);
   const [userArea, setUserArea] = useState(null);
+  const [useEmail, setUserEmail] = useState('');
+  const [userEmpresaId, setUserEmpresaId] = useState(null);
   const [userName, setUserName] = useState('');
   const [userPermisoCitas, setUserPermisoCitas] = useState(0);
+  const [authLoading, setAuthLoading] = useState(true);
   const [loading, setLoading] = useState(true);
 
   // Big Calendar Views
@@ -67,31 +70,44 @@ export default function CitasDossierPage() {
   const [formData, setFormData] = useState(formInicial);
 
   useEffect(() => {
-    fetch('/api/auth/me')
-      .then(res => res.json())
-      .then(data => {
+    async function checkAuth() {
+      try {
+        const res = await fetch('/api/auth/me');
+        const data = await res.json();
+        
         if (data.success) {
-          setUserRole(data.user.rol);
-          setUserArea(data.user.area);
-          setUserName(data.user.nombre);
-          setUserPermisoCitas(data.user.permisos_citas);
-          if (data.user.area !== 'Ambas') {
-            setActiveTab(data.user.area);
+          const u = data.user;
+          setUserRole(u.rol);
+          setUserArea(u.area);
+          setUserName(u.nombre);
+          setUserEmail(u.correo || u.email || '');
+          setUserEmpresaId(u.id_empresa);
+          setUserPermisoCitas(u.permisos_citas);
+          
+          if (u.area !== 'Ambas') {
+            setActiveTab(u.area);
+          }
+
+          // Solo cargar catálogos si el usuario es de Recal (ID 1) y no es Demo
+          const isDemo = (u.correo || u.email || '') === 'demo@obrasos.com';
+          if (u.id_empresa === 1 && !isDemo) {
+            fetch('/api/catalogos/subcontratistas')
+              .then(res => res.json())
+              .then(d => { if (d.success) setCatSubcontratistas(d.principales); });
+
+            fetch('/api/catalogos/revisores')
+              .then(res => res.json())
+              .then(d => { if (d.success) setCatUsuarios(d.data); });
           }
         }
-      });
-      
-    fetch('/api/catalogos/subcontratistas')
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) setCatSubcontratistas(data.principales);
-      });
+      } catch (error) {
+        console.error("Error al verificar auth:", error);
+      } finally {
+        setAuthLoading(false);
+      }
+    }
 
-    fetch('/api/catalogos/revisores')
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) setCatUsuarios(data.data);
-      });
+    checkAuth();
   }, []);
 
   const fetchCitas = async () => {
@@ -342,6 +358,51 @@ export default function CitasDossierPage() {
       Swal.fire('Error', 'No se pudo mover la cita por un error de conexión.', 'error');
     }
   };
+
+  if (authLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
+        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-gray-500 font-bold animate-pulse uppercase tracking-widest text-xs">Verificando Credenciales...</p>
+      </div>
+    );
+  }
+
+  const isDemo = useEmail === 'demo@obrasos.com';
+  const isAuthorized = userEmpresaId === 1 && !isDemo;
+
+  if (!isAuthorized) {
+    return (
+      <div className="p-4 md:p-8 max-w-4xl mx-auto min-h-[70vh] flex items-center justify-center animate-in fade-in duration-700">
+        <div className="bg-white dark:bg-slate-800 rounded-[3rem] p-10 md:p-16 shadow-2xl border border-gray-100 dark:border-slate-700 text-center relative overflow-hidden">
+          <div className="absolute -top-24 -right-24 w-64 h-64 bg-red-50 dark:bg-red-900/10 rounded-full blur-3xl opacity-50"></div>
+          
+          <div className="relative z-10 space-y-8">
+            <div className="w-24 h-24 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto shadow-inner">
+              <ShieldAlert className="w-12 h-12 text-red-600 dark:text-red-400" />
+            </div>
+            
+            <div className="space-y-4">
+              <h2 className="text-3xl md:text-4xl font-black text-gray-900 dark:text-white tracking-tight">
+                Módulo <span className="text-red-600">Restringido</span>
+              </h2>
+              <div className="h-1.5 w-16 bg-red-600 rounded-full mx-auto"></div>
+            </div>
+
+            <p className="text-lg text-gray-600 dark:text-gray-300 font-medium leading-relaxed max-w-lg mx-auto">
+              Esta sección es de uso exclusivo para el personal autorizado de <span className="font-bold text-gray-900 dark:text-white font-serif italic">Recal Estructuras</span>. 
+            </p>
+
+            <div className="bg-gray-50 dark:bg-slate-900/50 p-6 rounded-2xl border border-gray-100 dark:border-slate-800 inline-block">
+              <p className="text-sm text-gray-500 dark:text-gray-400 font-bold uppercase tracking-widest">
+                Modo Demo y Empresas Externas no tienen acceso a este tablero.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
