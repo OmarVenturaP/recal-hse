@@ -1,15 +1,46 @@
 import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
+import { jwtVerify } from 'jose';
 const pdf = require('pdf-parse');
+
+const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 
 export async function POST(request) {
   try {
-    const formData = await request.formData();
+    const contentType = request.headers.get('content-type') || '';
+    
+    if (!contentType.includes('multipart/form-data')) {
+      return NextResponse.json({ 
+        error: "Cabecera inválida", 
+        details: `Se esperaba multipart/form-data pero se recibió: ${contentType}. Asegúrate de que el archivo no sea demasiado pesado.` 
+      }, { status: 400 });
+    }
+
+    // Intentamos obtener el formData con un catch detallado
+    let formData;
+    try {
+      formData = await request.formData();
+    } catch (formError) {
+      console.error("Error al parsear FormData:", formError);
+      return NextResponse.json({ 
+        error: "Fallo al procesar el cuerpo de la petición (FormData)", 
+        details: formError.message,
+        hint: "Es posible que el archivo sea demasiado grande para el servidor o que la conexión se haya interrumpido."
+      }, { status: 400 });
+    }
+
     const file = formData.get('file');
 
     if (!file) {
       return NextResponse.json({ error: "No se envió ningún archivo" }, { status: 400 });
     }
+
+    // --- VERIFICACIÓN MANUAL DE IDENTIDAD (Bypass de Middleware para Multipart) ---
+    const token = request.cookies.get('hse_auth_token')?.value;
+    if (!token) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    
+    const { payload } = await jwtVerify(token, JWT_SECRET);
+    const idEmpresa = payload.id_empresa;
 
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
@@ -73,8 +104,6 @@ export async function POST(request) {
       return NextResponse.json({ success: false, message: "No se encontraron datos de trabajadores legibles." });
     }
 
-    const idEmpresa = request.headers.get('x-empresa-id');
-
     // Resultados finales
     const nuevos = [];
     const actualizaciones = [];
@@ -120,7 +149,9 @@ export async function POST(request) {
 
   } catch (error) {
     console.error("Error procesando PDF SUA:", error);
-    return NextResponse.json({ error: "Error al leer el archivo PDF" }, { status: 500 });
+    return NextResponse.json({ 
+      error: "Error al leer el archivo PDF" 
+    }, { status: 500 });
   }
 }
 
@@ -128,11 +159,17 @@ export async function POST(request) {
 export async function PUT(request) {
   try {
     const { nuevos, actualizaciones, id_subcontratista_principal } = await request.json();
-    const id_usuario_actual = request.headers.get('x-user-id');
-    const idEmpresa = request.headers.get('x-empresa-id');
+    
+    // --- VERIFICACIÓN MANUAL DE IDENTIDAD (Bypass Middleware) ---
+    const token = request.cookies.get('hse_auth_token')?.value;
+    if (!token) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    
+    const { payload } = await jwtVerify(token, JWT_SECRET);
+    const idEmpresa = payload.id_empresa;
+    const id_usuario_actual = payload.id_usuario || payload.id;
 
     if (!id_usuario_actual || !idEmpresa) {
-        return NextResponse.json({ error: "No se identificó al usuario o la empresa" }, { status: 401 });
+        return NextResponse.json({ error: "Token corrupto: faltan datos de identidad" }, { status: 401 });
     }
 
     // 1. Procesar Actualizaciones (Solo CURP)

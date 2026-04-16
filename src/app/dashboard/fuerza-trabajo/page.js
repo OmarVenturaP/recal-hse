@@ -457,10 +457,17 @@ export default function FuerzaTrabajoPage() {
       if (data.success) { 
         setIsModalOpen(false); fetchTrabajadores(); 
         Swal.fire('Guardado', 'Los datos del trabajador se guardaron correctamente.', 'success');
-      } else Swal.fire('Error', data.error, 'error');
+      } else {
+        if ((data.error?.includes('requiere una fecha de baja') || data.error?.includes('OBLIGATORIO ingresar una fecha de baja')) && !formData.tiene_baja) {
+          setFormData(prev => ({ ...prev, tiene_baja: true }));
+          Swal.fire('Conflicto de Fechas', data.error, 'warning');
+        } else {
+          Swal.fire('Error', data.error, 'error');
+        }
+      }
     } catch (err) {
       console.error(err);
-      Swal.fire('Error', 'Error al procesar el archivo', 'error');
+      Swal.fire('Error', 'Error al procesar la solicitud', 'error');
     } finally {
       setSaving(false);
     }
@@ -500,7 +507,7 @@ export default function FuerzaTrabajoPage() {
           setSuaFase(2);
         }
       } else {
-        Swal.fire('Error', result.message || 'Error al procesar PDF', 'error');
+        Swal.fire('Error', result.details || result.error || 'Error al procesar PDF', 'error');
       }
     } catch (error) {
       console.error(error);
@@ -581,6 +588,34 @@ export default function FuerzaTrabajoPage() {
         Swal.fire('Baja Confirmada', 'El trabajador ha sido dado de baja.', 'success');
       } else Swal.fire('Error', data.error, 'error');
     } catch (error) { Swal.fire('Error', 'Error de conexión', 'error'); } finally { setSaving(false); }
+  };
+
+  const handleEliminarPermanente = async (id) => {
+    const result = await Swal.fire({
+      title: 'ELIMINACIÓN PERMANENTE',
+      html: "Esta acción borrará físicamente el registro de la base de datos.<br><br><b>ATENCIÓN:</b> Solo debe usarse para registros duplicados o incorrectos. Si el trabajador está asociado a otros reportes, el sistema impedirá el borrado para proteger la integridad.",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Sí, borrar registro',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const res = await fetch(`/api/fuerza-trabajo?id=${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.success) {
+          Swal.fire('Eliminado', data.mensaje, 'success');
+          fetchTrabajadores();
+        } else {
+          Swal.fire('Operación Cancelada', data.error, 'error');
+        }
+      } catch (error) {
+        Swal.fire('Error', 'Ocurrió un error de conexión', 'error');
+      }
+    }
   };
 
   const limpiarFiltros = () => { 
@@ -948,20 +983,35 @@ const handleDc3Submit = async (e) => {
                       
                       <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 text-sm border-b dark:border-slate-700 md:border-none">
                         <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Info:</span>
-                        {canManageFt && (
-                          <label className="relative inline-flex items-center cursor-pointer mt-1">
-                            <input 
-                              type="checkbox" 
-                              className="sr-only peer" 
-                              checked={t.bActivo !== 0}
-                              onChange={() => handleToggleActivo(t.id_trabajador, t.bActivo)} 
-                            />
-                            <div className="w-7 h-4 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all dark:border-gray-500 peer-checked:bg-[var(--recal-blue)]"></div>
-                            <span className="ml-2 text-[10px] font-bold text-gray-600 dark:text-gray-400">
-                              {t.bActivo !== 0 ? 'ON' : 'OFF'}
-                            </span>
-                          </label>
-                          )}
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center gap-2">
+                            {canManageFt && (
+                              <label className="relative inline-flex items-center cursor-pointer">
+                                <input 
+                                  type="checkbox" 
+                                  className="sr-only peer" 
+                                  checked={t.bActivo !== 0}
+                                  onChange={() => handleToggleActivo(t.id_trabajador, t.bActivo)} 
+                                />
+                                <div className="w-7 h-4 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all dark:border-gray-500 peer-checked:bg-[var(--recal-blue)]"></div>
+                                <span className="ml-2 text-[10px] font-bold text-gray-600 dark:text-gray-400">
+                                  {t.bActivo !== 0 ? 'ON' : 'OFF'}
+                                </span>
+                              </label>
+                            )}
+                            {(userRole === 'Admin' || userRole === 'Master') && (
+                              <button 
+                                onClick={() => handleEliminarPermanente(t.id_trabajador)} 
+                                className="group relative flex items-center justify-center bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-800 text-red-700 dark:text-red-400 p-1.5 rounded-md transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                                <div className="absolute bottom-full mb-1 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
+                                  Eliminar Permanente
+                                  <div className="absolute top-full left-1/2 -translate-x-1/2 border-[3px] border-transparent border-t-gray-800"></div>
+                                </div>
+                              </button>
+                            )}
+                          </div>
                           <div className="flex flex-col items-end md:items-start gap-2">
                           <div className="flex flex-wrap gap-1 justify-end md:justify-start">
                             {!isAlta && !faltaCurp && !hayCurp && <span className="text-gray-400 dark:text-gray-600">-</span>}
@@ -975,6 +1025,7 @@ const handleDc3Submit = async (e) => {
                                </span>
                              )}
                           </div>
+                        </div>
                         </div>
                       </td>
 
@@ -1157,8 +1208,8 @@ const handleDc3Submit = async (e) => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Número de Seguridad Social (NSS)</label>
-                  <input type="text" maxLength={11} className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none placeholder-gray-400 dark:placeholder-gray-500" placeholder="11 dígitos" value={formData.nss} onChange={e => setFormData({...formData, nss: e.target.value})} />
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Número de Seguridad Social (NSS) *</label>
+                  <input required pattern="\d{11}" type="text" maxLength={11} className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 focus:ring-[var(--recal-blue)] outline-none placeholder-gray-400 dark:placeholder-gray-500" placeholder="11 dígitos" value={formData.nss} onChange={e => setFormData({...formData, nss: e.target.value})} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">CURP (Opcional)</label>

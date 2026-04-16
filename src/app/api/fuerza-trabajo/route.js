@@ -101,32 +101,42 @@ export async function POST(request) {
     if (!id_usuario_actual) return NextResponse.json({ error: "Usuario no identificado" }, { status: 401 });
     if (!idEmpresa) return NextResponse.json({ error: "Empresa no identificada" }, { status: 400 });
 
-    // --- REGLA DE NEGOCIO: VALIDACIÓN DE NSS Y CURP ---
+    // --- REGLA DE NEGOCIO: VALIDACIÓN DE SOLAPAMIENTO DE PERIODOS (NSS/CURP) ---
     if (nss || curp) {
-      let duplicateQuery = `SELECT id_subcontratista_principal, fecha_baja, nss, curp FROM Fuerza_Trabajo WHERE id_empresa = ? AND (1=0`;
-      const duplicateParams = [idEmpresa];
+      const [registros] = await pool.query(
+        `SELECT id_trabajador, fecha_ingreso_obra, fecha_baja, nss, curp 
+         FROM Fuerza_Trabajo 
+         WHERE id_empresa = ? AND (nss = ? OR curp = ?)`,
+        [idEmpresa, nss || 'N/A', curp || 'N/A']
+      );
 
-      if (nss) {
-        duplicateQuery += ` OR nss = ?`;
-        duplicateParams.push(nss);
-      }
-      if (curp) {
-        duplicateQuery += ` OR curp = ?`;
-        duplicateParams.push(curp);
-      }
-      duplicateQuery += `)`;
+      const nIngreso = new Date(fecha_ingreso_obra);
+      const nBaja = body.fecha_baja ? new Date(body.fecha_baja) : null;
 
-      const [duplicados] = await pool.query(duplicateQuery, duplicateParams);
-
-      if (duplicados.length > 0) {
-        const activo = duplicados.some(d => d.fecha_baja === null);
-        if (activo) {
-          return NextResponse.json({ success: false, error: "El NSS o CURP ya se encuentra activo en esta empresa." }, { status: 400 });
-        }
+      for (const reg of registros) {
+        const eIngreso = new Date(reg.fecha_ingreso_obra);
+        const eBaja = reg.fecha_baja ? new Date(reg.fecha_baja) : null;
         
-        const mismaEmpresa = duplicados.some(d => d.id_subcontratista_principal === parseInt(id_subcontratista_principal));
-        if (mismaEmpresa) {
-          return NextResponse.json({ success: false, error: "Este trabajador ya estuvo registrado con esta subcontratista en esta empresa." }, { status: 400 });
+        const fmtDate = (d) => d ? new Date(d).toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Actualidad';
+
+        // 1. Validar si requiere baja obligatoria (si el nuevo ingreso es previo a uno existente)
+        if (!nBaja && eIngreso > nIngreso) {
+          return NextResponse.json({ 
+            success: false, 
+            error: `Este trabajador ya cuenta con un ingreso posterior el ${fmtDate(eIngreso)}. Para registrar este periodo anterior, es OBLIGATORIO ingresar una fecha de baja que no solape.` 
+          }, { status: 400 });
+        }
+
+        // 2. Validar solapamiento estándar
+        // (StartA <= EndB OR EndB is NULL) AND (EndA >= StartB OR EndA is NULL)
+        const conflictIngreso = nIngreso <= (eBaja || new Date('2099-12-31'));
+        const conflictBaja = (nBaja || new Date('2099-12-31')) >= eIngreso;
+
+        if (conflictIngreso && conflictBaja) {
+          return NextResponse.json({ 
+            success: false, 
+            error: `Solapamiento de fechas detectado. El trabajador ya tiene un registro del ${fmtDate(eIngreso)} al ${fmtDate(eBaja)}.` 
+          }, { status: 400 });
         }
       }
     }
@@ -172,32 +182,41 @@ export async function PUT(request) {
     if (!id_usuario_actual) return NextResponse.json({ error: "Usuario no identificado" }, { status: 401 });
     if (!id_trabajador) return NextResponse.json({ error: "ID de trabajador faltante" }, { status: 400 });
 
-    // --- REGLA DE NEGOCIO: VALIDACIÓN DE NSS Y CURP AL ACTUALIZAR ---
+    // --- REGLA DE NEGOCIO: VALIDACIÓN DE SOLAPAMIENTO AL ACTUALIZAR ---
     if (nss || curp) {
-      let duplicateQuery = `SELECT id_subcontratista_principal, fecha_baja, nss, curp FROM Fuerza_Trabajo WHERE id_empresa = ? AND id_trabajador != ? AND (1=0`;
-      const duplicateParams = [idEmpresa, id_trabajador];
+      const [registros] = await pool.query(
+        `SELECT id_trabajador, fecha_ingreso_obra, fecha_baja, nss, curp 
+         FROM Fuerza_Trabajo 
+         WHERE id_empresa = ? AND id_trabajador != ? AND (nss = ? OR curp = ?)`,
+        [idEmpresa, id_trabajador, nss || 'N/A', curp || 'N/A']
+      );
 
-      if (nss) {
-        duplicateQuery += ` OR nss = ?`;
-        duplicateParams.push(nss);
-      }
-      if (curp) {
-        duplicateQuery += ` OR curp = ?`;
-        duplicateParams.push(curp);
-      }
-      duplicateQuery += `)`;
+      const nIngreso = new Date(fecha_ingreso_obra);
+      const nBaja = body.tiene_baja && body.fecha_baja ? new Date(body.fecha_baja) : null;
 
-      const [duplicados] = await pool.query(duplicateQuery, duplicateParams);
-
-      if (duplicados.length > 0) {
-        const activo = duplicados.some(d => d.fecha_baja === null);
-        if (activo) {
-          return NextResponse.json({ success: false, error: "Este NSS o CURP ya se encuentra activo en otro registro de esta empresa." }, { status: 400 });
-        }
+      for (const reg of registros) {
+        const eIngreso = new Date(reg.fecha_ingreso_obra);
+        const eBaja = reg.fecha_baja ? new Date(reg.fecha_baja) : null;
         
-        const mismaEmpresa = duplicados.some(d => d.id_subcontratista_principal === parseInt(id_subcontratista_principal));
-        if (mismaEmpresa) {
-          return NextResponse.json({ success: false, error: "Este trabajador ya estuvo registrado con esta subcontratista anteriormente en esta empresa." }, { status: 400 });
+        const fmtDate = (d) => d ? new Date(d).toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Actualidad';
+
+        // 1. Validar si requiere baja obligatoria 
+        if (!nBaja && eIngreso > nIngreso) {
+          return NextResponse.json({ 
+            success: false, 
+            error: `El trabajador tiene un ingreso posterior el ${fmtDate(eIngreso)}. Este registro requiere una fecha de baja para evitar solapamientos.` 
+          }, { status: 400 });
+        }
+
+        // 2. Validar solapamiento estándar
+        const conflictIngreso = nIngreso <= (eBaja || new Date('2099-12-31'));
+        const conflictBaja = (nBaja || new Date('2099-12-31')) >= eIngreso;
+
+        if (conflictIngreso && conflictBaja) {
+          return NextResponse.json({ 
+            success: false, 
+            error: `Solapamiento detectado. Ya existe un registro para este periodo (${fmtDate(eIngreso)} - ${fmtDate(eBaja)}).` 
+          }, { status: 400 });
         }
       }
     }
@@ -271,5 +290,58 @@ export async function PATCH(request) {
   } catch (error) {
     console.error("Error en PATCH:", error);
     return NextResponse.json({ success: false, error: "Error interno en BD" }, { status: 500 });
+  }
+}
+
+// --- DELETE: Eliminación Permanente ---
+export async function DELETE(request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id_trabajador = searchParams.get('id');
+    const id_usuario_actual = request.headers.get('x-user-id');
+    const idEmpresa = request.headers.get('x-empresa-id');
+    const userRol = request.headers.get('x-user-rol');
+
+    if (!id_usuario_actual) {
+      return NextResponse.json({ error: "Usuario no identificado" }, { status: 401 });
+    }
+
+    if (!id_trabajador) {
+      return NextResponse.json({ error: "Falta el ID del trabajador" }, { status: 400 });
+    }
+
+    // Validación estricta de Roles para Hard Delete
+    if (userRol !== 'Master' && userRol !== 'Admin') {
+      return NextResponse.json({ success: false, error: "Solo los administradores pueden eliminar registros permanentemente." }, { status: 403 });
+    }
+
+    let query = "DELETE FROM Fuerza_Trabajo WHERE id_trabajador = ?";
+    const queryParams = [id_trabajador];
+
+    if (userRol !== 'Master' && idEmpresa) {
+      query += " AND id_empresa = ?";
+      queryParams.push(idEmpresa);
+    }
+
+    const [result] = await pool.query(query, queryParams);
+
+    if (result.affectedRows === 0) {
+      return NextResponse.json({ success: false, error: "No se encontró el registro o no tienes permisos para eliminarlo." }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, mensaje: "Registro eliminado permanentemente de la base de datos." });
+
+  } catch (error) {
+    console.error("Error en DELETE (Hard Delete):", error);
+    
+    // Si mysql retorna un error de foreign key
+    if (error.code === 'ER_ROW_IS_REFERENCED_2') {
+      return NextResponse.json({ 
+        success: false, 
+        error: "No se puede eliminar porque este trabajador ya está vinculado a reportes o inspecciones. Use la baja lógica en su lugar." 
+      }, { status: 400 });
+    }
+
+    return NextResponse.json({ success: false, error: "Error al eliminar en la base de datos." }, { status: 500 });
   }
 }

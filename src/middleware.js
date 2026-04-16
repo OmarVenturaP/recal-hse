@@ -62,6 +62,13 @@ export async function middleware(request) {
       requestHeaders.set('x-user-rol', payload.rol);
       requestHeaders.set('x-empresa-id', payload.id_empresa || ''); // <-- NUEVO: Inyección del ID de tenant
 
+      // IMPORTANTE: Si es una subida de archivos (multipart), no sobreescribimos el 'request' 
+      // porque NextResponse.next({ request: { headers } }) consume/rompe el body stream en algunas versiones.
+      const contentType = request.headers.get('content-type') || '';
+      if (contentType.includes('multipart/form-data')) {
+        return NextResponse.next();
+      }
+
       return NextResponse.next({
         request: {
           headers: requestHeaders,
@@ -89,7 +96,7 @@ export const config = {
     '/',
     '/login',
     '/dashboard/:path*',
-    '/api/:path*', // NUEVO: Ahora el guardia también protege todas tus consultas a MySQL
-    '/cambiar-password' // NUEVO: Protegemos la ruta de cambiar contraseña
+    '/api/((?!fuerza-trabajo/importar-sua).*)', // Protegemos todas las apis EXCEPTO la importación multipart para evitar que Next.js rompa el FormData
+    '/cambiar-password'
   ]
 };
