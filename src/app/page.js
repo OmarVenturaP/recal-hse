@@ -134,8 +134,8 @@ export default function LandingPage() {
                   <span className="hidden md:inline">Explorar los </span> Módulos
                   <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </button>
-                <a 
-                  href="/login"
+                <Link 
+                  href="https://demo.obras-os.com/login/demo"
                   className="w-full sm:w-auto px-10 py-4 rounded-2xl bg-blue-600/20 backdrop-blur-md border border-white/20 text-white text-lg font-black shadow-2xl hover:bg-blue-600/40 transition-all flex items-center justify-center gap-2 group transform active:scale-95"
                 >
                   <span className="relative flex h-3 w-3 mr-1">
@@ -143,7 +143,7 @@ export default function LandingPage() {
                     <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
                   </span>
                   Acceso Live Demo
-                </a>
+                </Link>
               </div>
             </div>
           </Reveal>
@@ -482,7 +482,19 @@ export default function LandingPage() {
 
 
       {/* 5. SECCIÓN LIVE DEMO (NUEVO) */}
-      <section id="demo-live" className="py-24 px-6 relative overflow-hidden bg-slate-50 dark:bg-slate-900/40">
+      <section id="demo" className="py-24 px-6 relative overflow-hidden bg-slate-50 dark:bg-slate-900/40">
+      <div className="absolute inset-0 z-0">
+          <div className="absolute inset-0 bg-blue-900/60 dark:bg-blue-950/80 z-10 backdrop-blur-sm"></div>
+          <video
+            ref={videoRef}
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="w-full h-full object-cover"
+            src="https://res.cloudinary.com/ddl8myqbt/video/upload/q_auto/f_auto/v1775844100/hero_bxizkt.mp4"
+          ></video>
+        </div>
         <div className="max-w-7xl mx-auto">
           <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-[4rem] p-12 md:p-20 text-white relative overflow-hidden shadow-2xl">
             {/* Decoración */}
@@ -511,7 +523,7 @@ export default function LandingPage() {
                   </div>
                 </div>
                 <Link 
-                  href="/login" 
+                  href="https://demo.obras-os.com/login/demo" 
                   className="inline-flex items-center gap-3 px-8 py-4 bg-white text-blue-700 rounded-2xl font-black uppercase tracking-widest hover:bg-blue-50 transition-all shadow-xl"
                 >
                   Entrar al Demo <ChevronRight className="w-5 h-5" />
@@ -531,7 +543,7 @@ export default function LandingPage() {
                       <div className="w-12 h-12 bg-emerald-400/20 rounded-xl flex items-center justify-center text-emerald-200">
                         <FileBarChart className="w-6 h-6" />
                       </div>
-                      <p className="text-sm font-bold text-blue-50 leading-tight">Visualiza vistas previas de alta fidelidad de todos los reportes.</p>
+                      <p className="text-sm font-bold text-blue-50 leading-tight">Visualiza vistas previas de todos los reportes.</p>
                     </div>
                     <div className="flex items-center gap-4 p-4 bg-white/5 rounded-2xl border border-white/5">
                       <div className="w-12 h-12 bg-purple-400/20 rounded-xl flex items-center justify-center text-purple-200">
@@ -539,55 +551,12 @@ export default function LandingPage() {
                       </div>
                       <p className="text-sm font-bold text-blue-50 leading-tight">Si tienes dudas, ¡contáctanos con total confianza!</p>
                     </div>
-                  </div>
-                </div>
-              </Reveal>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 5. SECCIÓN CALL TO ACTION (CTA) CON VIDEO LOOP */}
-      <section id="demo" className="relative py-32 px-6 overflow-hidden min-h-[600px] flex items-center justify-center">
-        {/* VIDEO BACKGROUND LOOP */}
-        <div className="absolute inset-0 z-0">
-          <div className="absolute inset-0 bg-blue-900/60 dark:bg-blue-950/80 z-10 backdrop-blur-sm"></div>
-          <video
-            ref={videoRef}
-            autoPlay
-            loop
-            muted
-            playsInline
-            className="w-full h-full object-cover"
-            src="https://res.cloudinary.com/ddl8myqbt/video/upload/q_auto/f_auto/v1775844100/hero_bxizkt.mp4"
-          ></video>
-        </div>
-
-        <div className="max-w-5xl mx-auto relative z-10 text-center">
-          <Reveal>
-            <div className="bg-white/10 backdrop-blur-3xl border border-white/20 rounded-[4rem] p-12 md:p-20 shadow-2xl border-t-white/30 border-l-white/30">
-              <span className="inline-block px-4 py-1.5 rounded-full bg-blue-400/20 text-blue-100 text-[10px] font-black uppercase tracking-[0.4em] mb-8 border border-white/10">
-                Prueba la Potencia Real
-              </span>
-              <h2 className="text-4xl md:text-7xl font-black text-white tracking-tighter mb-8 leading-[0.9]">
-                ¿Listo para ver la potencia real? <br/> <span className="text-blue-200">DEMO GRATUITO</span>
-              </h2>
-              <p className="text-xl text-blue-100/70 mb-12 max-w-2xl mx-auto font-medium">
-                Accede a nuestro entorno de prueba sin costo o contáctanos para resolver cualquier duda técnica o comercial.
-              </p>
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-                <Link 
-                  href="/login" 
-                  className="w-full sm:w-auto px-10 py-5 rounded-2xl bg-white/20 backdrop-blur-md border border-white/30 text-white text-lg font-black uppercase tracking-widest shadow-xl hover:bg-white/30 transition-all flex items-center justify-center gap-3 active:scale-95"
-                >
-                  <LayoutDashboard className="w-5 h-5" />
-                  Ir al DEMO
-                </Link>
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
                 <a 
                   href="https://wa.me/529619326182?text=Hola,%20me%20gustaría%20solicitar%20información%20sobre%20ObrasOS%20-%20DOCS" 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="w-full sm:w-auto px-10 py-5 rounded-2xl bg-[#25D366] text-white text-lg font-black uppercase tracking-widest shadow-xl shadow-green-900/20 hover:-translate-y-1 transition-all flex items-center justify-center gap-3"
+                  className="w-full sm:w-auto px-5 py-5 rounded-2xl bg-[#25D366] text-white text-lg font-black uppercase tracking-widest shadow-xl shadow-green-900/20 hover:-translate-y-1 transition-all flex items-center justify-center gap-3"
                 >
                   <div className="bg-white/20 p-2 rounded-lg">
                     <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.049-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.399-4.385 9.814-9.784 9.814zM20.52 3.449C18.24 1.245 15.24 0 12.045 0c-7.21 0-13.08 5.87-13.084 13.09a13.048 13.048 0 001.781 6.588L0 24l4.411-1.157a13.066 13.066 0 006.331 1.638h.005c7.218 0 13.087-5.87 13.09-13.09a13.02 13.02 0 00-3.317-9.522z"/></svg>
@@ -596,16 +565,19 @@ export default function LandingPage() {
                 </a>
                 <a 
                   href="tel:9619326182" 
-                  className="w-full sm:w-auto px-10 py-5 rounded-2xl bg-white text-slate-900 text-lg font-black uppercase tracking-widest shadow-xl hover:-translate-y-1 transition-all flex items-center justify-center gap-3"
+                  className="w-full sm:w-auto px-5 py-5 rounded-2xl bg-white text-slate-900 text-lg font-black uppercase tracking-widest shadow-xl hover:-translate-y-1 transition-all flex items-center justify-center gap-3"
                 >
                   <div className="bg-slate-100 p-2 rounded-lg">
                     <Phone className="w-5 h-5" />
                   </div>
-                  Llamar Ahora
+                  Llamanos
                 </a>
               </div>
+                  </div>
+                </div>
+              </Reveal>
             </div>
-          </Reveal>
+          </div>
         </div>
       </section>
 
