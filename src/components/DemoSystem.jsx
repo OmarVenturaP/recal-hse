@@ -159,7 +159,7 @@ export default function DemoSystem({ children, userEmail, onUpgradeClick }) {
         return new Response(JSON.stringify({
           success: true,
           user: { 
-            nombre: 'Usuario Demo',
+            nombre: 'Ingeniero Demo',
             rol: 'Master', 
             plan_suscripcion: 'Total', 
             correo: 'demo@obrasos.com',
@@ -577,8 +577,7 @@ export default function DemoSystem({ children, userEmail, onUpgradeClick }) {
         type: 'CARTA_SIMPLE',
         icon: '📑',
         title: 'EXPORTACIÓN DE INFORME SEMANAL',
-        message: 'Se generará el reporte semanal de seguridad con los gráficos, matriz H.H., hallazgos fotográficos y firmas autorizadas.',
-        disclaimer: 'En la versión Completa, este informe se exporta a Excel con macros formuladas y se puede imprimir o descargar.'
+        disclaimer: 'Se generará el reporte semanal de seguridad con los gráficos, matriz H.H., hallazgos fotográficos y personal autorizado.',
       });
       return;
     }

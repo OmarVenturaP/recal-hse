@@ -570,14 +570,21 @@ export default function LandingPage() {
                 Prueba la Potencia Real
               </span>
               <h2 className="text-4xl md:text-7xl font-black text-white tracking-tighter mb-8 leading-[0.9]">
-                ¿Listo para dar el siguiente paso? <br/> <span className="text-blue-200">Solicita tu DEMO</span>
+                ¿Listo para ver la potencia real? <br/> <span className="text-blue-200">DEMO GRATUITO</span>
               </h2>
               <p className="text-xl text-blue-100/70 mb-12 max-w-2xl mx-auto font-medium">
-                Te mostramos cómo nuestra plataforma puede transformar la gestión documental de tu obra en minutos.
+                Accede a nuestro entorno de prueba sin costo o contáctanos para resolver cualquier duda técnica o comercial.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
+                <Link 
+                  href="/login" 
+                  className="w-full sm:w-auto px-10 py-5 rounded-2xl bg-white/20 backdrop-blur-md border border-white/30 text-white text-lg font-black uppercase tracking-widest shadow-xl hover:bg-white/30 transition-all flex items-center justify-center gap-3 active:scale-95"
+                >
+                  <LayoutDashboard className="w-5 h-5" />
+                  Ir al DEMO
+                </Link>
                 <a 
-                  href="https://wa.me/529619326182?text=Hola,%20me%20gustaría%20solicitar%20una%20DEMO%20de%20ObrasOS%20-%20DOCS" 
+                  href="https://wa.me/529619326182?text=Hola,%20me%20gustaría%20solicitar%20información%20sobre%20ObrasOS%20-%20DOCS" 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="w-full sm:w-auto px-10 py-5 rounded-2xl bg-[#25D366] text-white text-lg font-black uppercase tracking-widest shadow-xl shadow-green-900/20 hover:-translate-y-1 transition-all flex items-center justify-center gap-3"

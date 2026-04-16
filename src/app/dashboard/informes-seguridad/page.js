@@ -482,7 +482,7 @@ export default function InformesSeguridad() {
     if ((formData.fotos || []).length < 4) {
       const { isConfirmed } = await Swal.fire({
         title: 'Pocas evidencias fotográficas',
-        text: `Solo se han cargado ${(formData.fotos || []).length} foto(s). Se recomienda incluir al menos 4 evidencias por informe. ¿Deseas guardar de todas formas?`,
+        text: `Solo se han cargado ${(formData.fotos || []).length} foto(s). Se recomienda incluir al menos 6 evidencias por informe. ¿Deseas guardar de todas formas?`,
         icon: 'warning',
         showCancelButton: true,
         confirmButtonText: 'Sí, guardar',
