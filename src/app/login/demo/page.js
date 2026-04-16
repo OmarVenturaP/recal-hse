@@ -130,7 +130,7 @@ export default function LoginDemoPage() {
         <div className="mt-8 text-center">
           <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
             ¿Buscas tu cuenta real? 
-            <a href="/login" className="ml-2 text-blue-400 hover:text-white transition-colors border-b border-blue-400/30">Acceso Estándar</a>
+            <a href="https://docs.obras-os.com/login" className="ml-2 text-blue-400 hover:text-white transition-colors border-b border-blue-400/30">Acceso Estándar</a>
           </p>
         </div>
 

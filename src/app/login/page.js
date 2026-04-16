@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -114,22 +115,20 @@ export default function LoginPage() {
         </form>
 
         {/* MODO DEMO HELPER */}
-        <div className="mt-10 p-4 bg-indigo-50/50 dark:bg-indigo-900/20 rounded-2xl border border-indigo-100 dark:border-indigo-800/30 relative overflow-hidden group">
+        <div className="mt-10 p-6 bg-indigo-50/50 dark:bg-indigo-900/20 rounded-2xl border border-indigo-100 dark:border-indigo-800/30 relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
             <svg className="w-12 h-12 text-indigo-600" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9l6 4.5-6 4.5z"/></svg>
           </div>
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400 mb-3 ml-1">Acceso Demo Gratuito</p>
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between text-xs bg-white/50 dark:bg-slate-900/50 p-2 rounded-lg border border-white dark:border-slate-800">
-              <span className="text-gray-500 font-bold uppercase tracking-tighter">Usuario:</span>
-              <span className="font-mono font-bold text-indigo-700 dark:text-indigo-300">demo@obrasos.com</span>
-            </div>
-            <div className="flex items-center justify-between text-xs bg-white/50 dark:bg-slate-900/50 p-2 rounded-lg border border-white dark:border-slate-800">
-              <span className="text-gray-500 font-bold uppercase tracking-tighter">Password:</span>
-              <span className="font-mono font-bold text-indigo-700 dark:text-indigo-300">demoObrasOS</span>
-            </div>
-          </div>
-          <p className="mt-3 text-[10px] text-indigo-500/60 font-medium italic text-center">Navega y prueba todas las funciones del sistema.</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400 mb-4 ml-1">¿Eres un visitante nuevo?</p>
+          
+          <Link 
+            href="https://demo.obras-os.com/login/demo"
+            className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-indigo-500/20 hover:-translate-y-0.5"
+          >
+            Probar Modo Demo <span className="text-indigo-200">→</span>
+          </Link>
+          
+          <p className="mt-4 text-[10px] text-indigo-500/60 font-medium italic text-center">Acceso rápido sin compromisos.</p>
         </div>
 
       </div>
