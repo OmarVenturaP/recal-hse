@@ -8,7 +8,7 @@ export async function middleware(request) {
   const path = request.nextUrl.pathname;
 
   // 2. Definimos áreas
-  const isPublicPath = path === '/login' || path === '/';
+  const isPublicPath = path === '/login' || path === '/login/demo' || path === '/';
   const isDashboardPath = path.startsWith('/dashboard');
   const isApiPath = path.startsWith('/api'); // NUEVO: Identificamos si intenta acceder a la base de datos
   const isApiLogin = path.includes('/login') || path.includes('/auth');
@@ -94,7 +94,7 @@ export async function middleware(request) {
 export const config = {
   matcher: [
     '/',
-    '/login',
+    '/login/:path*',
     '/dashboard/:path*',
     '/api/((?!fuerza-trabajo/importar-sua).*)', // Protegemos todas las apis EXCEPTO la importación multipart para evitar que Next.js rompa el FormData
     '/cambiar-password'
