@@ -4,6 +4,8 @@ import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import fs from 'fs';
 import path from 'path';
+import archiver from 'archiver';
+import { Readable } from 'stream';
 
 // --- FUNCIONES AUXILIARES ---
 
@@ -130,26 +132,26 @@ export async function GET(request) {
     const trabajadoresAProcesar = omitirFaltantes ? validos : trabajadores;
 
     if (trabajadoresAProcesar.length === 0) {
-         return NextResponse.json({ success: false, error: 'Todos los trabajadores fueron omitidos por falta de CURP.' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'Todos los trabajadores fueron omitidos por falta de CURP.' }, { status: 400 });
     }
 
-    // 3. Cargar plantilla Word
-    const templatePath = path.join(process.cwd(), 'public', 'plantillas', 'CERTIFICADO_MEDICO.docx');
-    if (!fs.existsSync(templatePath)) return NextResponse.json({ success: false, error: 'Falta plantilla CERTIFICADO_MEDICO.docx' }, { status: 404 });
-
-    const content = fs.readFileSync(templatePath, 'binary');
-    const zip = new PizZip(content);
-    const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
-
+    // 3. Agrupar por plantilla
+    const gruposPorPlantilla = {};
     const inicioFiltroDate = new Date(fechaInicio);
     const finFiltroDate = new Date(fechaFin);
 
-    // 4. Mapear datos
-    const datosProcesados = trabajadoresAProcesar.map(t => {
+    trabajadoresAProcesar.forEach(t => {
+      // Elegir médico (y su plantilla)
       const medico = medicos[Math.floor(Math.random() * medicos.length)];
+      let plantilla = medico.nombre_plantilla || 'CERTIFICADO_MEDICO.docx';
+      
+      // Normalizar extensión
+      if (plantilla && !plantilla.toLowerCase().endsWith('.docx')) {
+        plantilla += '.docx';
+      }
+      
       const ingresoDate = new Date(t.fecha_ingreso_obra);
       const isNuevoIngreso = ingresoDate >= inicioFiltroDate && ingresoDate <= finFiltroDate;
-      
       const fechaCertificado = new Date();
       if (isNuevoIngreso) {
         fechaCertificado.setTime(ingresoDate.getTime() - (5 * 24 * 60 * 60 * 1000));
@@ -167,7 +169,7 @@ export async function GET(request) {
         edadFinal = 'S/D';
       }
 
-      return {
+      const dato = {
         ciudad: medico.ciudad ? medico.ciudad.toUpperCase() : 'TONALA',
         nombre_medico: medico.nombre.toUpperCase(),
         cedula_medico: medico.cedula,
@@ -175,22 +177,77 @@ export async function GET(request) {
         edad_trabajador: edadFinal,
         fecha_texto: formatearFechaTexto(fechaCertificado)
       };
+
+      if (!gruposPorPlantilla[plantilla]) gruposPorPlantilla[plantilla] = [];
+      gruposPorPlantilla[plantilla].push(dato);
     });
 
-    doc.render({ trabajadores: datosProcesados });
-    const buffer = doc.getZip().generate({ type: 'nodebuffer' });
+    const plantillasUtilizadas = Object.keys(gruposPorPlantilla);
 
-    const fileName = id_trabajador 
-      ? `Certificado_${trabajadoresAProcesar[0].nombre_trabajador.replace(/ /g, '_')}.docx`
-      : `Certificados_Masivos_Periodo.docx`;
+    if (plantillasUtilizadas.length === 1) {
+      // --- UN SOLO FORMATO: Retornar DOCX directo ---
+      const plantilla = plantillasUtilizadas[0];
+      let templatePath = path.join(process.cwd(), 'public', 'plantillas', plantilla);
+      
+      if (!fs.existsSync(templatePath)) {
+        // Fallback al genérico si no existe el personalizado
+        templatePath = path.join(process.cwd(), 'public', 'plantillas', 'CERTIFICADO_MEDICO.docx');
+        if (!fs.existsSync(templatePath)) return NextResponse.json({ success: false, error: `Falta plantilla ${plantilla} y también la genérica.` }, { status: 404 });
+      }
 
-    return new NextResponse(buffer, {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'Content-Disposition': `attachment; filename="${fileName}"`,
-      },
-    });
+      const content = fs.readFileSync(templatePath, 'binary');
+      const zip = new PizZip(content);
+      const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+      doc.render({ trabajadores: gruposPorPlantilla[plantilla] });
+      const bufferResult = doc.getZip().generate({ type: 'nodebuffer' });
+
+      const fileName = id_trabajador 
+        ? `Certificado_${trabajadoresAProcesar[0].apellido_trabajador?.replace(/ /g, '_') || 'Trabajador'}.docx`
+        : `Certificados_${plantilla}`;
+
+      return new NextResponse(bufferResult, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'Content-Disposition': `attachment; filename="${fileName}"`,
+        },
+      });
+
+    } else {
+      // --- MÚLTIPLES FORMATOS: Generar ZIP ---
+      const archive = archiver('zip', { zlib: { level: 9 } });
+
+      // Convertimos el archiver a un stream legible para Next.js
+      const { Readable } = await import('stream');
+      const stream = Readable.from(archive);
+
+      for (const plantilla of plantillasUtilizadas) {
+        let nombreArchivoNorm = plantilla.toLowerCase().endsWith('.docx') ? plantilla : `${plantilla}.docx`;
+        let templatePath = path.join(process.cwd(), 'public', 'plantillas', nombreArchivoNorm);
+        if (!fs.existsSync(templatePath)) {
+           templatePath = path.join(process.cwd(), 'public', 'plantillas', 'CERTIFICADO_MEDICO.docx');
+        }
+        
+        if (fs.existsSync(templatePath)) {
+          const content = fs.readFileSync(templatePath, 'binary');
+          const zip = new PizZip(content);
+          const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+          doc.render({ trabajadores: gruposPorPlantilla[plantilla] });
+          const bufferPart = doc.getZip().generate({ type: 'nodebuffer' });
+          archive.append(bufferPart, { name: `Certificados_${nombreArchivoNorm}` });
+        }
+      }
+
+      archive.finalize();
+
+      return new NextResponse(stream, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/zip',
+          'Content-Disposition': `attachment; filename="Certificados_Masivos_Multiformat.zip"`,
+        },
+      });
+    }
 
   } catch (error) {
     console.error("Error exportando certificados:", error);

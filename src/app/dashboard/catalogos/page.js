@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Building2, UserCheck, GraduationCap, Plus, Search, Edit, Trash2, Loader2, Image as ImageIcon, X, Pencil, Users, Stethoscope, Sparkles, Lock, ShieldAlert } from 'lucide-react';
+import { Building2, UserCheck, GraduationCap, Plus, Search, Edit, Trash2, Loader2, Image as ImageIcon, X, Pencil, Users, Stethoscope, Sparkles, Lock, ShieldAlert, FileText, Upload } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 export default function CatalogosPage() {
@@ -282,6 +282,46 @@ export default function CatalogosPage() {
     );
   };
 
+  const DocxPicker = ({ label, fieldName }) => {
+    const currentFile = filesToUpload[fieldName];
+    const existingName = formData.nombre_plantilla;
+
+    return (
+      <div className="flex flex-col gap-2">
+        <label className="text-sm font-bold text-blue-600 dark:text-blue-400 flex items-center gap-2">
+          <FileText className="w-4 h-4" /> {label}
+        </label>
+        <div className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl">
+          <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+            <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+              {currentFile ? currentFile.name : (existingName || 'Certificado_Medico.docx')}
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">
+              {currentFile ? 'Listo para subir' : 'Plantilla actual'}
+            </p>
+          </div>
+          <label className="cursor-pointer bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-700 dark:text-gray-200 transition-colors shadow-sm flex items-center gap-2">
+            <Upload className="h-3 w-3" />
+            {currentFile ? 'Cambiar' : 'Subir .docx'}
+            <input 
+              type="file" 
+              className="hidden" 
+              accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" 
+              onChange={(e) => {
+                const file = e.target.files[0];
+                if (file) setFilesToUpload(prev => ({ ...prev, [fieldName]: file }));
+              }} 
+            />
+          </label>
+        </div>
+        <p className="text-[10px] text-gray-400 italic">Formatos permitidos: Word (.docx) únicamente.</p>
+      </div>
+    );
+  };
+
   const renderModalForm = () => {
     if (modalType === 'contratista') {
       return (
@@ -471,42 +511,9 @@ export default function CatalogosPage() {
                 <input type="text" name="ciudad" value={formData.ciudad || ''} onChange={handleInputChange} className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white uppercase" />
               </div>
             </div>
-          </div>
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700 mt-6">
-            <button type="button" onClick={closeModal} className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">Cancelar</button>
-            <button type="submit" className="px-4 py-2 text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors">Guardar Médico</button>
-          </div>
-        </form>
-      );
-    }
 
-    if (modalType === 'medico') {
-      return (
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nombre Completo del Médico *</label>
-              <input required type="text" name="nombre" value={formData.nombre || ''} onChange={handleInputChange} className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white uppercase" />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Cédula Profesional *</label>
-                <input required type="text" name="cedula" value={formData.cedula || ''} onChange={handleInputChange} className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white uppercase" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Especialidad</label>
-                <input type="text" name="especialidad" value={formData.especialidad || ''} onChange={handleInputChange} className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white uppercase" />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Universidad</label>
-                <input type="text" name="universidad" value={formData.universidad || ''} onChange={handleInputChange} className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white uppercase" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ciudad</label>
-                <input type="text" name="ciudad" value={formData.ciudad || ''} onChange={handleInputChange} className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white uppercase" />
-              </div>
+            <div className="pt-2 border-t border-gray-100 dark:border-gray-800">
+               <DocxPicker label="Plantilla Personalizada (.docx)" fieldName="archivo_plantilla" />
             </div>
           </div>
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700 mt-6">
@@ -873,6 +880,9 @@ export default function CatalogosPage() {
                       <div className="flex flex-col text-right md:text-left text-xs">
                         <div className="text-gray-600 dark:text-gray-300">{medico.universidad || 'S/N'}</div>
                         <div className="text-gray-400 dark:text-gray-500">{medico.ciudad || ''}</div>
+                        <div className="mt-1 flex items-center gap-1 text-[9px] font-bold text-blue-500 dark:text-blue-400 uppercase">
+                          <ImageIcon className="w-3 h-3" /> {medico.nombre_plantilla || 'Default'}
+                        </div>
                       </div>
                     </td>
                     <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-3 md:py-4 text-sm md:text-right border-none">

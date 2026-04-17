@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
+import fs from 'fs';
+import path from 'path';
 
 export async function GET(request) {
   try {
@@ -14,6 +16,13 @@ export async function GET(request) {
       queryParams.push(idEmpresa);
     }
 
+    // Migración silenciosa
+    try {
+      await pool.query(`ALTER TABLE Medicos_Empresa ADD COLUMN IF NOT EXISTS nombre_plantilla VARCHAR(255) DEFAULT 'CERTIFICADO_MEDICO.docx' AFTER ciudad`);
+    } catch (e) {
+      // Ignorar si falla (ya existe o permisos)
+    }
+
     const query = `
       SELECT 
         id_medico, 
@@ -21,7 +30,8 @@ export async function GET(request) {
         nombre, 
         especialidad, 
         universidad, 
-        ciudad
+        ciudad,
+        nombre_plantilla
       FROM Medicos_Empresa
       WHERE ${whereClause}
       ORDER BY nombre ASC
@@ -45,17 +55,38 @@ export async function POST(request) {
     const especialidad = formData.get('especialidad');
     const universidad = formData.get('universidad');
     const ciudad = formData.get('ciudad');
+    const nombre_plantilla = formData.get('nombre_plantilla') || 'CERTIFICADO_MEDICO.docx';
 
     if (!cedula || !nombre) {
       return NextResponse.json({ error: "La cédula y el nombre son obligatorios." }, { status: 400 });
     }
 
     const queryInsert = `
-      INSERT INTO Medicos_Empresa (cedula, nombre, especialidad, universidad, ciudad, id_empresa, bActivo)
-      VALUES (?, ?, ?, ?, ?, ?, 1)
+      INSERT INTO Medicos_Empresa (cedula, nombre, especialidad, universidad, ciudad, nombre_plantilla, id_empresa, bActivo)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 1)
     `;
     
-    const [result] = await pool.query(queryInsert, [cedula, nombre, especialidad, universidad, ciudad, idEmpresa || 1]);
+    const [result] = await pool.query(queryInsert, [cedula, nombre, especialidad, universidad, ciudad, nombre_plantilla, idEmpresa || 1]);
+
+    // --- MANEJO DE ARCHIVO ---
+    const archivo_plantilla = formData.get('archivo_plantilla');
+    if (archivo_plantilla && typeof archivo_plantilla !== 'string') {
+      try {
+        const buffer = Buffer.from(await archivo_plantilla.arrayBuffer());
+        const ext = '.docx';
+        const finalFilename = `plantilla_medico_${result.insertId}${ext}`;
+        const uploadDir = path.join(process.cwd(), 'public', 'plantillas');
+        
+        if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+        
+        fs.writeFileSync(path.join(uploadDir, finalFilename), buffer);
+        
+        // Actualizar el nombre definitivo
+        await pool.query('UPDATE Medicos_Empresa SET nombre_plantilla = ? WHERE id_medico = ?', [finalFilename, result.insertId]);
+      } catch (uploadError) {
+        console.error("Error al guardar archivo en POST:", uploadError);
+      }
+    }
 
     return NextResponse.json({ success: true, id: result.insertId });
 
@@ -77,6 +108,7 @@ export async function PUT(request) {
     const especialidad = formData.get('especialidad');
     const universidad = formData.get('universidad');
     const ciudad = formData.get('ciudad');
+    const nombre_plantilla = formData.get('nombre_plantilla') || 'CERTIFICADO_MEDICO.docx';
     
     if (!id_medico) {
       return NextResponse.json({ error: "Falta el ID del médico." }, { status: 400 });
@@ -94,11 +126,32 @@ export async function PUT(request) {
 
     const queryUpdate = `
       UPDATE Medicos_Empresa 
-      SET cedula = ?, nombre = ?, especialidad = ?, universidad = ?, ciudad = ?
+      SET cedula = ?, nombre = ?, especialidad = ?, universidad = ?, ciudad = ?, nombre_plantilla = ?
       WHERE id_medico = ?
     `;
     
-    await pool.query(queryUpdate, [cedula, nombre, especialidad, universidad, ciudad, id_medico]);
+    await pool.query(queryUpdate, [cedula, nombre, especialidad, universidad, ciudad, nombre_plantilla, id_medico]);
+
+    // --- MANEJO DE ARCHIVO (PUT) ---
+    const archivo_plantilla = formData.get('archivo_plantilla');
+    if (archivo_plantilla && typeof archivo_plantilla !== 'string') {
+      try {
+        const buffer = Buffer.from(await archivo_plantilla.arrayBuffer());
+        const ext = '.docx';
+        const finalFilename = `plantilla_medico_${id_medico}${ext}`;
+        const uploadDir = path.join(process.cwd(), 'public', 'plantillas');
+        
+        if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+        
+        // Eliminar archivo previo si es distinto al nuevo (aunque aquí el nombre será el mismo por ID)
+        // Pero si el nombre en DB era distinto (ej. el genérico), lo actualizamos
+        fs.writeFileSync(path.join(uploadDir, finalFilename), buffer);
+        
+        await pool.query('UPDATE Medicos_Empresa SET nombre_plantilla = ? WHERE id_medico = ?', [finalFilename, id_medico]);
+      } catch (uploadError) {
+        console.error("Error al guardar archivo en PUT:", uploadError);
+      }
+    }
 
     return NextResponse.json({ success: true, mensaje: "Actualizado correctamente" });
 
