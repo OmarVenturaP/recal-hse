@@ -50,7 +50,7 @@ export default function FooterPublic() {
           <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.4em] font-sans">© {new Date().getFullYear()} ObrasOS</span>
           <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2">
             CREADO POR 
-            <a href="https://servitec-tonala.vercel.app/" target="_blank" rel="noopener noreferrer" className="text-[10px] font-black text-slate-500 dark:text-slate-300 hover:text-[#4CFDFD] hover:drop-shadow-[0_0_8px_rgba(76,253,253,0.5)] transition-all duration-300 tracking-[0.4em]">
+            <a href="https://servitec-tonala.es" target="_blank" rel="noopener noreferrer" className="text-[10px] font-black text-slate-500 dark:text-slate-300 hover:text-[#4CFDFD] hover:drop-shadow-[0_0_8px_rgba(76,253,253,0.5)] transition-all duration-300 tracking-[0.4em]">
               SERVITEC
             </a>
           </span>

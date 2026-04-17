@@ -315,7 +315,7 @@ export default function DashboardLayout({ children }) {
         {/* Créditos discretos */}
         <div className={`px-6 pb-2 transition-all duration-300 ${isCollapsed ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100'}`}>
           <a 
-            href="https://servitec-tonala.vercel.app/" 
+            href="https://servitec-tonala.es/" 
             target="_blank" 
             rel="noopener noreferrer" 
             className="text-[8px] font-black text-white/20 hover:text-[#4CFDFD] hover:drop-shadow-[0_0_5px_rgba(76,253,253,0.4)] transition-all duration-300 tracking-[0.3em] uppercase block text-center"
