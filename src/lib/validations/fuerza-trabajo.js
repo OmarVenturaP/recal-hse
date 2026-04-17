@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const trabajadorSchema = z.object({
-  id_trabajador: z.number().optional(),
+  id_trabajador: z.number().optional().nullable(),
   numero_empleado: z.string().optional().nullable(),
   nombre_trabajador: z.string().min(1, "Nombre es obligatorio"),
   apellido_trabajador: z.string().optional().nullable(),
@@ -20,5 +20,5 @@ export const trabajadorSchema = z.object({
 export const patchTrabajadorSchema = z.object({
   id_trabajador: z.number().int().positive("ID de trabajador es obligatorio"),
   fecha_baja: z.string().optional().nullable(),
-  bActivo: z.union([z.boolean(), z.number()]).optional(),
+  bActivo: z.union([z.boolean(), z.number()]).optional().nullable(),
 });

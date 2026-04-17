@@ -87,7 +87,7 @@ export async function POST(request) {
     // Validación con Zod
     const validation = trabajadorSchema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json({ success: false, error: validation.error.errors[0].message }, { status: 400 });
+      return NextResponse.json({ success: false, error: validation.error.issues[0]?.message || "Error de validación" }, { status: 400 });
     }
 
     const { 
@@ -165,8 +165,7 @@ export async function PUT(request) {
     // Validación con Zod
     const validation = trabajadorSchema.safeParse(body);
     if (!validation.success) {
-        console.error("ZOD ERROR DETAILS:", JSON.stringify(validation.error.format(), null, 2));
-        const firstError = validation.error.issues?.[0]?.message || validation.error.errors?.[0]?.message || "Error de validación en los campos";
+        const firstError = validation.error.issues[0]?.message || "Error de validación en los campos";
         return NextResponse.json({ success: false, error: firstError }, { status: 400 });
     }
 
@@ -254,7 +253,7 @@ export async function PATCH(request) {
     // Validación con Zod
     const validation = patchTrabajadorSchema.safeParse(body);
     if (!validation.success) {
-        return NextResponse.json({ success: false, error: validation.error.errors[0].message }, { status: 400 });
+        return NextResponse.json({ success: false, error: validation.error.issues[0]?.message || "Error de validación" }, { status: 400 });
     }
 
     const { id_trabajador, fecha_baja, bActivo } = validation.data;

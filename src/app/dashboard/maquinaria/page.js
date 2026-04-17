@@ -42,9 +42,12 @@ export default function MaquinariaPage() {
   const [maquinaria, setMaquinaria] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const canSeeBothAreas = userArea === 'Ambas' || userRole === 'Admin' || userRole === 'Master';
+
   const [catPrincipales, setCatPrincipales] = useState([]);
   const [filtroSub, setFiltroSub] = useState('');
   const [busqueda, setBusqueda] = useState('');
+  const [filtroArea, setFiltroArea] = useState('');
 
   const [ordenPor, setOrdenPor] = useState('fecha_ingreso_obra');
   const [ordenDireccion, setOrdenDireccion] = useState('DESC');
@@ -130,8 +133,9 @@ export default function MaquinariaPage() {
     try {
       let url = `/api/maquinaria?ordenPor=${ordenPor}&ordenDireccion=${ordenDireccion}&`;
       if (userArea) url += `area_usuario=${userArea}&`;
+      if (filtroArea) url += `area_filtro=${filtroArea}&`;
       
-      if (userArea === 'ambiental') {
+      if (userArea === 'Medio Ambiente') {
         url += `semana=${exportSemana}&`;
       } else {
         url += `mes=${exportMes}&anio=${exportAnio}&`;
@@ -149,8 +153,8 @@ export default function MaquinariaPage() {
     }
   };
 
-  useEffect(() => { fetchMaquinaria(); }, [filtroSub, exportMes, exportAnio, exportSemana, userArea, busqueda, ordenPor, ordenDireccion]);
-  useEffect(() => { setCurrentPage(1); }, [busqueda, filtroSub, exportMes, exportAnio, exportSemana, userArea, ordenPor, ordenDireccion]);
+  useEffect(() => { fetchMaquinaria(); }, [filtroSub, filtroArea, exportMes, exportAnio, exportSemana, userArea, busqueda, ordenPor, ordenDireccion]);
+  useEffect(() => { setCurrentPage(1); }, [busqueda, filtroSub, filtroArea, exportMes, exportAnio, exportSemana, userArea, ordenPor, ordenDireccion]);
 
   useEffect(() => {
     if (topRef.current) topRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -267,7 +271,7 @@ export default function MaquinariaPage() {
       fecha_proximo_mantenimiento: m.fecha_proximo_mantenimiento ? formatForInput(m.fecha_proximo_mantenimiento) : '',
       fecha_ingreso_obra: formatForInput(m.fecha_ingreso_obra), 
       id_subcontratista: m.id_subcontratista || '', 
-      area: m.area || 'seguridad',
+      area: m.area || (userArea === 'Medio Ambiente' ? 'ambiental' : 'seguridad'),
       imagen_url_actual: m.imagen_url || ''
     });
     setImageFile(null); setEditId(m.id_maquinaria); setIsEditing(true); setIsModalOpen(true);
@@ -389,6 +393,7 @@ export default function MaquinariaPage() {
   const limpiarFiltros = () => { 
     setFiltroSub(''); 
     setBusqueda('');
+    setFiltroArea('');
   };
 
   const handleGenerarInspeccion = (id_maquina) => {
@@ -397,7 +402,7 @@ export default function MaquinariaPage() {
 
   const handleExportarUtilizacion = (e) => {
     e.preventDefault();
-    const url = `/api/maquinaria/exportar-utilizacion?${userArea === 'ambiental' ? `mes=${exportMes}&anio=${exportAnio}` : `mes=${exportMes}&anio=${exportAnio}`}&area_usuario=${userArea}`;
+    const url = `/api/maquinaria/exportar-utilizacion?${userArea === 'Medio Ambiente' ? `mes=${exportMes}&anio=${exportAnio}` : `mes=${exportMes}&anio=${exportAnio}`}&area_usuario=${userArea}`;
     
     const maquinasActivasSinFoto = maquinaria.filter(m => !m.fecha_baja && !m.imagen_url);
     
@@ -480,7 +485,7 @@ export default function MaquinariaPage() {
               <span className="mr-1">📊</span> <span className="hidden sm:inline">Utilización</span><span className="sm:hidden">Util</span>
             </button>
             <button 
-              onClick={() => window.open(`/api/maquinaria/exportar-plan-servicio?${userArea === 'ambiental' ? `mes=${exportMes}&anio=${exportAnio}` : `mes=${exportMes}&anio=${exportAnio}`}&area_usuario=${userArea}`, '_blank')} 
+              onClick={() => window.open(`/api/maquinaria/exportar-plan-servicio?${userArea === 'Medio Ambiente' ? `mes=${exportMes}&anio=${exportAnio}` : `mes=${exportMes}&anio=${exportAnio}`}&area_usuario=${userArea}`, '_blank')} 
               className="flex-1 sm:flex-none justify-center bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center"
             >
               <span className="mr-1">🛠️</span> <span className="hidden sm:inline">Servicio</span><span className="sm:hidden">Serv</span>
@@ -496,8 +501,8 @@ export default function MaquinariaPage() {
       </div>
 
       {/* PANEL DE FILTROS Y BÚSQUEDA */}
-      <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="md:col-span-2">
+      <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 grid grid-cols-1 lg:grid-cols-12 gap-4">
+        <div className={`lg:col-span-${canSeeBothAreas ? '5' : '7'}`}>
           <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Buscar Equipo</label>
           <div className="relative">
             <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">🔍</span>
@@ -506,7 +511,7 @@ export default function MaquinariaPage() {
               value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
           </div>
         </div>
-        <div className="md:col-span-1">
+        <div className="lg:col-span-3">
           <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Filtrar por Contratista</label>
           <select className="w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 shadow-sm focus:ring-[var(--recal-blue)] outline-none sm:text-sm" 
             value={filtroSub} onChange={(e) => setFiltroSub(e.target.value)}>
@@ -514,7 +519,18 @@ export default function MaquinariaPage() {
             {catPrincipales && catPrincipales.map(empresa => <option key={empresa.id_subcontratista} value={empresa.id_subcontratista}>{empresa.razon_social}</option>)}
           </select>
         </div>
-        <div className="md:col-span-1 flex items-end">
+        {canSeeBothAreas && (
+          <div className="lg:col-span-2">
+            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Filtrar por Área</label>
+            <select className="w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 shadow-sm focus:ring-[var(--recal-blue)] outline-none sm:text-sm" 
+              value={filtroArea} onChange={(e) => setFiltroArea(e.target.value)}>
+              <option value="">Ambas Áreas</option>
+              <option value="seguridad">Seguridad</option>
+              <option value="ambiental">Medio Ambiente</option>
+            </select>
+          </div>
+        )}
+        <div className="lg:col-span-2 flex items-end">
           <button onClick={limpiarFiltros} className="w-full bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-md font-medium sm:text-sm transition-colors border border-gray-300 dark:border-slate-600">Limpiar Todo</button>
         </div>
       </div>
@@ -541,6 +557,11 @@ export default function MaquinariaPage() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('fecha_baja')}>
                   Baja {ordenPor === 'fecha_baja' && (ordenDireccion === 'ASC' ? '↑' : '↓')}
                 </th>
+                {canSeeBothAreas && (
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('area')}>
+                    Área {ordenPor === 'area' && (ordenDireccion === 'ASC' ? '↑' : '↓')}
+                  </th>
+                )}
                 <th className="px-4 py-3 text-center text-xs font-medium text-[var(--recal-blue)] dark:text-blue-400 uppercase">Último Servicio</th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Estatus</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Acciones</th>
@@ -603,6 +624,15 @@ export default function MaquinariaPage() {
                       <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Baja:</span>
                       <span>{m.fecha_baja ? formatDDMMYYYY(m.fecha_baja) : '-'}</span>
                     </td>
+
+                    {canSeeBothAreas && (
+                      <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 text-center border-b dark:border-slate-700 md:border-none">
+                        <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 text-sm">Área:</span>
+                        <span className={`px-2 py-1 inline-flex text-[10px] uppercase font-bold rounded shadow-sm border ${m.area === 'ambiental' ? 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800/50' : 'bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-900/50 dark:text-slate-300 dark:border-slate-700/50'}`}>
+                          {m.area === 'ambiental' ? 'Medio Ambiente' : 'Seguridad'}
+                        </span>
+                      </td>
+                    )}
                     
                     <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 border-b dark:border-slate-700 md:border-none">
                       <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 text-sm">Último Servicio:</span>
@@ -742,6 +772,7 @@ export default function MaquinariaPage() {
         imageFile={imageFile}
         setImageFile={setImageFile}
         catPrincipales={catPrincipales}
+        canSeeBothAreas={canSeeBothAreas}
       />
       
       <MaquinariaBajaModal

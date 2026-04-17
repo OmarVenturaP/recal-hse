@@ -43,7 +43,7 @@ export async function POST(request) {
     // Validación con Zod
     const validation = usuarioSchema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json({ success: false, error: validation.error.errors[0].message }, { status: 400 });
+      return NextResponse.json({ success: false, error: validation.error.issues[0]?.message || "Error de validación" }, { status: 400 });
     }
 
     const { 
@@ -90,7 +90,7 @@ export async function PUT(request) {
     // Validación con Zod
     const validation = usuarioSchema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json({ success: false, error: validation.error.errors[0].message }, { status: 400 });
+      return NextResponse.json({ success: false, error: validation.error.issues[0]?.message || "Error de validación" }, { status: 400 });
     }
 
     const { 
@@ -139,7 +139,7 @@ export async function PATCH(request) {
     // Validación con Zod
     const validation = patchPasswordSchema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json({ success: false, error: validation.error.errors[0].message }, { status: 400 });
+      return NextResponse.json({ success: false, error: validation.error.issues[0]?.message || "Error de validación" }, { status: 400 });
     }
 
     const { id_personal } = validation.data;

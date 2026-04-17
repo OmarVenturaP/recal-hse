@@ -8,7 +8,8 @@ export default function MaquinariaFormModal({
   saving,
   imageFile,
   setImageFile,
-  catPrincipales
+  catPrincipales,
+  canSeeBothAreas
 }) {
   if (!isOpen) return null;
 
@@ -34,7 +35,7 @@ export default function MaquinariaFormModal({
             {/* Campo Condicional: Horas vs Fecha (Equipo Menor) */}
             {(() => {
               const tipoUpper = (formData.tipo || '').toUpperCase();
-              const esEquipoMenor = tipoUpper.includes('ESMERIL') || tipoUpper.includes('GENERADOR') || tipoUpper.includes('CORTADORA');
+              const esEquipoMenor = tipoUpper.includes('ESMERIL') || tipoUpper.includes('GENERADOR') || tipoUpper.includes('CORTADORA') || tipoUpper.includes('GENERADORA') || tipoUpper.includes('BOMBA');
               
               if (esEquipoMenor) {
                 return (
@@ -71,13 +72,15 @@ export default function MaquinariaFormModal({
               </select>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Área Asignada *</label>
-              <select required className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.area || ''} onChange={e => setFormData({...formData, area: e.target.value})}>
-                <option value="seguridad" className="dark:bg-slate-800">Seguridad</option>
-                <option value="ambiental" className="dark:bg-slate-800">Medio Ambiente</option>
-              </select>
-            </div>
+            {canSeeBothAreas && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Área Asignada *</label>
+                <select required className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 outline-none focus:ring-[var(--recal-blue)]" value={formData.area || ''} onChange={e => setFormData({...formData, area: e.target.value})}>
+                  <option value="seguridad" className="dark:bg-slate-800">Seguridad</option>
+                  <option value="ambiental" className="dark:bg-slate-800">Medio Ambiente</option>
+                </select>
+              </div>
+            )}
 
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Fotografía</label>

@@ -35,6 +35,7 @@ export async function GET(request) {
     const mes = searchParams.get('mes');
     const anio = searchParams.get('anio');
     const busqueda = searchParams.get('busqueda'); 
+    const areaFiltro = searchParams.get('area_filtro');
     const ordenPor = searchParams.get('ordenPor') || 'fecha_ingreso_obra';
     const ordenDireccion = searchParams.get('ordenDireccion') || 'DESC';
 
@@ -46,6 +47,11 @@ export async function GET(request) {
       whereClause += ` AND m.area = 'seguridad'`;
     } else if (areaUsuario === 'Medio Ambiente') {
       whereClause += ` AND m.area = 'ambiental'`;
+    } else {
+      if (areaFiltro) {
+        whereClause += ` AND m.area = ?`;
+        queryParams.push(areaFiltro);
+      }
     }
 
     // Aislamiento Multi-Tenant

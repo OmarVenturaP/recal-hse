@@ -102,7 +102,7 @@ export async function POST(request) {
       periodo_inicio, periodo_fin, ubicaciones, ft_rows, fotos, desviaciones
     } = body;
 
-    const creado_por = request.headers.get('x-user-id') || null;
+    const usuario_registro = request.headers.get('x-user-id') || null;
     const id_empresa = request.headers.get('x-empresa-id') || 1;
 
     // 1. Regla de negocio: Calcular hh_semana_anterior
@@ -130,9 +130,9 @@ export async function POST(request) {
     // 3. INSERT informe principal
     const [result] = await pool.query(
       `INSERT INTO informes_seguridad 
-        (num_reporte, id_subcontratista, subcontratista, mes_anio, periodo_inicio, periodo_fin, hh_semana_anterior, hh_semana_actual, creado_por, id_empresa)
+        (num_reporte, id_subcontratista, subcontratista, mes_anio, periodo_inicio, periodo_fin, hh_semana_anterior, hh_semana_actual, usuario_registro, id_empresa)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [num_reporte, id_subcontratista, subcontratista, mes_anio, periodo_inicio, periodo_fin, hh_semana_anterior, hh_semana_actual, creado_por, id_empresa]
+      [num_reporte, id_subcontratista, subcontratista, mes_anio, periodo_inicio, periodo_fin, hh_semana_anterior, hh_semana_actual, usuario_registro, id_empresa]
     );
 
     const id_informe = result.insertId;
