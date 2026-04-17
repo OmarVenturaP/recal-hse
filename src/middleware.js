@@ -62,12 +62,8 @@ export async function middleware(request) {
       requestHeaders.set('x-user-rol', payload.rol);
       requestHeaders.set('x-empresa-id', payload.id_empresa || ''); // <-- NUEVO: Inyección del ID de tenant
 
-      // IMPORTANTE: Si es una subida de archivos (multipart), no sobreescribimos el 'request' 
-      // porque NextResponse.next({ request: { headers } }) consume/rompe el body stream en algunas versiones.
-      const contentType = request.headers.get('content-type') || '';
-      if (contentType.includes('multipart/form-data')) {
-        return NextResponse.next();
-      }
+      // La ruta de importar-sua (la única que se corrompía por el peso del PDF) ya fue aislada en el 'matcher' de abajo.
+      // Así que obligamos a Next.js a inyectar las cabeceras para el resto de peticiones normales (como registrar maquinaria).
 
       return NextResponse.next({
         request: {
