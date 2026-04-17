@@ -2,8 +2,14 @@
 
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 export default function FooterPublic() {
+  const [year, setYear] = useState(new Date().getFullYear());
+
+  useEffect(() => {
+    setYear(new Date().getFullYear());
+  }, []);
   return (
     <footer className="bg-white dark:bg-slate-950 pt-32 pb-16 border-t border-slate-200 dark:border-slate-900">
       <div className="max-w-7xl mx-auto px-6">
@@ -47,7 +53,7 @@ export default function FooterPublic() {
           </div>
         </div>
         <div className="border-t border-slate-100 dark:border-slate-900 pt-16 flex flex-col md:flex-row justify-between items-center gap-8 text-center md:text-left">
-          <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.4em] font-sans">© {new Date().getFullYear()} ObrasOS</span>
+          <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.4em] font-sans" suppressHydrationWarning>© {year} ObrasOS</span>
           <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2">
             CREADO POR 
             <a href="https://servitec-tonala.es" target="_blank" rel="noopener noreferrer" className="text-[10px] font-black text-slate-500 dark:text-slate-300 hover:text-[#4CFDFD] hover:drop-shadow-[0_0_8px_rgba(76,253,253,0.5)] transition-all duration-300 tracking-[0.4em]">

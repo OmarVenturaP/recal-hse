@@ -11,7 +11,11 @@ const pool = createPool({
   connectionLimit: 10,
   queueLimit: 0,
   timezone: '-06:00',
-  dateStrings: true
+  dateStrings: true,
+  ssl: process.env.DB_SSL_CA ? {
+    ca: process.env.DB_SSL_CA,
+    rejectUnauthorized: false
+  } : undefined
 });
 
 export default pool;

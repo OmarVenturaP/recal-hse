@@ -12,11 +12,14 @@ async function generateSqlDump() {
   sql += `SET FOREIGN_KEY_CHECKS = 0;\n\n`;
 
   // 1. Get all tables
+  console.log('Fetching tables...');
   const [tables] = await pool.query('SHOW TABLES');
   const tableKey = Object.keys(tables[0])[0];
+  console.log(`Found ${tables.length} tables to backup.`);
 
   for (const tableRow of tables) {
     const tableName = tableRow[tableKey];
+    console.log(`Dumping table: ${tableName}`);
     
     // 2. Get Create Table statement
     const [[createTableResult]] = await pool.query(`SHOW CREATE TABLE \`${tableName}\``);
@@ -27,6 +30,7 @@ async function generateSqlDump() {
     // 3. Get Data
     const [rows] = await pool.query(`SELECT * FROM \`${tableName}\``);
     if (rows.length > 0) {
+      console.log(`Dumping ${rows.length} rows for ${tableName}`);
       sql += `-- Dumping data for table \`${tableName}\`\n`;
       
       // Batch inserts for efficiency
@@ -53,6 +57,7 @@ async function generateSqlDump() {
   }
 
   sql += `SET FOREIGN_KEY_CHECKS = 1;\n`;
+  console.log('SQL dump generated successfully.');
   return sql;
 }
 

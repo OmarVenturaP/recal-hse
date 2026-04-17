@@ -21,6 +21,17 @@ export async function GET(request) {
       );
     }
 
+    // 1.5. Validate required environment variables
+    const requiredEnv = ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS', 'BACKUP_EMAIL_TO'];
+    const missingEnv = requiredEnv.filter(env => !process.env[env]);
+    if (missingEnv.length > 0) {
+      console.error('Missing environment variables for backup:', missingEnv);
+      return NextResponse.json(
+        { success: false, error: `Variables de entorno faltantes: ${missingEnv.join(', ')}` },
+        { status: 500 }
+      );
+    }
+
     // 2. Generate Backup
     console.log('Starting database backup...');
     const zipBuffer = await createZippedBackup();
