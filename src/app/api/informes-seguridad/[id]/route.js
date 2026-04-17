@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
+import { registrarAuditoria } from '@/lib/auditoria';
 
 // =====================================================================
 // GET: Obtener detalle completo de un informe (general + ubicaciones + FT)
@@ -205,6 +206,17 @@ export async function PUT(request, { params }) {
     }
 
 
+    // AUDITORÍA (silenciosa)
+    await registrarAuditoria({
+      modulo: 'Informes de Seguridad',
+      accion: 'UPDATE',
+      id_registro: id,
+      descripcion: `Edición informe #${num_reporte} de ${subcontratista} | Periodo: ${periodo_inicio} a ${periodo_fin}`,
+      datos_nuevos: { num_reporte, subcontratista, mes_anio, periodo_inicio, periodo_fin, hh_semana_actual },
+      id_usuario: usuario_actualizacion,
+      id_empresa: idEmpresa,
+    });
+
     return NextResponse.json({ success: true, message: "Informe actualizado correctamente" });
   } catch (error) {
     console.error("Error PUT informe:", error);
@@ -229,12 +241,27 @@ export async function DELETE(request, { params }) {
       return NextResponse.json({ error: "No autorizado para eliminar este informe" }, { status: 403 });
     }
 
+    // Capturar datos antes de eliminar (para la auditoría)
+    const datosEliminados = verif[0];
+
     // 2. Transacción de eliminación manual (ordenada por integridad)
     await pool.query(`DELETE FROM informes_ubicaciones WHERE id_informe = ?`, [id]);
     await pool.query(`DELETE FROM informes_seguridad_ft WHERE id_informe = ?`, [id]);
     await pool.query(`DELETE FROM informes_fotos WHERE id_informe = ?`, [id]);
     await pool.query(`DELETE FROM informes_desviaciones WHERE id_informe = ?`, [id]);
     await pool.query(`DELETE FROM informes_seguridad WHERE id_informe = ?`, [id]);
+
+    // AUDITORÍA (silenciosa)
+    const idUsuario = request.headers.get('x-user-id');
+    await registrarAuditoria({
+      modulo: 'Informes de Seguridad',
+      accion: 'DELETE',
+      id_registro: id,
+      descripcion: `Eliminación de informe ID ${id} | Empresa ID: ${datosEliminados.id_empresa}`,
+      datos_anteriores: datosEliminados,
+      id_usuario: idUsuario,
+      id_empresa: idEmpresa,
+    });
 
     return NextResponse.json({ success: true, message: "Informe eliminado correctamente" });
   } catch (error) {

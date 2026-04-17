@@ -6,6 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import archiver from 'archiver';
 import { Readable } from 'stream';
+import { registrarAuditoria } from '@/lib/auditoria';
 
 // --- FUNCIONES AUXILIARES ---
 
@@ -205,6 +206,17 @@ export async function GET(request) {
         ? `Certificado_${trabajadoresAProcesar[0].apellido_trabajador?.replace(/ /g, '_') || 'Trabajador'}.docx`
         : `Certificados_${plantilla}`;
 
+      // AUDITORÍA - Rastreo de descarga (silenciosa)
+      await registrarAuditoria({
+        modulo: 'Certificados Médicos',
+        accion: 'EXPORT',
+        id_registro: id_trabajador || 'masivo',
+        descripcion: `Descarga certificado: ${fileName} | Trabajadores: ${trabajadoresAProcesar.length} | Plantilla: ${plantilla}`,
+        datos_nuevos: { archivo: fileName, plantilla, total_trabajadores: trabajadoresAProcesar.length },
+        id_usuario: request.headers.get('x-user-id'),
+        id_empresa: request.headers.get('x-empresa-id'),
+      });
+
       return new NextResponse(bufferResult, {
         status: 200,
         headers: {
@@ -239,6 +251,17 @@ export async function GET(request) {
       }
 
       archive.finalize();
+
+      // AUDITORÍA - Rastreo de descarga ZIP (silenciosa)
+      await registrarAuditoria({
+        modulo: 'Certificados Médicos',
+        accion: 'EXPORT',
+        id_registro: 'masivo-zip',
+        descripcion: `Descarga ZIP con ${plantillasUtilizadas.length} formatos | Trabajadores: ${trabajadoresAProcesar.length}`,
+        datos_nuevos: { plantillas: plantillasUtilizadas, total_trabajadores: trabajadoresAProcesar.length },
+        id_usuario: request.headers.get('x-user-id'),
+        id_empresa: request.headers.get('x-empresa-id'),
+      });
 
       return new NextResponse(stream, {
         status: 200,

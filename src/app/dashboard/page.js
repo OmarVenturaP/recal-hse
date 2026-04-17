@@ -232,6 +232,7 @@ export default function DashboardHome() {
       );
     }
     
+  
     if (daysRemaining <= 0) {
       return (
         <div className="mb-8 animate-in slide-in-from-top-4 duration-500">

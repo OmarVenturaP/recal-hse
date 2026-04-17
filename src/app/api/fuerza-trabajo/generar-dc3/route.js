@@ -5,6 +5,7 @@ import Docxtemplater from 'docxtemplater';
 import ImageModule from 'docxtemplater-image-module-free';
 import path from 'path';
 import fs from 'fs';
+import { registrarAuditoria } from '@/lib/auditoria';
 
 const transparentImgBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
 
@@ -155,6 +156,19 @@ export async function GET(request) {
     });
 
     const nombreArchivo = `DC3_${nombreCompleto.replace(/ /g, '_')}_${curso.nombre_curso.substring(0, 15).replace(/ /g, '')}.docx`;
+
+    // AUDITORÍA - Rastreo de descarga (silenciosa)
+    const idUsuario = request.headers.get('x-user-id');
+    const idEmpresa = request.headers.get('x-empresa-id');
+    await registrarAuditoria({
+      modulo: 'DC3',
+      accion: 'EXPORT',
+      id_registro: `${id_trabajador}-${id_curso}`,
+      descripcion: `Descarga DC3: ${nombreCompleto} | Curso: ${curso.nombre_curso} | Periodo: ${fechaInicio} a ${fechaFin}`,
+      datos_nuevos: { archivo: nombreArchivo, trabajador: nombreCompleto, curso: curso.nombre_curso, fechaInicio, fechaFin },
+      id_usuario: idUsuario,
+      id_empresa: idEmpresa,
+    });
 
     return new NextResponse(buffer, {
       status: 200,

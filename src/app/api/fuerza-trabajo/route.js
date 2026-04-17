@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import { trabajadorSchema, patchTrabajadorSchema } from '@/lib/validations/fuerza-trabajo';
+import { registrarAuditoria } from '@/lib/auditoria';
 
 export async function GET(request) {
   try {
@@ -150,6 +151,17 @@ export async function POST(request) {
       numero_empleado, nombre_trabajador, apellido_trabajador || null, puesto_categoria, nss, curp || null, fecha_ingreso_obra, fecha_alta_imss || null, origen, id_subcontratista_ft || null, id_subcontratista_principal || null, id_usuario_actual, idEmpresa 
     ]);
 
+    // AUDITORÍA (silenciosa)
+    await registrarAuditoria({
+      modulo: 'Fuerza de Trabajo',
+      accion: 'INSERT',
+      id_registro: result.insertId,
+      descripcion: `Alta de trabajador: ${nombre_trabajador} ${apellido_trabajador || ''} | NSS: ${nss || 'N/D'}`,
+      datos_nuevos: { nombre_trabajador, apellido_trabajador, nss, curp, puesto_categoria, fecha_ingreso_obra },
+      id_usuario: id_usuario_actual,
+      id_empresa: idEmpresa,
+    });
+
     return NextResponse.json({ success: true, id: result.insertId });
   } catch (error) {
     console.error(error);
@@ -239,7 +251,18 @@ export async function PUT(request) {
     
     await pool.query(query, queryParams);
 
-    return NextResponse.json({ success: true, mensaje: "Actualizado correctamente" });
+    // AUDITORÍA (silenciosa)
+    await registrarAuditoria({
+      modulo: 'Fuerza de Trabajo',
+      accion: 'UPDATE',
+      id_registro: id_trabajador,
+      descripcion: `Edición de trabajador ID ${id_trabajador}: ${nombre_trabajador} ${apellido_trabajador || ''} | NSS: ${nss || 'N/D'}`,
+      datos_nuevos: { nombre_trabajador, apellido_trabajador, nss, curp, puesto_categoria, fecha_ingreso_obra },
+      id_usuario: id_usuario_actual,
+      id_empresa: idEmpresa,
+    });
+
+    return NextResponse.json({ success: true, mensaje: 'Actualizado correctamente' });
   } catch (error) {
     console.error(error);
     return NextResponse.json({ success: false, error: "Error al actualizar" }, { status: 500 });
@@ -275,12 +298,36 @@ export async function PATCH(request) {
     if (bActivo !== undefined) {
       const query = `UPDATE Fuerza_Trabajo SET bActivo = ?, usuario_actualizacion = ?, ultima_modificacion = NOW() WHERE id_trabajador = ?${authFilter}`;
       await pool.query(query, [bActivo, id_usuario_actual, id_trabajador, ...authParams]);
+
+      // AUDITORÍA (silenciosa)
+      await registrarAuditoria({
+        modulo: 'Fuerza de Trabajo',
+        accion: 'UPDATE',
+        id_registro: id_trabajador,
+        descripcion: `Cambio de estado (bActivo=${bActivo}) al trabajador ID ${id_trabajador}`,
+        datos_nuevos: { bActivo },
+        id_usuario: id_usuario_actual,
+        id_empresa: idEmpresa,
+      });
+
       return NextResponse.json({ success: true, mensaje: "Estado actualizado" });
     } 
     // Lógica original de Baja
     else if (fecha_baja) {
       const query = `UPDATE Fuerza_Trabajo SET fecha_baja = ?, usuario_actualizacion = ?, ultima_modificacion = NOW() WHERE id_trabajador = ?${authFilter}`;
       await pool.query(query, [fecha_baja, id_usuario_actual, id_trabajador, ...authParams]);
+
+      // AUDITORÍA (silenciosa)
+      await registrarAuditoria({
+        modulo: 'Fuerza de Trabajo',
+        accion: 'UPDATE',
+        id_registro: id_trabajador,
+        descripcion: `Baja de trabajador ID ${id_trabajador} con fecha ${fecha_baja}`,
+        datos_nuevos: { fecha_baja },
+        id_usuario: id_usuario_actual,
+        id_empresa: idEmpresa,
+      });
+
       return NextResponse.json({ success: true, mensaje: "Trabajador dado de baja correctamente" });
     } else {
       return NextResponse.json({ error: "No se envió acción válida" }, { status: 400 });
@@ -327,6 +374,16 @@ export async function DELETE(request) {
     if (result.affectedRows === 0) {
       return NextResponse.json({ success: false, error: "No se encontró el registro o no tienes permisos para eliminarlo." }, { status: 404 });
     }
+
+    // AUDITORÍA (silenciosa)
+    await registrarAuditoria({
+      modulo: 'Fuerza de Trabajo',
+      accion: 'DELETE',
+      id_registro: id_trabajador,
+      descripcion: `Eliminación permanente de trabajador ID ${id_trabajador}`,
+      id_usuario: id_usuario_actual,
+      id_empresa: idEmpresa,
+    });
 
     return NextResponse.json({ success: true, mensaje: "Registro eliminado permanentemente de la base de datos." });
 

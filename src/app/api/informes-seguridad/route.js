@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
+import { registrarAuditoria } from '@/lib/auditoria';
 
 // =====================================================================
 // GET: Listar informes por mes (filtro obligatorio)
@@ -212,6 +213,17 @@ export async function POST(request) {
         }
       }
     }
+
+    // AUDITORÍA (silenciosa)
+    await registrarAuditoria({
+      modulo: 'Informes de Seguridad',
+      accion: 'INSERT',
+      id_registro: id_informe,
+      descripcion: `Nuevo informe #${num_reporte} para ${subcontratista} | Periodo: ${periodo_inicio} a ${periodo_fin}`,
+      datos_nuevos: { num_reporte, subcontratista, mes_anio, periodo_inicio, periodo_fin },
+      id_usuario: usuario_registro,
+      id_empresa: id_empresa,
+    });
 
     return NextResponse.json({ success: true, id_informe, message: "Informe creado correctamente" });
   } catch (error) {

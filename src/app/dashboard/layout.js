@@ -7,7 +7,7 @@ import BotonTema from '@/components/BotonTema';
 import { 
   LayoutDashboard, Tractor, Users, ClipboardList, 
   BookOpen, CalendarDays, ShieldCheck, LogOut, Menu, X, FileBarChart,
-  ChevronLeft, ChevronRight, Building, Lock
+  ChevronLeft, ChevronRight, Building, Lock, History
 } from 'lucide-react';
 import ModalPlanDetalles from '@/components/ModalPlanDetalles';
 import DemoSystem from '@/components/DemoSystem';
@@ -286,6 +286,7 @@ export default function DashboardLayout({ children }) {
                {isCollapsed && <div className="hidden md:block border-t border-white/10 mb-2"></div>}
                <NavItem href="/dashboard/usuarios" icon={ShieldCheck} label="Control de Accesos" isPurple={true} />
                <NavItem href="/dashboard/empresas" icon={Building} label="Control de Empresas" isPurple={true} />
+               <NavItem href="/dashboard/trazabilidad" icon={History} label="Trazabilidad" isPurple={true} />
              </div>
           )}
         </nav>
