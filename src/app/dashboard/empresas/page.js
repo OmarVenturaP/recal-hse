@@ -8,6 +8,8 @@ export default function EmpresasPage() {
   const [empresas, setEmpresas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState('empresas'); // 'empresas' o 'contratistas'
+  const [contratistas, setContratistas] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
@@ -15,7 +17,7 @@ export default function EmpresasPage() {
   const [isEditing, setIsEditing] = useState(false);
   
   const formInicial = {
-    id_empresa: null, nombre_comercial: '', rfc: '', plan_suscripcion: 'Free'
+    id_empresa: null, nombre_comercial: '', rfc: '', plan_suscripcion: 'Free', fecha_inicio_plan: ''
   };
   const [formData, setFormData] = useState(formInicial);
 
@@ -37,7 +39,18 @@ export default function EmpresasPage() {
     }
   };
 
-  useEffect(() => { fetchEmpresas(); }, []);
+  const fetchContratistas = async () => {
+    try {
+      const res = await fetch('/api/admin/contratistas');
+      const data = await res.json();
+      if (data.success) setContratistas(data.data);
+    } catch (e) { console.error(e); }
+  };
+
+  useEffect(() => { 
+    fetchEmpresas(); 
+    fetchContratistas();
+  }, []);
 
   const handleNewClick = () => {
     setFormData(formInicial);
@@ -50,7 +63,8 @@ export default function EmpresasPage() {
       id_empresa: emp.id_empresa,
       nombre_comercial: emp.nombre_comercial,
       rfc: emp.rfc || '',
-      plan_suscripcion: emp.plan_suscripcion || 'Free'
+      plan_suscripcion: emp.plan_suscripcion || 'Free',
+      fecha_inicio_plan: emp.fecha_inicio_plan ? emp.fecha_inicio_plan.split('T')[0] : ''
     });
     setIsEditing(true);
     setIsModalOpen(true);
@@ -111,6 +125,28 @@ export default function EmpresasPage() {
     });
   };
 
+  const handleUpdateContratistaFecha = async (id, fecha) => {
+    try {
+      const res = await fetch('/api/admin/contratistas', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id_subcontratista: id, fecha_corte: fecha })
+      });
+      const data = await res.json();
+      if (data.success) {
+        fetchContratistas();
+        Swal.fire({
+          toast: true,
+          position: 'top-end',
+          icon: 'success',
+          title: 'Fecha actualizada',
+          showConfirmButton: false,
+          timer: 1500
+        });
+      }
+    } catch (e) { Swal.fire('Error', 'Error al actualizar', 'error'); }
+  };
+
   return (
     <>
     <div className="max-w-[100rem] mx-auto p-4 md:p-6 lg:p-8 space-y-6 animate-in fade-in duration-500">
@@ -125,14 +161,29 @@ export default function EmpresasPage() {
              <p className="text-gray-500 dark:text-gray-400 font-medium">Gestión administrativa de los Tenants afiliados (Master).</p>
            </div>
            
-           <div className="md:ml-auto w-full md:w-auto mt-4 md:mt-0">
-               <button onClick={handleNewClick} className="w-full sm:w-auto bg-[var(--recal-blue)] hover:bg-[var(--recal-blue-hover)] text-white px-4 py-3 sm:py-2 rounded-md font-medium flex items-center justify-center gap-2">
-                 + Nueva Empresa
-               </button>
-           </div>
+           <div className="md:ml-auto w-full md:w-auto mt-4 md:mt-0 flex gap-2">
+                <button 
+                  onClick={() => setActiveTab('empresas')} 
+                  className={`px-4 py-2 rounded-md font-bold text-sm transition-all ${activeTab === 'empresas' ? 'bg-[var(--recal-blue)] text-white shadow-lg' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                >
+                  Tenants
+                </button>
+                <button 
+                  onClick={() => setActiveTab('contratistas')} 
+                  className={`px-4 py-2 rounded-md font-bold text-sm transition-all ${activeTab === 'contratistas' ? 'bg-[var(--recal-blue)] text-white shadow-lg' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                >
+                  Contratistas (Cortes)
+                </button>
+                {activeTab === 'empresas' && (
+                  <button onClick={handleNewClick} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-md font-bold text-sm flex items-center justify-center gap-2 ml-4">
+                    + Nueva Empresa
+                  </button>
+                )}
+            </div>
         </div>
 
-        <div className="space-y-6">
+        {activeTab === 'empresas' ? (
+          <div className="space-y-6">
           <div className="bg-white dark:bg-slate-800 shadow-sm rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
@@ -140,6 +191,7 @@ export default function EmpresasPage() {
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Empresa</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Plan</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Vencimiento</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Estado</th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Acciones</th>
                   </tr>
@@ -176,6 +228,18 @@ export default function EmpresasPage() {
                       </td>
 
                       <td className="flex justify-between md:table-cell px-2 md:px-6 py-2 md:py-4 border-b md:border-none">
+                        <span className="md:hidden font-bold text-gray-500 text-sm">Vencimiento:</span>
+                        <div className="text-right md:text-left">
+                          <div className={`text-xs font-bold ${emp.fecha_inicio_plan ? 'text-gray-600 dark:text-gray-300' : 'text-gray-400 italic'}`}>
+                            {emp.fecha_inicio_plan 
+                              ? new Date(new Date(emp.fecha_inicio_plan).getTime() + (30 * 24 * 60 * 60 * 1000)).toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                              : 'Sin fecha'
+                            }
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="flex justify-between md:table-cell px-2 md:px-6 py-2 md:py-4 border-b md:border-none">
                         <span className="md:hidden font-bold text-gray-500 text-sm">Estado:</span>
                         <span className={`px-2 py-1 text-xs font-semibold rounded-full ${emp.estado === 'activo' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                           {emp.estado.toUpperCase()}
@@ -202,6 +266,48 @@ export default function EmpresasPage() {
             </div>
           )}
         </div>
+        ) : (
+          /* VISTA DE CONTRATISTAS GLOBALES */
+          <div className="bg-white dark:bg-slate-800 shadow-sm rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-500">
+             <div className="p-4 bg-slate-50 dark:bg-slate-900 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center">
+                <h2 className="font-black text-slate-800 dark:text-white uppercase tracking-widest text-xs">Control Global de Fechas de Corte (Contratistas)</h2>
+                <span className="text-[10px] font-bold text-slate-400 bg-white dark:bg-slate-800 px-3 py-1 rounded-full border">{contratistas.length} registros</span>
+             </div>
+             <div className="overflow-x-auto">
+               <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+                  <thead className="bg-gray-50 dark:bg-slate-900">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Empresa (Tenant)</th>
+                      <th className="px-6 py-3 text-left text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Contratista</th>
+                      <th className="px-6 py-3 text-left text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Fecha de Corte</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
+                    {contratistas.map((c) => (
+                      <tr key={c.id_subcontratista} className="hover:bg-blue-50/30 dark:hover:bg-blue-900/10 transition-colors">
+                        <td className="px-6 py-4">
+                          <span className="text-xs font-black text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-lg border border-blue-100 dark:border-blue-800 uppercase tracking-tighter">
+                            {c.empresa_nombre}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm font-bold text-slate-700 dark:text-slate-200">{c.razon_social}</div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <input 
+                            type="date" 
+                            className="bg-transparent border border-gray-200 dark:border-slate-700 rounded-lg p-2 text-sm font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 transition-all outline-none"
+                            value={c.fecha_corte ? c.fecha_corte.split('T')[0] : ''}
+                            onChange={(e) => handleUpdateContratistaFecha(c.id_subcontratista, e.target.value)}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+               </table>
+             </div>
+          </div>
+        )}
       </div>
     </div>
 
@@ -234,6 +340,13 @@ export default function EmpresasPage() {
                 <option value="Intermedio">Intermedio</option>
                 <option value="Total">Total (Premium)</option>
               </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1 dark:text-white">Fecha de Inicio / Renovación de Plan</label>
+              <input type="date" className="w-full bg-transparent border rounded p-2 dark:text-white" 
+                value={formData.fecha_inicio_plan} onChange={e => setFormData({...formData, fecha_inicio_plan: e.target.value})} />
+              <p className="text-[10px] text-gray-500 mt-1 italic">El sistema calculará automáticamente 30 días adicionales para el corte.</p>
             </div>
 
             <div className="pt-4 flex justify-end space-x-3 mt-6 border-t">

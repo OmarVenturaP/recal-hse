@@ -7,7 +7,7 @@ import Link from 'next/link';
 import ModalPlanDetalles from '@/components/ModalPlanDetalles';
 
 export default function DashboardHome() {
-  const [stats, setStats] = useState({ maquinaria: 0, personal: 0 });
+  const [stats, setStats] = useState({ maquinaria: 0, personal: 0, fechaInicioPlan: null });
   const [loading, setLoading] = useState(true);
   const [userAuth, setUserAuth] = useState(null);
   const [userPerms, setUserPerms] = useState({ ft: 0, dc3: 0, informe: 0 });
@@ -57,7 +57,8 @@ export default function DashboardHome() {
         if (data.success) {
           setStats({
             maquinaria: data.maquinariaActiva,
-            personal: data.personalActivo
+            personal: data.personalActivo,
+            fechaInicioPlan: data.fechaInicioPlan
           });
         }
       } catch (error) {
@@ -182,8 +183,88 @@ export default function DashboardHome() {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
   });
 
+
+ 
+  // ---- CALCULO DE VENCIMIENTO Y ALERTAS ----
+  const getSubscriptionAlert = () => {
+    if (!stats.fechaInicioPlan || (userAuth?.rol !== 'Admin' && userAuth?.rol !== 'Master')) return null;
+
+    const start = new Date(stats.fechaInicioPlan);
+    const expiration = new Date(start.getTime() + (30 * 24 * 60 * 60 * 1000));
+    const now = new Date();
+    
+    // Diferencia en milisegundos
+    const diff = expiration.getTime() - now.getTime();
+    const daysRemaining = Math.ceil(diff / (1000 * 60 * 60 * 24));
+
+    if (daysRemaining > 0 && daysRemaining <= 5) {
+      return (
+        <div className="mb-8 animate-in slide-in-from-top-4 duration-500">
+          <div className="bg-gradient-to-r from-amber-500 via-orange-600 to-amber-500 p-[1px] rounded-[2rem] shadow-2xl shadow-orange-500/20">
+            <div className="bg-white dark:bg-slate-900 rounded-[2rem] p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden relative">
+              <div className="absolute -right-10 top-0 w-40 h-40 bg-orange-500/10 rounded-full blur-3xl"></div>
+              
+              <div className="flex items-center gap-6 relative z-10">
+                <div className="w-16 h-16 bg-orange-100 dark:bg-orange-900/30 rounded-2xl flex items-center justify-center text-orange-600 shrink-0 shadow-inner">
+                  <Zap className="w-8 h-8 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight mb-1">
+                    Tu acceso premium está por vencer
+                  </h3>
+                  <p className="text-slate-500 dark:text-slate-400 font-medium max-w-md">
+                    Quedan <span className="text-orange-600 dark:text-orange-400 font-black">{daysRemaining} {daysRemaining === 1 ? 'día' : 'días'}</span> para la fecha de corte de tu membresía. Renueva hoy para evitar interrupciones en el servicio.
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex gap-4 relative z-10 w-full md:w-auto">
+                 <button 
+                  onClick={() => setIsPlanModalOpen(true)}
+                  className="flex-1 md:flex-none px-8 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-orange-600/30 transition-all hover:-translate-y-1 active:scale-95 whitespace-nowrap"
+                 >
+                   Renovar Ahora
+                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    
+    if (daysRemaining <= 0) {
+      return (
+        <div className="mb-8 animate-in slide-in-from-top-4 duration-500">
+          <div className="bg-gradient-to-r from-red-500 to-red-800 p-[1px] rounded-[2rem] shadow-2xl shadow-red-500/20">
+            <div className="bg-white dark:bg-slate-900 rounded-[2rem] p-6 md:p-8 flex items-center justify-between gap-6">
+              <div className="flex items-center gap-6">
+                <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-2xl flex items-center justify-center text-red-600 shrink-0">
+                  <ShieldCheck className="w-8 h-8" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight mb-1">
+                    Periodo de suscripción vencido
+                  </h3>
+                  <p className="text-slate-500 dark:text-slate-400 font-medium uppercase text-[10px] tracking-widest">
+                    Contacta a soporte técnico para regularizar tu cuenta.
+                  </p>
+                </div>
+              </div>
+              <a href="https://wa.me/529619326182" target="_blank" rel="noopener noreferrer" className="px-6 py-3 bg-red-600 text-white rounded-xl font-black text-xs uppercase tracking-widest">Soporte</a>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
   return (
     <div className="min-h-screen bg-[#f5f7fa] dark:bg-[#0f172a] p-4 sm:p-6 lg:p-10 space-y-8 font-sans transition-colors duration-300">
+      
+      {/* ALERTA DE SUSCRIPCION */}
+      {getSubscriptionAlert()}
       
       {/* 1. HERO SECTION INTUITIVO (Glassmorphism & Gradients) */}
       <div className={`relative overflow-hidden rounded-[2.5rem] ${isTotalDash ? 'bg-gradient-to-br from-[#1a1c2c] via-[#0f172a] to-slate-950 border-amber-900/20' : 'bg-gradient-to-br from-[var(--recal-blue)] via-blue-700 to-indigo-900'} dark:from-slate-800 dark:via-slate-800 dark:to-slate-900 shadow-2xl border border-white/10 p-8 md:p-12 transition-all`}>

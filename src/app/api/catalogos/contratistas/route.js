@@ -37,9 +37,14 @@ export async function GET(request) {
       queryParams.push(idEmpresa);
     }
 
+    // --- MIGRACIÓN SILENCIOSA ---
+    try {
+      await pool.query(`ALTER TABLE Subcontratistas ADD COLUMN fecha_corte DATE DEFAULT NULL AFTER logo_empresa`);
+    } catch(e) {}
+
     const query = `
       SELECT id_subcontratista, razon_social, rfc, nombre_fiscal, telefono, correo, representante_legal, 
-      firma_representante_legal, representante_trabajadores, firma_representante_trabajadores, nombre_fiscal, logo_empresa
+      firma_representante_legal, representante_trabajadores, firma_representante_trabajadores, nombre_fiscal, logo_empresa, fecha_corte
       FROM Subcontratistas 
       WHERE ${whereClause}
       ORDER BY razon_social ASC
@@ -73,17 +78,18 @@ export async function POST(request) {
     const logo_empresa = await uploadImage(formData.get('logo_empresa'), 'recal_hse_logos');
     const firma_representante_legal = await uploadImage(formData.get('firma_representante_legal'), 'recal_hse_firmas');
     const firma_representante_trabajadores = await uploadImage(formData.get('firma_representante_trabajadores'), 'recal_hse_firmas');
+    const fecha_corte = formData.get('fecha_corte') || null;
 
     await connection.beginTransaction();
 
     const queryInsert = `
       INSERT INTO Subcontratistas 
-      (razon_social, rfc, telefono, correo, representante_legal, representante_trabajadores, logo_empresa, firma_representante_legal, firma_representante_trabajadores, nombre_fiscal, id_empresa)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (razon_social, rfc, telefono, correo, representante_legal, representante_trabajadores, logo_empresa, firma_representante_legal, firma_representante_trabajadores, nombre_fiscal, id_empresa, fecha_corte)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const [result] = await connection.query(queryInsert, [
       razon_social, rfc, telefono, correo, representante_legal, representante_trabajadores, 
-      logo_empresa, firma_representante_legal, firma_representante_trabajadores, nombre_fiscal, idEmpresa || 1
+      logo_empresa, firma_representante_legal, firma_representante_trabajadores, nombre_fiscal, idEmpresa || 1, fecha_corte
     ]);
     
     const nuevoId = result.insertId;
@@ -148,15 +154,17 @@ export async function PUT(request) {
 
     await connection.beginTransaction();
 
+    const fecha_corte = formData.get('fecha_corte') || null;
+
     const queryUpdate = `
       UPDATE Subcontratistas SET 
         razon_social=?, rfc=?, telefono=?, correo=?, representante_legal=?, representante_trabajadores=?,
-        logo_empresa=?, firma_representante_legal=?, firma_representante_trabajadores=?, nombre_fiscal=?
+        logo_empresa=?, firma_representante_legal=?, firma_representante_trabajadores=?, nombre_fiscal=?, fecha_corte=?
       WHERE id_subcontratista=?
     `;
     await connection.query(queryUpdate, [
       razon_social, rfc, telefono, correo, representante_legal, representante_trabajadores, 
-      logo_empresa, firma_representante_legal, firma_representante_trabajadores, nombre_fiscal, id_subcontratista
+      logo_empresa, firma_representante_legal, firma_representante_trabajadores, nombre_fiscal, fecha_corte, id_subcontratista
     ]);
 
     const cuadrillasRaw = formData.get('cuadrillas');

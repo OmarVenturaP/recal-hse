@@ -46,16 +46,23 @@ export async function GET(request) {
       queryParamsMaquinaria
     );
 
-    // 4. Contar Personal Activo respetando el tenant
     const [personal] = await pool.query(
       `SELECT COUNT(*) as total FROM Fuerza_Trabajo WHERE ${basePersonalWhere}`,
       queryParamsPersonal
     );
 
+    // 5. Obtener fecha de inicio de plan de la empresa
+    let fechaInicioPlan = null;
+    if (idEmpresa) {
+      const [empresa] = await pool.query('SELECT fecha_inicio_plan FROM cat_empresas WHERE id_empresa = ?', [idEmpresa]);
+      if (empresa.length > 0) fechaInicioPlan = empresa[0].fecha_inicio_plan;
+    }
+
     return NextResponse.json({
       success: true,
       maquinariaActiva: maquinaria[0].total,
-      personalActivo: personal[0].total
+      personalActivo: personal[0].total,
+      fechaInicioPlan
     });
 
   } catch (error) {

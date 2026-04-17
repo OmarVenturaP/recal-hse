@@ -10,8 +10,13 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Acceso denegado. Solo nivel Master.' }, { status: 403 });
     }
 
+    // --- MIGRACIÓN SILENCIOSA ---
+    try {
+      await pool.query(`ALTER TABLE cat_empresas ADD COLUMN fecha_inicio_plan DATE DEFAULT NULL AFTER estado`);
+    } catch(e) {}
+
     const query = `
-      SELECT id_empresa, nombre_comercial, rfc, plan_suscripcion, estado, fecha_registro
+      SELECT id_empresa, nombre_comercial, rfc, plan_suscripcion, estado, fecha_registro, fecha_inicio_plan
       FROM cat_empresas 
       WHERE estado = 'activo'
       ORDER BY nombre_comercial ASC
@@ -31,14 +36,14 @@ export async function POST(request) {
     if (userRol !== 'Master') return NextResponse.json({ error: 'Acceso denegado.' }, { status: 403 });
 
     const body = await request.json();
-    const { nombre_comercial, rfc, plan_suscripcion } = body;
+    const { nombre_comercial, rfc, plan_suscripcion, fecha_inicio_plan } = body;
 
     if (!nombre_comercial || !plan_suscripcion) {
       return NextResponse.json({ error: 'El nombre comercial y el plan son obligatorios.' }, { status: 400 });
     }
 
-    const query = `INSERT INTO cat_empresas (nombre_comercial, rfc, plan_suscripcion) VALUES (?, ?, ?)`;
-    const [result] = await pool.query(query, [nombre_comercial, rfc || null, plan_suscripcion]);
+    const query = `INSERT INTO cat_empresas (nombre_comercial, rfc, plan_suscripcion, fecha_inicio_plan) VALUES (?, ?, ?, ?)`;
+    const [result] = await pool.query(query, [nombre_comercial, rfc || null, plan_suscripcion, fecha_inicio_plan || null]);
 
     return NextResponse.json({ success: true, id_empresa: result.insertId });
   } catch (error) {
@@ -53,14 +58,14 @@ export async function PUT(request) {
     if (userRol !== 'Master') return NextResponse.json({ error: 'Acceso denegado.' }, { status: 403 });
 
     const body = await request.json();
-    const { id_empresa, nombre_comercial, rfc, plan_suscripcion } = body;
+    const { id_empresa, nombre_comercial, rfc, plan_suscripcion, fecha_inicio_plan } = body;
 
     if (!id_empresa || !nombre_comercial || !plan_suscripcion) {
       return NextResponse.json({ error: 'Datos incompletos.' }, { status: 400 });
     }
 
-    const query = `UPDATE cat_empresas SET nombre_comercial = ?, rfc = ?, plan_suscripcion = ? WHERE id_empresa = ?`;
-    await pool.query(query, [nombre_comercial, rfc || null, plan_suscripcion, id_empresa]);
+    const query = `UPDATE cat_empresas SET nombre_comercial = ?, rfc = ?, plan_suscripcion = ?, fecha_inicio_plan = ? WHERE id_empresa = ?`;
+    await pool.query(query, [nombre_comercial, rfc || null, plan_suscripcion, fecha_inicio_plan || null, id_empresa]);
 
     return NextResponse.json({ success: true, mensaje: "Actualizado correctamente" });
   } catch (error) {
