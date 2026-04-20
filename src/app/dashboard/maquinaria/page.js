@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { ClipboardList, Pencil, Trash2, Upload, Tractor, FileSpreadsheet, FolderDown } from 'lucide-react';
+import { ClipboardList, Pencil, Trash2, Upload, Tractor, FileSpreadsheet, FolderDown, Settings, Eye, Check } from 'lucide-react';
 import Swal from 'sweetalert2';
 import MaquinariaFormModal from '@/components/maquinaria/modals/MaquinariaFormModal';
 import MaquinariaBajaModal from '@/components/maquinaria/modals/MaquinariaBajaModal';
@@ -48,6 +48,7 @@ export default function MaquinariaPage() {
   const [filtroSub, setFiltroSub] = useState('');
   const [busqueda, setBusqueda] = useState('');
   const [filtroArea, setFiltroArea] = useState('');
+  const [filtroTipoUnidad, setFiltroTipoUnidad] = useState('todos');
 
   const [ordenPor, setOrdenPor] = useState('fecha_ingreso_obra');
   const [ordenDireccion, setOrdenDireccion] = useState('DESC');
@@ -75,6 +76,7 @@ export default function MaquinariaPage() {
   const formInicial = {
     num_economico: '', tipo: '', marca: '', anio: '', modelo: '', 
     color: '', serie: '', placa: '', horometro: '', 
+    tipo_unidad: 'maquinaria', horometro_inicial: '',
     intervalo_mantenimiento: '', fecha_proximo_mantenimiento: '', fecha_ingreso_obra: '', id_subcontratista: '',
     area: 'seguridad', 
     imagen_url_actual: ''
@@ -96,6 +98,65 @@ export default function MaquinariaPage() {
 
   const [isHistorialOpen, setIsHistorialOpen] = useState(false);
   const [maquinaSeleccionada, setMaquinaSeleccionada] = useState(null);
+
+  // --- CONFIGURACIÓN DE VISIBILIDAD DE COLUMNAS ---
+  const [showColumnConfig, setShowColumnConfig] = useState(false);
+  const [columnasVisibles, setColumnasVisibles] = useState({
+    foto: true,
+    categoria: true,
+    equipo: true, // Obligatorio
+    info: true,   // Obligatorio
+    contratista: true,
+    ingreso: true,
+    baja: true,
+    area: true,
+    ultimoServicio: true,
+    estatus: true,
+    realizadoPor: true,
+    acciones: true, // Obligatorio
+    trazabilidad: true
+  });
+
+  // Cargar preferencias al montar
+  useEffect(() => {
+    const saved = localStorage.getItem('recal_maquinaria_columns');
+    if (saved) {
+      try {
+        setColumnasVisibles(JSON.parse(saved));
+      } catch (e) {
+        console.error("Error al cargar columnas:", e);
+      }
+    }
+  }, []);
+
+  // Guardar preferencias ante cambios
+  useEffect(() => {
+    localStorage.setItem('recal_maquinaria_columns', JSON.stringify(columnasVisibles));
+  }, [columnasVisibles]);
+
+  const toggleColumna = (key) => {
+    // Evitar ocultar obligatorias
+    if (['equipo', 'info', 'acciones'].includes(key)) return;
+    setColumnasVisibles(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const getVisibleCount = () => {
+    let count = 0;
+    if (columnasVisibles.foto) count++;
+    if (columnasVisibles.categoria) count++;
+    if (columnasVisibles.equipo) count++;
+    if (columnasVisibles.info) count++;
+    if (columnasVisibles.contratista) count++;
+    if (columnasVisibles.ingreso) count++;
+    if (columnasVisibles.baja) count++;
+    if (columnasVisibles.area && canSeeBothAreas) count++;
+    if (columnasVisibles.ultimoServicio) count++;
+    if (columnasVisibles.estatus) count++;
+    if (columnasVisibles.realizadoPor) count++;
+    if (columnasVisibles.acciones) count++;
+    if (columnasVisibles.trazabilidad && (userRole === 'Admin' || userRole === 'Master')) count++;
+    return count;
+  };
   const [historial, setHistorial] = useState([]);
   const [formMantenimiento, setFormMantenimiento] = useState({
     fecha_mantenimiento: '', tipo_mantenimiento: 'Preventivo', horometro_mantenimiento: '', observaciones: ''
@@ -142,6 +203,7 @@ export default function MaquinariaPage() {
       }
 
       if (filtroSub) url += `subcontratista=${filtroSub}&`;
+      if (filtroTipoUnidad && filtroTipoUnidad !== 'todos') url += `tipo_unidad=${filtroTipoUnidad}&`;
       if (busqueda) url += `busqueda=${encodeURIComponent(busqueda)}&`; 
       
       const res = await fetch(url);
@@ -153,8 +215,8 @@ export default function MaquinariaPage() {
     }
   };
 
-  useEffect(() => { fetchMaquinaria(); }, [filtroSub, filtroArea, exportMes, exportAnio, exportSemana, userArea, busqueda, ordenPor, ordenDireccion]);
-  useEffect(() => { setCurrentPage(1); }, [busqueda, filtroSub, filtroArea, exportMes, exportAnio, exportSemana, userArea, ordenPor, ordenDireccion]);
+  useEffect(() => { fetchMaquinaria(); }, [filtroSub, filtroArea, filtroTipoUnidad, exportMes, exportAnio, exportSemana, userArea, busqueda, ordenPor, ordenDireccion]);
+  useEffect(() => { setCurrentPage(1); }, [busqueda, filtroSub, filtroArea, filtroTipoUnidad, exportMes, exportAnio, exportSemana, userArea, ordenPor, ordenDireccion]);
 
   useEffect(() => {
     if (topRef.current) topRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -272,6 +334,8 @@ export default function MaquinariaPage() {
       fecha_ingreso_obra: formatForInput(m.fecha_ingreso_obra), 
       id_subcontratista: m.id_subcontratista || '', 
       area: m.area || (userArea === 'Medio Ambiente' ? 'ambiental' : 'seguridad'),
+      tipo_unidad: m.tipo_unidad || 'maquinaria',
+      horometro_inicial: m.horometro_inicial || '',
       imagen_url_actual: m.imagen_url || ''
     });
     setImageFile(null); setEditId(m.id_maquinaria); setIsEditing(true); setIsModalOpen(true);
@@ -394,6 +458,7 @@ export default function MaquinariaPage() {
     setFiltroSub(''); 
     setBusqueda('');
     setFiltroArea('');
+    setFiltroTipoUnidad('todos');
   };
 
   const handleGenerarInspeccion = (id_maquina) => {
@@ -402,7 +467,7 @@ export default function MaquinariaPage() {
 
   const handleExportarUtilizacion = (e) => {
     e.preventDefault();
-    const url = `/api/maquinaria/exportar-utilizacion?${userArea === 'Medio Ambiente' ? `mes=${exportMes}&anio=${exportAnio}` : `mes=${exportMes}&anio=${exportAnio}`}&area_usuario=${userArea}`;
+    const url = `/api/maquinaria/exportar-utilizacion?${userArea === 'Medio Ambiente' ? `mes=${exportMes}&anio=${exportAnio}` : `mes=${exportMes}&anio=${exportAnio}`}&area_usuario=${userArea}&tipo_unidad=${filtroTipoUnidad}`;
     
     const maquinasActivasSinFoto = maquinaria.filter(m => !m.fecha_baja && !m.imagen_url);
     
@@ -485,7 +550,7 @@ export default function MaquinariaPage() {
               <span className="mr-1">📊</span> <span className="hidden sm:inline">Utilización</span><span className="sm:hidden">Util</span>
             </button>
             <button 
-              onClick={() => window.open(`/api/maquinaria/exportar-plan-servicio?${userArea === 'Medio Ambiente' ? `mes=${exportMes}&anio=${exportAnio}` : `mes=${exportMes}&anio=${exportAnio}`}&area_usuario=${userArea}`, '_blank')} 
+              onClick={() => window.open(`/api/maquinaria/exportar-plan-servicio?${userArea === 'Medio Ambiente' ? `mes=${exportMes}&anio=${exportAnio}` : `mes=${exportMes}&anio=${exportAnio}`}&area_usuario=${userArea}&tipo_unidad=${filtroTipoUnidad}`, '_blank')} 
               className="flex-1 sm:flex-none justify-center bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center"
             >
               <span className="mr-1">🛠️</span> <span className="hidden sm:inline">Servicio</span><span className="sm:hidden">Serv</span>
@@ -502,7 +567,7 @@ export default function MaquinariaPage() {
 
       {/* PANEL DE FILTROS Y BÚSQUEDA */}
       <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 grid grid-cols-1 lg:grid-cols-12 gap-4">
-        <div className={`lg:col-span-${canSeeBothAreas ? '5' : '7'}`}>
+        <div className={`lg:col-span-${canSeeBothAreas ? '3' : '5'}`}>
           <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Buscar Equipo</label>
           <div className="relative">
             <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">🔍</span>
@@ -510,6 +575,17 @@ export default function MaquinariaPage() {
               className="w-full pl-10 bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 shadow-sm focus:ring-[var(--recal-blue)] outline-none sm:text-sm"
               value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
           </div>
+        </div>
+        <div className="lg:col-span-2">
+          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Tipo de Unidad</label>
+          <select className="w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 shadow-sm focus:ring-[var(--recal-blue)] outline-none sm:text-sm" 
+            value={filtroTipoUnidad} onChange={(e) => setFiltroTipoUnidad(e.target.value)}>
+            <option value="todos">Todos los tipos</option>
+            <option value="maquinaria">Maquinaria</option>
+            <option value="equipo">Equipo Menor</option>
+            <option value="herramienta">Herramienta</option>
+            <option value="vehiculo">Vehículo</option>
+          </select>
         </div>
         <div className="lg:col-span-3">
           <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Filtrar por Contratista</label>
@@ -530,8 +606,66 @@ export default function MaquinariaPage() {
             </select>
           </div>
         )}
-        <div className="lg:col-span-2 flex items-end">
-          <button onClick={limpiarFiltros} className="w-full bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-md font-medium sm:text-sm transition-colors border border-gray-300 dark:border-slate-600">Limpiar Todo</button>
+        <div className="lg:col-span-2 flex items-end gap-2">
+          <button onClick={limpiarFiltros} className="flex-1 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-md font-medium sm:text-sm transition-colors border border-gray-300 dark:border-slate-600">
+            Limpiar Todo
+          </button>
+          
+          {/* Botón Configurador de Columnas */}
+          <div className="relative">
+            <button 
+              onClick={() => setShowColumnConfig(!showColumnConfig)}
+              className={`p-2 rounded-md border transition-all ${showColumnConfig ? 'bg-orange-100 border-orange-300 text-orange-600' : 'bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200 dark:bg-slate-700 dark:border-slate-600 dark:text-gray-300'}`}
+              title="Configurar Columnas"
+            >
+              <Settings className={`w-5 h-5 ${showColumnConfig ? 'animate-spin-slow' : ''}`} />
+            </button>
+
+            {showColumnConfig && (
+              <div className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-gray-100 dark:border-slate-700 p-4 z-[9999] animate-in slide-in-from-top-2 duration-200">
+                <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-100 dark:border-slate-700">
+                  <span className="text-sm font-bold text-gray-800 dark:text-white flex items-center">
+                    <Eye className="w-4 h-4 mr-2" /> Columnas Visibles
+                  </span>
+                  <button onClick={() => setShowColumnConfig(false)} className="text-gray-400 hover:text-gray-600">&times;</button>
+                </div>
+                <div className="space-y-1.5 max-h-[40vh] overflow-y-auto custom-scrollbar">
+                  {[
+                    { id: 'foto', label: 'Imagen' },
+                    { id: 'categoria', label: 'Categoría' },
+                    { id: 'equipo', label: 'Equipo', mandatory: true },
+                    { id: 'info', label: 'Info', mandatory: true },
+                    { id: 'contratista', label: 'Contratista' },
+                    { id: 'ingreso', label: 'Fecha Ingreso' },
+                    { id: 'baja', label: 'Fecha Baja' },
+                    { id: 'area', label: 'Área Asignada', permission: canSeeBothAreas },
+                    { id: 'ultimoServicio', label: 'Último Servicio' },
+                    { id: 'estatus', label: 'Estatus' },
+                    { id: 'realizadoPor', label: 'Realizado por' },
+                    { id: 'trazabilidad', label: 'Trazabilidad', permission: (userRole === 'Admin' || userRole === 'Master') },
+                    { id: 'acciones', label: 'Acciones', mandatory: true },
+                  ].map(col => {
+                    if (col.permission === false) return null;
+                    return (
+                      <label key={col.id} className={`flex items-center p-2 rounded-lg cursor-pointer transition-colors ${col.mandatory ? 'bg-gray-50 dark:bg-slate-900/50 opacity-80 cursor-not-allowed' : 'hover:bg-gray-50 dark:hover:bg-slate-700/50'}`}>
+                        <input 
+                          type="checkbox" 
+                          className="w-4 h-4 rounded text-orange-500 focus:ring-orange-500 border-gray-300"
+                          checked={columnasVisibles[col.id]}
+                          disabled={col.mandatory}
+                          onChange={() => toggleColumna(col.id)}
+                        />
+                        <span className="ml-3 text-sm font-medium text-gray-700 dark:text-gray-300">
+                          {col.label} {col.mandatory && <span className="text-[10px] text-gray-400 font-normal">(Oblig.)</span>}
+                        </span>
+                        {columnasVisibles[col.id] && <Check className="w-3 h-3 ml-auto text-green-500" />}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -541,31 +675,65 @@ export default function MaquinariaPage() {
           <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700 relative">
             <thead className="bg-gray-50 dark:bg-slate-900 hidden md:table-header-group sticky top-0 z-10 shadow-sm outline outline-1 outline-gray-200 dark:outline-slate-700">
               <tr>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Imagen</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('tipo')}>
-                  Tipo {ordenPor === 'tipo' && (ordenDireccion === 'ASC' ? '↑' : '↓')}
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('marca')}>
-                  Equipo {ordenPor === 'marca' && (ordenDireccion === 'ASC' ? '↑' : '↓')}
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('nombre_subcontratista')}>
-                  Contratista {ordenPor === 'nombre_subcontratista' && (ordenDireccion === 'ASC' ? '↑' : '↓')}
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('fecha_ingreso_obra')}>
-                  Ingreso {ordenPor === 'fecha_ingreso_obra' && (ordenDireccion === 'ASC' ? '↑' : '↓')}
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('fecha_baja')}>
-                  Baja {ordenPor === 'fecha_baja' && (ordenDireccion === 'ASC' ? '↑' : '↓')}
-                </th>
-                {canSeeBothAreas && (
+                {columnasVisibles.foto && <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Imagen</th>}
+                
+                {columnasVisibles.categoria && (
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('tipo_unidad')}>
+                    Categoría {ordenPor === 'tipo_unidad' && (ordenDireccion === 'ASC' ? '↑' : '↓')}
+                  </th>
+                )}
+
+                {columnasVisibles.equipo && (
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('tipo')}>
+                    Equipo {ordenPor === 'tipo' && (ordenDireccion === 'ASC' ? '↑' : '↓')}
+                  </th>
+                )}
+
+                {columnasVisibles.info && (
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('marca')}>
+                    Info {ordenPor === 'marca' && (ordenDireccion === 'ASC' ? '↑' : '↓')}
+                  </th>
+                )}
+
+                {columnasVisibles.contratista && (
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('nombre_subcontratista')}>
+                    Contratista {ordenPor === 'nombre_subcontratista' && (ordenDireccion === 'ASC' ? '↑' : '↓')}
+                  </th>
+                )}
+
+                {columnasVisibles.ingreso && (
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('fecha_ingreso_obra')}>
+                    Ingreso {ordenPor === 'fecha_ingreso_obra' && (ordenDireccion === 'ASC' ? '↑' : '↓')}
+                  </th>
+                )}
+
+                {columnasVisibles.baja && (
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('fecha_baja')}>
+                    Baja {ordenPor === 'fecha_baja' && (ordenDireccion === 'ASC' ? '↑' : '↓')}
+                  </th>
+                )}
+
+                {columnasVisibles.area && canSeeBothAreas && (
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('area')}>
                     Área {ordenPor === 'area' && (ordenDireccion === 'ASC' ? '↑' : '↓')}
                   </th>
                 )}
-                <th className="px-4 py-3 text-center text-xs font-medium text-[var(--recal-blue)] dark:text-blue-400 uppercase">Último Servicio</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Estatus</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Acciones</th>
-                {(userRole === 'Admin' || userRole === 'Master') && (
+
+                {columnasVisibles.ultimoServicio && (
+                  <th className="px-4 py-3 text-center text-xs font-medium text-[var(--recal-blue)] dark:text-blue-400 uppercase">Último Servicio</th>
+                )}
+
+                {columnasVisibles.estatus && (
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Estatus</th>
+                )}
+
+                {columnasVisibles.realizadoPor && (
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Realizado por</th>
+                )}
+
+                {columnasVisibles.acciones && <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Acciones</th>}
+                
+                {columnasVisibles.trazabilidad && (userRole === 'Admin' || userRole === 'Master') && (
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Trazabilidad</th>
                 )}
               </tr>
@@ -573,10 +741,10 @@ export default function MaquinariaPage() {
             
             <tbody className="bg-white dark:bg-slate-800 divide-y md:divide-y-0 md:divide-gray-200 dark:md:divide-slate-700 block md:table-row-group">
               {loading ? (
-                <tr className="block md:table-row"><td colSpan="8" className="px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400 block md:table-cell">Cargando inventario...</td></tr>
+                <tr className="block md:table-row"><td colSpan={getVisibleCount()} className="px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400 block md:table-cell">Cargando inventario...</td></tr>
               ) : maquinaria.length === 0 ? (
                 <tr className="block md:table-row">
-                  <td colSpan="8" className="px-6 py-12 text-center block md:table-cell">
+                  <td colSpan={getVisibleCount()} className="px-6 py-12 text-center block md:table-cell">
                     <div className="text-gray-400 dark:text-gray-500 text-4xl mb-2">🔍</div>
                     <p className="text-sm font-medium text-gray-900 dark:text-gray-200">No se han encontrado resultados</p>
                   </td>
@@ -584,128 +752,159 @@ export default function MaquinariaPage() {
               ) : maquinariaPaginada.map((m) => (
                   <tr key={m.id_maquinaria} className="block md:table-row border border-gray-200 dark:border-slate-700 md:border-none mb-4 md:mb-0 rounded-lg shadow-sm md:shadow-none p-4 md:p-0 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
                     
-                    <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 border-b dark:border-slate-700 md:border-none">
-                      <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 text-sm">Foto:</span>
-                      <div className="flex-shrink-0 h-12 w-12 md:h-10 md:w-10 mx-auto md:mx-0">
-                        {m.imagen_url ? (
-                          <img className="h-12 w-12 md:h-10 md:w-10 rounded-md object-cover border border-gray-200 dark:border-slate-600" src={m.imagen_url} alt="" />
-                        ) : (
-                          <div className="h-12 w-12 md:h-10 md:w-10 rounded-full bg-gray-100 dark:bg-slate-700 flex items-center justify-center border border-gray-200 dark:border-slate-600 text-gray-400 dark:text-gray-500">🚜</div>
-                        )}
-                      </div>
-                    </td>
-                    
-                    <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 text-sm font-bold text-[var(--recal-blue)] dark:text-blue-400 md:text-gray-900 dark:md:text-white border-b dark:border-slate-700 md:border-none">
-                      <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Tipo:</span>
-                      <span>{m.tipo}</span>
-                    </td>
-                    
-                    <td className="flex justify-between items-start md:table-cell px-2 md:px-4 py-2 md:py-4 text-sm border-b dark:border-slate-700 md:border-none">
-                      <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 mt-1">Equipo:</span>
-                      <div className="flex flex-col sm:items-start items-end gap-1">
-                        <span className="text-sm font-bold text-gray-900 dark:text-gray-200 bg-gray-100 dark:bg-slate-700 px-1.5 py-0.5 rounded w-fit">Marca: {m.marca || 'S/N'}</span>
-                        <span className="text-sm font-bold text-gray-900 dark:text-gray-200 bg-gray-100 dark:bg-slate-700 px-1.5 py-0.5 rounded w-fit">Modelo: {m.modelo || 'S/N'}</span>
-                        <span className="text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-slate-700 px-1.5 py-0.5 rounded w-fit">Num. Eco: {m.num_economico || 'S/N'}</span>
-                        <span className="text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-slate-700 px-1.5 py-0.5 rounded w-fit">Serie: {m.serie || 'S/N'}</span>
-                      </div>
-                    </td>
-                    
-                    <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
-                      <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Contratista:</span>
-                      <span>{m.nombre_subcontratista || '-'}</span>
-                    </td>
+                {columnasVisibles.foto && (
+                  <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 border-b dark:border-slate-700 md:border-none">
+                    <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 text-sm">Foto:</span>
+                    <div className="flex-shrink-0 h-12 w-12 md:h-10 md:w-10 mx-auto md:mx-0">
+                      {m.imagen_url ? (
+                        <img className="h-12 w-12 md:h-10 md:w-10 rounded-md object-cover border border-gray-200 dark:border-slate-600" src={m.imagen_url} alt="" />
+                      ) : (
+                        <div className="h-12 w-12 md:h-10 md:w-10 rounded-full bg-gray-100 dark:bg-slate-700 flex items-center justify-center border border-gray-200 dark:border-slate-600 text-gray-400 dark:text-gray-500">🚜</div>
+                      )}
+                    </div>
+                  </td>
+                )}
+                
+                {columnasVisibles.categoria && (
+                  <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 text-xs font-bold uppercase text-gray-600 dark:text-gray-400 border-b dark:border-slate-700 md:border-none">
+                    <span className="md:hidden font-bold">Categoría:</span>
+                    <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-slate-700 rounded border border-gray-200 dark:border-slate-600">{m.tipo_unidad === 'equipo' ? 'Equipo Menor' : (m.tipo_unidad || 'N/A')}</span>
+                  </td>
+                )}
 
-                    <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
-                      <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Ingreso:</span>
-                      <span>{formatDDMMYYYY(m.fecha_ingreso_obra)}</span>
-                    </td>
+                {columnasVisibles.equipo && (
+                  <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 text-sm font-bold text-[var(--recal-blue)] dark:text-blue-400 md:text-gray-900 dark:md:text-white border-b dark:border-slate-700 md:border-none">
+                    <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Equipo:</span>
+                    <span>{m.tipo}</span>
+                  </td>
+                )}
+                
+                {columnasVisibles.info && (
+                  <td className="flex justify-between items-start md:table-cell px-2 md:px-4 py-2 md:py-4 text-sm border-b dark:border-slate-700 md:border-none">
+                    <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 mt-1">Info:</span>
+                    <div className="flex flex-col sm:items-start items-end gap-1">
+                      <span className="text-sm font-bold text-gray-900 dark:text-gray-200 bg-gray-100 dark:bg-slate-700 px-1.5 py-0.5 rounded w-fit">Marca: {m.marca || 'S/N'}</span>
+                      <span className="text-sm font-bold text-gray-900 dark:text-gray-200 bg-gray-100 dark:bg-slate-700 px-1.5 py-0.5 rounded w-fit">Modelo: {m.modelo || 'S/N'}</span>
+                      <span className="text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-slate-700 px-1.5 py-0.5 rounded w-fit">Num. Eco: {m.num_economico || 'S/N'}</span>
+                      <span className="text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-slate-700 px-1.5 py-0.5 rounded w-fit">Serie: {m.serie || 'S/N'}</span>
+                    </div>
+                  </td>
+                )}
+                    
+                {columnasVisibles.contratista && (
+                  <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
+                    <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Contratista:</span>
+                    <span>{m.nombre_subcontratista || '-'}</span>
+                  </td>
+                )}
 
-                    <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
-                      <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Baja:</span>
-                      <span>{m.fecha_baja ? formatDDMMYYYY(m.fecha_baja) : '-'}</span>
-                    </td>
+                {columnasVisibles.ingreso && (
+                  <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
+                    <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Ingreso:</span>
+                    <span>{formatDDMMYYYY(m.fecha_ingreso_obra)}</span>
+                  </td>
+                )}
 
-                    {canSeeBothAreas && (
-                      <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 text-center border-b dark:border-slate-700 md:border-none">
-                        <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 text-sm">Área:</span>
-                        <span className={`px-2 py-1 inline-flex text-[10px] uppercase font-bold rounded shadow-sm border ${m.area === 'ambiental' ? 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800/50' : 'bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-900/50 dark:text-slate-300 dark:border-slate-700/50'}`}>
-                          {m.area === 'ambiental' ? 'Medio Ambiente' : 'Seguridad'}
-                        </span>
+                {columnasVisibles.baja && (
+                  <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
+                    <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Baja:</span>
+                    <span>{m.fecha_baja ? formatDDMMYYYY(m.fecha_baja) : '-'}</span>
+                  </td>
+                )}
+
+                {columnasVisibles.area && canSeeBothAreas && (
+                  <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 text-center border-b dark:border-slate-700 md:border-none">
+                    <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 text-sm">Área:</span>
+                    <span className={`px-2 py-1 inline-flex text-[10px] uppercase font-bold rounded shadow-sm border ${m.area === 'ambiental' ? 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800/50' : 'bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-900/50 dark:text-slate-300 dark:border-slate-700/50'}`}>
+                      {m.area === 'ambiental' ? 'Medio Ambiente' : 'Seguridad'}
+                    </span>
+                  </td>
+                )}
+                    
+                {columnasVisibles.ultimoServicio && (
+                  <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 border-b dark:border-slate-700 md:border-none">
+                    <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 text-sm">Último Servicio:</span>
+                    <div className="text-right md:text-center">
+                      <div className="text-sm font-semibold text-blue-900 dark:text-blue-400">{m.ultima_fecha_mantenimiento && m.ultima_fecha_mantenimiento != m.fecha_ingreso_obra ? formatDDMMYYYY(m.ultima_fecha_mantenimiento) : 'Sin Registro'}</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">{m.horometro_actual ? `${m.horometro_actual} ${m.tipo_unidad === 'vehiculo' ? 'km' : 'hrs'}` : ''}</div>
+                    </div>
+                  </td>
+                )}
+                
+                {columnasVisibles.estatus && (
+                  <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 text-center border-b dark:border-slate-700 md:border-none">
+                    <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 text-sm">Estatus:</span>
+                    <div>
+                      {m.fecha_baja ? (
+                        <span className="px-2 inline-flex text-xs font-semibold rounded-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-300">Baja: {formatDDMMYYYY(m.fecha_baja)}</span>
+                      ) : (
+                        renderBadge(m)
+                      )}
+                    </div>
+                  </td>
+                )}
+
+                {columnasVisibles.realizadoPor && (
+                  <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 text-center border-b dark:border-slate-700 md:border-none">
+                    <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 text-xs uppercase">Realizado por:</span>
+                    <span className="text-xs font-semibold text-gray-600 dark:text-gray-300 italic">{m.responsable_ultimo_mantenimiento || 'N/A'}</span>
+                  </td>
+                )}
+                    
+                    {columnasVisibles.acciones && (
+                      <td className="flex justify-end items-center md:table-cell px-2 md:px-4 py-4 md:py-4 text-sm font-medium border-b dark:border-slate-700 md:border-none">
+                        <div className="flex justify-end items-center gap-2 md:gap-3">
+                          
+                          {/* Botón: Generar Inspección (Individual) */}
+                          {(userArea === 'Medio Ambiente' || userRole === 'Master') && (
+                            <div className="relative group flex items-center justify-center">
+                              <button onClick={() => handleGenerarInspeccion(m.id_maquinaria)} className="text-green-600 dark:text-green-400 hover:text-green-800 hover:bg-blue-50 dark:hover:bg-blue-50 p-2 rounded-md transition-colors">
+                                <FileSpreadsheet className="w-4 h-4 sm:w-5 sm:h-5" />
+                              </button>
+                              <div className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
+                                Generar Inspección
+                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-gray-800"></div>
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="relative group flex items-center justify-center">
+                            <button onClick={() => handleHistorialOpen(m)} className="text-[var(--recal-blue)] dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 p-2 rounded-md transition-colors">
+                              <ClipboardList className="w-4 h-4 sm:w-5 sm:h-5" />
+                            </button>
+                            <div className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
+                              Historial de Servicio
+                              <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-gray-800"></div>
+                            </div>
+                          </div>
+
+                          {canManageMaquinaria && (
+                            <div className="relative group flex items-center justify-center">
+                              <button onClick={() => handleEditClick(m)} className="text-blue-600 dark:text-blue-400 hover:text-blue-800 hover:bg-blue-50 p-2 rounded-md transition-colors">
+                                <Pencil className="w-4 h-4 sm:w-5 sm:h-5" />
+                              </button>
+                              <div className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
+                                Editar Equipo
+                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-gray-800"></div>
+                              </div>
+                            </div>
+                          )}
+
+                          {canManageMaquinaria && !m.fecha_baja && (
+                            <div className="relative group flex items-center justify-center">
+                              <button onClick={() => handleBajaClick(m.id_maquinaria)} className="text-red-500 dark:text-red-400 hover:text-red-700 hover:bg-red-50 p-2 rounded-md transition-colors">
+                                <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                              </button>
+                              <div className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
+                                Dar de Baja
+                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-gray-800"></div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </td>
                     )}
-                    
-                    <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 border-b dark:border-slate-700 md:border-none">
-                      <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 text-sm">Último Servicio:</span>
-                      <div className="text-right md:text-center">
-                        <div className="text-sm font-semibold text-blue-900 dark:text-blue-400">{m.ultima_fecha_mantenimiento && m.ultima_fecha_mantenimiento != m.fecha_ingreso_obra ? formatDDMMYYYY(m.ultima_fecha_mantenimiento) : 'Sin Registro'}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">{m.horometro_actual ? `${m.horometro_actual} hrs` : ''}</div>
-                      </div>
-                    </td>
-                    
-                    <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 text-center border-b dark:border-slate-700 md:border-none">
-                      <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 text-sm">Estatus:</span>
-                      <div>
-                        {m.fecha_baja ? (
-                          <span className="px-2 inline-flex text-xs font-semibold rounded-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-300">Baja: {formatDDMMYYYY(m.fecha_baja)}</span>
-                        ) : (
-                          renderBadge(m)
-                        )}
-                      </div>
-                    </td>
-                    
-                    <td className="flex justify-end items-center md:table-cell px-2 md:px-4 py-4 md:py-4 text-sm font-medium border-b dark:border-slate-700 md:border-none">
-                      <div className="flex justify-end items-center gap-2 md:gap-3">
-                        
-                        {/* Botón: Generar Inspección (Individual) */}
-                        {(userArea === 'Medio Ambiente' || userRole === 'Master') && (
-                          <div className="relative group flex items-center justify-center">
-                            <button onClick={() => handleGenerarInspeccion(m.id_maquinaria)} className="text-green-600 dark:text-green-400 hover:text-green-800 hover:bg-blue-50 dark:hover:bg-blue-50 p-2 rounded-md transition-colors">
-                              <FileSpreadsheet className="w-4 h-4 sm:w-5 sm:h-5" />
-                            </button>
-                            <div className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
-                              Generar Inspección
-                              <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-gray-800"></div>
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="relative group flex items-center justify-center">
-                          <button onClick={() => abrirHistorial(m)} className="text-[var(--recal-blue)] dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 p-2 rounded-md transition-colors">
-                            <ClipboardList className="w-4 h-4 sm:w-5 sm:h-5" />
-                          </button>
-                          <div className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
-                            Historial de Servicio
-                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-gray-800"></div>
-                          </div>
-                        </div>
-
-                        {canManageMaquinaria && (
-                          <div className="relative group flex items-center justify-center">
-                            <button onClick={() => handleEditClick(m)} className="text-blue-600 dark:text-blue-400 hover:text-blue-800 hover:bg-blue-50 p-2 rounded-md transition-colors">
-                              <Pencil className="w-4 h-4 sm:w-5 sm:h-5" />
-                            </button>
-                            <div className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
-                              Editar Equipo
-                              <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-gray-800"></div>
-                            </div>
-                          </div>
-                        )}
-
-                        {canManageMaquinaria && !m.fecha_baja && (
-                          <div className="relative group flex items-center justify-center">
-                            <button onClick={() => handleBajaClick(m.id_maquinaria)} className="text-red-500 dark:text-red-400 hover:text-red-700 hover:bg-red-50 p-2 rounded-md transition-colors">
-                              <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
-                            </button>
-                            <div className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
-                              Dar de Baja
-                              <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-gray-800"></div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </td>
-
-                    {(userRole === 'Admin' || userRole === 'Master') && (
+                    {columnasVisibles.trazabilidad && (userRole === 'Admin' || userRole === 'Master') && (
                       <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 border-b dark:border-slate-700 md:border-none">
                         <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 text-sm">Trazabilidad:</span>
                         <div className="flex flex-col items-end md:items-start gap-1">

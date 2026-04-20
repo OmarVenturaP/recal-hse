@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Pencil, Trash2, Upload, FileSpreadsheet, Users } from 'lucide-react';
+import { Pencil, Trash2, Upload, FileSpreadsheet, Users, Settings, Eye, Check } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 // FUNCIÓN DE UTILIDAD: Verifica si una fecha de alta es anterior al inicio del periodo filtrado (SUA anterior)
@@ -140,6 +140,59 @@ export default function FuerzaTrabajoPage() {
   };
   
   const [formData, setFormData] = useState(formInicial);
+
+  // --- CONFIGURACIÓN DE VISIBILIDAD DE COLUMNAS ---
+  const [showColumnConfig, setShowColumnConfig] = useState(false);
+  const [columnasVisibles, setColumnasVisibles] = useState({
+    nombre: true,       // Obligatorio
+    categoria: true,    // Obligatorio
+    nss: true,
+    ingreso: true,
+    altaImss: true,
+    contratista: true,
+    info: true,
+    estatus: true,
+    acciones: true,      // Obligatorio
+    trazabilidad: true
+  });
+
+  // Cargar preferencias al montar
+  useEffect(() => {
+    const saved = localStorage.getItem('recal_ft_columns');
+    if (saved) {
+      try {
+        setColumnasVisibles(JSON.parse(saved));
+      } catch (e) {
+        console.error("Error al cargar columnas FT:", e);
+      }
+    }
+  }, []);
+
+  // Guardar preferencias ante cambios
+  useEffect(() => {
+    localStorage.setItem('recal_ft_columns', JSON.stringify(columnasVisibles));
+  }, [columnasVisibles]);
+
+  const toggleColumna = (key) => {
+    // Evitar ocultar obligatorias
+    if (['nombre', 'categoria', 'acciones'].includes(key)) return;
+    setColumnasVisibles(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const getVisibleCount = () => {
+    let count = 0;
+    if (columnasVisibles.nombre) count++;
+    if (columnasVisibles.categoria) count++;
+    if (columnasVisibles.nss) count++;
+    if (columnasVisibles.ingreso) count++;
+    if (columnasVisibles.altaImss) count++;
+    if (columnasVisibles.contratista) count++;
+    if (columnasVisibles.info) count++;
+    if (columnasVisibles.estatus) count++;
+    if (columnasVisibles.acciones) count++;
+    if (columnasVisibles.trazabilidad && (userRole === 'Admin' || userRole === 'Master')) count++;
+    return count;
+  };
 
   const formatDDMMYYYY = (dateString) => {
     if (!dateString) return '';
@@ -907,12 +960,68 @@ const handleDc3Submit = async (e) => {
               {soloFaltaCuadrilla ? 'VER TODO' : 'S/CUADRILLA'}
             </button>
           </div>
-          <button 
-            onClick={() => { setBusqueda(''); setFiltroSub(''); setSoloFaltaCurp(false); setSoloFaltaCuadrilla(false); setSoloAltas(false); }} 
-            className="w-full bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-md font-bold text-xs transition-colors border border-gray-300 dark:border-slate-600 uppercase"
-          >
-            Limpiar Todo
-          </button>
+          
+          <div className="flex gap-2">
+            <button 
+              onClick={() => { setBusqueda(''); setFiltroSub(''); setSoloFaltaCurp(false); setSoloFaltaCuadrilla(false); setSoloAltas(false); }} 
+              className="flex-1 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-md font-bold text-xs transition-colors border border-gray-300 dark:border-slate-600 uppercase"
+            >
+              Limpiar Todo
+            </button>
+
+            {/* Configuración de Columnas */}
+            <div className="relative">
+              <button 
+                onClick={() => setShowColumnConfig(!showColumnConfig)}
+                className={`p-2 rounded-md border transition-all ${showColumnConfig ? 'bg-blue-100 border-blue-300 text-blue-600' : 'bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200 dark:bg-slate-700 dark:border-slate-600 dark:text-gray-300'}`}
+                title="Configurar Columnas"
+              >
+                <Settings className={`w-5 h-5 ${showColumnConfig ? 'animate-spin-slow' : ''}`} />
+              </button>
+
+              {showColumnConfig && (
+                <div className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-gray-100 dark:border-slate-700 p-4 z-[9999] animate-in slide-in-from-top-2 duration-200">
+                  <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-100 dark:border-slate-700">
+                    <span className="text-sm font-bold text-gray-800 dark:text-white flex items-center">
+                      <Eye className="w-4 h-4 mr-2" /> Columnas Visibles
+                    </span>
+                    <button onClick={() => setShowColumnConfig(false)} className="text-gray-400 hover:text-gray-600 font-bold">&times;</button>
+                  </div>
+                  <div className="space-y-1.5 max-h-[40vh] overflow-y-auto custom-scrollbar">
+                    {[
+                      { id: 'nombre', label: 'Nombre Completo', mandatory: true },
+                      { id: 'categoria', label: 'Categoría/Puesto', mandatory: true },
+                      { id: 'nss', label: 'NSS' },
+                      { id: 'ingreso', label: 'Fecha Ingreso' },
+                      { id: 'altaImss', label: 'Fecha Alta IMSS' },
+                      { id: 'contratista', label: 'Contratista' },
+                      { id: 'info', label: 'Info/Badges' },
+                      { id: 'estatus', label: 'Estatus (Activo/Baja)' },
+                      { id: 'trazabilidad', label: 'Trazabilidad', permission: (userRole === 'Admin' || userRole === 'Master') },
+                      { id: 'acciones', label: 'Acciones', mandatory: true },
+                    ].map(col => {
+                      if (col.permission === false) return null;
+                      return (
+                        <label key={col.id} className={`flex items-center p-2 rounded-lg cursor-pointer transition-colors ${col.mandatory ? 'bg-gray-50 dark:bg-slate-900/50 opacity-80 cursor-not-allowed' : 'hover:bg-gray-50 dark:hover:bg-slate-700/50'}`}>
+                          <input 
+                            type="checkbox" 
+                            className="w-4 h-4 rounded text-blue-500 focus:ring-blue-500 border-gray-300"
+                            checked={columnasVisibles[col.id]}
+                            disabled={col.mandatory}
+                            onChange={() => toggleColumna(col.id)}
+                          />
+                          <span className="ml-3 text-xs font-medium text-gray-700 dark:text-gray-300">
+                            {col.label} {col.mandatory && <span className="text-[10px] text-gray-400 font-normal">(Oblig.)</span>}
+                          </span>
+                          {columnasVisibles[col.id] && <Check className="w-3 h-3 ml-auto text-green-500" />}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -921,26 +1030,26 @@ const handleDc3Submit = async (e) => {
           <table className="w-full divide-y divide-gray-200 dark:divide-slate-700 block md:table relative">
             <thead className="bg-gray-50 dark:bg-slate-900 hidden md:table-header-group sticky top-0 z-10 shadow-sm outline outline-1 outline-gray-200 dark:outline-slate-700">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('apellido_trabajador')}>Nombre {ordenPor === 'apellido_trabajador' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('puesto_categoria')}>Categoría {ordenPor === 'puesto_categoria' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('nss')}>NSS {ordenPor === 'nss' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('fecha_ingreso_obra')}>Ingreso {ordenPor === 'fecha_ingreso_obra' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('fecha_alta_imss')}>Alta {ordenPor === 'fecha_alta_imss' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('nombre_subcontratista')}>Contratista {ordenPor === 'nombre_subcontratista' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Info</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Estatus</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Acciones</th>
-                {(userRole === 'Admin' || userRole === 'Master') && (
+                {columnasVisibles.nombre && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('apellido_trabajador')}>Nombre {ordenPor === 'apellido_trabajador' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>}
+                {columnasVisibles.categoria && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('puesto_categoria')}>Categoría {ordenPor === 'puesto_categoria' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>}
+                {columnasVisibles.nss && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('nss')}>NSS {ordenPor === 'nss' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>}
+                {columnasVisibles.ingreso && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('fecha_ingreso_obra')}>Ingreso {ordenPor === 'fecha_ingreso_obra' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>}
+                {columnasVisibles.altaImss && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('fecha_alta_imss')}>Alta {ordenPor === 'fecha_alta_imss' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>}
+                {columnasVisibles.contratista && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('nombre_subcontratista')}>Contratista {ordenPor === 'nombre_subcontratista' && (ordenDireccion === 'ASC' ? '↑' : '↓')}</th>}
+                {columnasVisibles.info && <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Info</th>}
+                {columnasVisibles.estatus && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Estatus</th>}
+                {columnasVisibles.acciones && <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Acciones</th>}
+                {columnasVisibles.trazabilidad && (userRole === 'Admin' || userRole === 'Master') && (
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Trazabilidad</th>
                 )}
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-slate-800 divide-y md:divide-y-0 md:divide-gray-200 dark:md:divide-slate-700 block md:table-row-group">
               {loading ? (
-                <tr className="block md:table-row"><td colSpan="10" className="px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400 block md:table-cell">Cargando personal...</td></tr>
+                <tr className="block md:table-row"><td colSpan={getVisibleCount()} className="px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400 block md:table-cell">Cargando personal...</td></tr>
               ) : trabajadores.length === 0 ? (
                 <tr className="block md:table-row">
-                  <td colSpan="10" className="px-6 py-12 text-center block md:table-cell">
+                  <td colSpan={getVisibleCount()} className="px-6 py-12 text-center block md:table-cell">
                     <div className="text-gray-400 dark:text-gray-500 text-4xl mb-2">🔍</div>
                     <p className="text-sm font-medium text-gray-900 dark:text-gray-200">No se encontraron resultados en esta semana</p>
                   </td>
@@ -960,176 +1069,198 @@ const handleDc3Submit = async (e) => {
 
                   return (
                     <tr key={t.id_trabajador} className="block md:table-row border border-gray-200 dark:border-slate-700 md:border-none mb-4 md:mb-0 rounded-lg shadow-sm md:shadow-none p-4 md:p-0 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
-                      <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm font-bold text-[var(--recal-blue)] dark:text-white md:text-gray-900 border-b dark:border-slate-700 md:border-none gap-4">
-                        <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 shrink-0">Nombre:</span>
-                        <span className="text-right md:text-left break-words max-w-[65%] md:max-w-none">{`${t.apellido_trabajador || ''} ${t.nombre_trabajador}`.trim()}</span>
-                      </td>
-                      <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
-                        <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Categoría:</span>{t.puesto_categoria}
-                      </td>
-                      <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
-                        <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">NSS:</span>{t.nss || 'N/A'}
-                      </td>
-                      <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
-                        <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Ingreso a obra:</span>{formatDDMMYYYY(t.fecha_ingreso_obra)}
-                      </td>
-                      <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
-                        <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Alta IMSS:</span>
-                        {t.fecha_alta_imss ? formatDDMMYYYY(t.fecha_alta_imss) : 'N/A'}
-                      </td>
-                      <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
-                        <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Contratista:</span>{t.nombre_subcontratista || 'RECAL'}
-                      </td>
+                      {columnasVisibles.nombre && (
+                        <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm font-bold text-[var(--recal-blue)] dark:text-white md:text-gray-900 border-b dark:border-slate-700 md:border-none gap-4">
+                          <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 shrink-0">Nombre:</span>
+                          <span className="text-right md:text-left break-words max-w-[65%] md:max-w-none">{`${t.apellido_trabajador || ''} ${t.nombre_trabajador}`.trim()}</span>
+                        </td>
+                      )}
                       
-                      <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 text-sm border-b dark:border-slate-700 md:border-none">
-                        <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Info:</span>
-                        <div className="flex flex-col gap-2">
-                          <div className="flex items-center gap-2">
-                            {canManageFt && (
-                              <label className="relative inline-flex items-center cursor-pointer">
-                                <input 
-                                  type="checkbox" 
-                                  className="sr-only peer" 
-                                  checked={t.bActivo !== 0}
-                                  onChange={() => handleToggleActivo(t.id_trabajador, t.bActivo)} 
-                                />
-                                <div className="w-7 h-4 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all dark:border-gray-500 peer-checked:bg-[var(--recal-blue)]"></div>
-                                <span className="ml-2 text-[10px] font-bold text-gray-600 dark:text-gray-400">
-                                  {t.bActivo !== 0 ? 'ON' : 'OFF'}
-                                </span>
-                              </label>
-                            )}
-                            {(userRole === 'Admin' || userRole === 'Master') && (
-                              <button 
-                                onClick={() => handleEliminarPermanente(t.id_trabajador)} 
-                                className="group relative flex items-center justify-center bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-800 text-red-700 dark:text-red-400 p-1.5 rounded-md transition-colors"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                                <div className="absolute bottom-full mb-1 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
-                                  Eliminar Permanente
-                                  <div className="absolute top-full left-1/2 -translate-x-1/2 border-[3px] border-transparent border-t-gray-800"></div>
-                                </div>
-                              </button>
-                            )}
-                          </div>
-                          <div className="flex flex-col items-end md:items-start gap-2">
-                          <div className="flex flex-wrap gap-1 justify-end md:justify-start">
-                            {!isAlta && !faltaCurp && !hayCurp && <span className="text-gray-400 dark:text-gray-600">-</span>}
-                            {isAlta && <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">ALTA</span>}
-                            {faltaCurp && <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-600 text-white dark:bg-red-900/30 dark:text-white">FALTA CURP</span>}
-                            {hayCurp && <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-green-600 text-white dark:bg-green-900/30 dark:text-white">CURP</span>}
-                            {!t.id_subcontratista_ft && <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-600 text-white dark:bg-red-900/30 dark:text-white">FALTA CUADRILLA</span>}
-                            {t.puesto_categoria === 'POR DEFINIR' && (
-                               <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-amber-500 text-white dark:bg-amber-900/40 dark:text-amber-300 animate-pulse border border-amber-600/20">
-                                 ⚠️ PUESTO PENDIENTE
-                               </span>
-                             )}
-                          </div>
-                        </div>
-                        </div>
-                      </td>
-
-
-                      <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm border-b dark:border-slate-700 md:border-none">
-                        <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Estatus:</span>
-                        {t.fecha_baja ? (<span className="px-2 inline-flex text-xs font-semibold rounded-full bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300">Baja: {formatDDMMYYYY(t.fecha_baja)}</span>) : (<span className="px-2 inline-flex text-xs font-semibold rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">Activo</span>)}
-                      </td>
-                      <td className="flex justify-between md:justify-end items-center md:table-cell px-2 md:px-6 py-4 md:py-4 text-sm font-medium border-b dark:border-slate-700 md:border-none">
-                        <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Acciones:</span>
-                        <div className="flex justify-end items-center gap-2 md:gap-3 flex-wrap">
-
-                        {canManageCert && t.puesto_categoria && ['SUPERVISOR', 'RESIDENTE', 'COORDINADOR DE SEGURIDAD', 'AUXILIAR DE SEGURIDAD'].some(rol => t.puesto_categoria.toUpperCase().includes(rol)) && (
-                            <div className="relative group flex items-center justify-center">
-                              <button 
-                                onClick={() => handleGenerarCartaAsignacion(t)} 
-                                className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 p-2 rounded-md transition-colors"
-                              >
-                                <span className="w-4 h-4 sm:w-5 sm:h-5 block text-center">📄</span>
-                              </button>
-                              <div className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
-                                Carta de Asignación
-                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-gray-800"></div>
-                              </div>
-                            </div>
-                        )}
-
-                          {canManageDc3 && t.curp && t.curp.length === 18 && (
-                            <div className="relative group flex items-center justify-center">
-                              <button onClick={() => handleGenerarDc3Individual(t)} className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 hover:bg-indigo-50 dark:hover:bg-gray-600 p-2 rounded-md transition-colors" disabled={!t.curp || t.curp.length !== 18}>
-                                <span className="w-4 h-4 sm:w-5 sm:h-5 block text-center">⛑️</span>
-                              </button>
-                              <div className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
-                                Generar DC3
-                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-gray-800"></div>
-                              </div>
-                            </div>
-                          )}
-
-                          {canManageCert && (
-                            <div className="relative group flex items-center justify-center">
-                              <button onClick={() => handleGenerarCertificadoIndividual(t)} className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-200 hover:bg-indigo-50 dark:hover:bg-indigo-300/30 p-2 rounded-md transition-colors">
-                                <span className="w-4 h-4 sm:w-5 sm:h-5 block text-center">🩺</span>
-                              </button>
-                              <div className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
-                                Generar Certificado
-                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-gray-800"></div>
-                              </div>
-                            </div>
-                          )}
-
-                          {canManageFt && (
-                          <div className="relative group flex items-center justify-center">
-                            <button onClick={() => handleEditClick(t)} className="text-[var(--recal-blue)] dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 p-2 rounded-md transition-colors">
-                              <Pencil className="w-4 h-4 sm:w-5 sm:h-5" />
-                            </button>
-                            <div className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
-                              Editar
-                              <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-gray-800"></div>
-                            </div>
-                          </div>
-                          )}
-
-                          
-                          {!t.fecha_baja ? (
-                            <div className="relative group flex items-center justify-center">
+                      {columnasVisibles.categoria && (
+                        <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
+                          <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Categoría:</span>{t.puesto_categoria}
+                        </td>
+                      )}
+                      
+                      {columnasVisibles.nss && (
+                        <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
+                          <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">NSS:</span>{t.nss || 'N/A'}
+                        </td>
+                      )}
+                      
+                      {columnasVisibles.ingreso && (
+                        <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
+                          <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Ingreso a obra:</span>{formatDDMMYYYY(t.fecha_ingreso_obra)}
+                        </td>
+                      )}
+                      
+                      {columnasVisibles.altaImss && (
+                        <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
+                          <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Alta IMSS:</span>
+                          {t.fecha_alta_imss ? formatDDMMYYYY(t.fecha_alta_imss) : 'N/A'}
+                        </td>
+                      )}
+                      
+                      {columnasVisibles.contratista && (
+                        <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm text-gray-500 dark:text-gray-300 border-b dark:border-slate-700 md:border-none">
+                          <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Contratista:</span>{t.nombre_subcontratista || 'RECAL'}
+                        </td>
+                      )}
+                      
+                      {columnasVisibles.info && (
+                        <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 text-sm border-b dark:border-slate-700 md:border-none">
+                          <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Info:</span>
+                          <div className="flex flex-col gap-2">
+                            <div className="flex items-center gap-2">
                               {canManageFt && (
-                                <button onClick={() => handleBajaClick(t.id_trabajador)} className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 p-2 rounded-md transition-colors">
-                                  <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                  <input 
+                                    type="checkbox" 
+                                    className="sr-only peer" 
+                                    checked={t.bActivo !== 0}
+                                    onChange={() => handleToggleActivo(t.id_trabajador, t.bActivo)} 
+                                  />
+                                  <div className="w-7 h-4 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all dark:border-gray-500 peer-checked:bg-[var(--recal-blue)]"></div>
+                                  <span className="ml-2 text-[10px] font-bold text-gray-600 dark:text-gray-400">
+                                    {t.bActivo !== 0 ? 'ON' : 'OFF'}
+                                  </span>
+                                </label>
+                              )}
+                              {(userRole === 'Admin' || userRole === 'Master') && (
+                                <button 
+                                  onClick={() => handleEliminarPermanente(t.id_trabajador)} 
+                                  className="group relative flex items-center justify-center bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-800 text-red-700 dark:text-red-400 p-1.5 rounded-md transition-colors"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                  <div className="absolute bottom-full mb-1 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
+                                    Eliminar Permanente
+                                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-[3px] border-transparent border-t-gray-800"></div>
+                                  </div>
                                 </button>
                               )}
-                              <div className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
-                                Dar Baja
-                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-gray-800"></div>
+                            </div>
+                            <div className="flex flex-col items-end md:items-start gap-2">
+                              <div className="flex flex-wrap gap-1 justify-end md:justify-start">
+                                {!isAlta && !faltaCurp && !hayCurp && <span className="text-gray-400 dark:text-gray-600">-</span>}
+                                {isAlta && <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">ALTA</span>}
+                                {faltaCurp && <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-600 text-white dark:bg-red-900/30 dark:text-white">FALTA CURP</span>}
+                                {hayCurp && <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-green-600 text-white dark:bg-green-900/30 dark:text-white">CURP</span>}
+                                {!t.id_subcontratista_ft && <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-600 text-white dark:bg-red-900/30 dark:text-white">FALTA CUADRILLA</span>}
+                                {t.puesto_categoria === 'POR DEFINIR' && (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-amber-500 text-white dark:bg-amber-900/40 dark:text-amber-300 animate-pulse border border-amber-600/20">
+                                    ⚠️ PUESTO PENDIENTE
+                                  </span>
+                                )}
                               </div>
                             </div>
-                          ) : (
-                            <span className="text-gray-400 dark:text-gray-500 italic text-xs px-2 flex items-center h-full">Retirado</span>
-                          )}
-                        </div>
-                      </td>
-                        {(userRole === 'Admin' || userRole === 'Master') && (
-                          <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 border-b dark:border-slate-700 md:border-none">
-                            <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 text-sm">Trazabilidad:</span>
-                            <div className="flex flex-col items-end md:items-start gap-1 max-w-[65%] md:max-w-none">
-                              {t.creador ? (
-                                <span className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 px-2 py-0.5 rounded text-[10px] font-bold border border-green-200 dark:border-green-800 flex-wrap break-words inline-block" title="Registrado por">
-                                  Agregó: {t.creador}
-                                  {t.fecha_creacion && ` el ${new Date(t.fecha_creacion).toLocaleDateString('es-MX')}`}
-                                </span>
-                              ) : (
-                                <span className="bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-400 px-2 py-0.5 rounded text-[10px] font-bold border border-gray-200 dark:border-slate-600 flex-wrap break-words inline-block" title="Registrado por Master">
-                                  Agregó: Master
-                                </span>
-                              )}
-                              {t.modificador && (
-                                <span className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 px-2 py-0.5 rounded text-[10px] font-bold border border-yellow-200 dark:border-yellow-800 flex-wrap break-words inline-block" title="Modificado por">
-                                  Modificó: {t.modificador}
-                                  {t.ultima_modificacion && ` el ${new Date(t.ultima_modificacion).toLocaleDateString('es-MX')}`}
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                        )}
+                          </div>
+                        </td>
+                      )}
+
+                      {columnasVisibles.estatus && (
+                        <td className="flex justify-between items-center md:table-cell px-2 md:px-6 py-2 md:py-4 text-sm border-b dark:border-slate-700 md:border-none">
+                          <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Estatus:</span>
+                          {t.fecha_baja ? (<span className="px-2 inline-flex text-xs font-semibold rounded-full bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300">Baja: {formatDDMMYYYY(t.fecha_baja)}</span>) : (<span className="px-2 inline-flex text-xs font-semibold rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">Activo</span>)}
+                        </td>
+                      )}
+                      
+                      {columnasVisibles.acciones && (
+                        <td className="flex justify-between md:justify-end items-center md:table-cell px-2 md:px-6 py-4 md:py-4 text-sm font-medium border-b dark:border-slate-700 md:border-none">
+                          <span className="md:hidden font-bold text-gray-500 dark:text-gray-400">Acciones:</span>
+                          <div className="flex justify-end items-center gap-2 md:gap-3 flex-wrap">
+                            {canManageCert && t.puesto_categoria && ['SUPERVISOR', 'RESIDENTE', 'COORDINADOR DE SEGURIDAD', 'AUXILIAR DE SEGURIDAD'].some(rol => t.puesto_categoria.toUpperCase().includes(rol)) && (
+                              <div className="relative group flex items-center justify-center">
+                                <button 
+                                  onClick={() => handleGenerarCartaAsignacion(t)} 
+                                  className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 p-2 rounded-md transition-colors"
+                                >
+                                  <span className="w-4 h-4 sm:w-5 sm:h-5 block text-center">📄</span>
+                                </button>
+                                <div className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
+                                  Carta de Asignación
+                                  <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-gray-800"></div>
+                                </div>
+                              </div>
+                            )}
+
+                            {canManageDc3 && t.curp && t.curp.length === 18 && (
+                              <div className="relative group flex items-center justify-center">
+                                <button onClick={() => handleGenerarDc3Individual(t)} className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 hover:bg-indigo-50 dark:hover:bg-gray-600 p-2 rounded-md transition-colors" disabled={!t.curp || t.curp.length !== 18}>
+                                  <span className="w-4 h-4 sm:w-5 sm:h-5 block text-center">⛑️</span>
+                                </button>
+                                <div className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
+                                  Generar DC3
+                                  <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-gray-800"></div>
+                                </div>
+                              </div>
+                            )}
+
+                            {canManageCert && (
+                              <div className="relative group flex items-center justify-center">
+                                <button onClick={() => handleGenerarCertificadoIndividual(t)} className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-200 hover:bg-indigo-50 dark:hover:bg-indigo-300/30 p-2 rounded-md transition-colors">
+                                  <span className="w-4 h-4 sm:w-5 sm:h-5 block text-center">🩺</span>
+                                </button>
+                                <div className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
+                                  Generar Certificado
+                                  <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-gray-800"></div>
+                                </div>
+                              </div>
+                            )}
+
+                            {canManageFt && (
+                              <div className="relative group flex items-center justify-center">
+                                <button onClick={() => handleEditClick(t)} className="text-[var(--recal-blue)] dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 p-2 rounded-md transition-colors">
+                                  <Pencil className="w-4 h-4 sm:w-5 sm:h-5" />
+                                </button>
+                                <div className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
+                                  Editar
+                                  <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-gray-800"></div>
+                                </div>
+                              </div>
+                            )}
+
+                            {!t.fecha_baja ? (
+                              <div className="relative group flex items-center justify-center">
+                                {canManageFt && (
+                                  <button onClick={() => handleBajaClick(t.id_trabajador)} className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 p-2 rounded-md transition-colors">
+                                    <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                                  </button>
+                                )}
+                                <div className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
+                                  Dar Baja
+                                  <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-gray-800"></div>
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-gray-400 dark:text-gray-500 italic text-xs px-2 flex items-center h-full">Retirado</span>
+                            )}
+                          </div>
+                        </td>
+                      )}
+
+                      {columnasVisibles.trazabilidad && (userRole === 'Admin' || userRole === 'Master') && (
+                        <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 border-b dark:border-slate-700 md:border-none">
+                          <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 text-sm">Trazabilidad:</span>
+                          <div className="flex flex-col items-end md:items-start gap-1 max-w-[65%] md:max-w-none">
+                            {t.creador ? (
+                              <span className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 px-2 py-0.5 rounded text-[10px] font-bold border border-green-200 dark:border-green-800 flex-wrap break-words inline-block" title="Registrado por">
+                                Agregó: {t.creador}
+                                {t.fecha_creacion && ` el ${new Date(t.fecha_creacion).toLocaleDateString('es-MX')}`}
+                              </span>
+                            ) : (
+                              <span className="bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-400 px-2 py-0.5 rounded text-[10px] font-bold border border-gray-200 dark:border-slate-600 flex-wrap break-words inline-block" title="Registrado por Master">
+                                Agregó: Master
+                              </span>
+                            )}
+                            {t.modificador && (
+                              <span className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 px-2 py-0.5 rounded text-[10px] font-bold border border-yellow-200 dark:border-yellow-800 flex-wrap break-words inline-block" title="Modificado por">
+                                Modificó: {t.modificador}
+                                {t.ultima_modificacion && ` el ${new Date(t.ultima_modificacion).toLocaleDateString('es-MX')}`}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   );
                 })
