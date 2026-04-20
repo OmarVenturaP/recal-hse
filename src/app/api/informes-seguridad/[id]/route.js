@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import { registrarAuditoria } from '@/lib/auditoria';
+import { fechaCDMX } from '@/lib/dateUtils';
 
 // =====================================================================
 // GET: Obtener detalle completo de un informe (general + ubicaciones + FT)
@@ -109,13 +110,14 @@ export async function PUT(request, { params }) {
 
     // 3. UPDATE informe principal
     const usuario_actualizacion = request.headers.get('x-user-id') || null;
+    const ahora = fechaCDMX();
     await pool.query(
       `UPDATE informes_seguridad SET
         num_reporte = ?, id_subcontratista = ?, subcontratista = ?, mes_anio = ?,
         periodo_inicio = ?, periodo_fin = ?, hh_semana_anterior = ?, hh_semana_actual = ?,
-        usuario_actualizacion = ?, ultima_modificacion = NOW()
+        usuario_actualizacion = ?, ultima_modificacion = ?
        WHERE id_informe = ?`,
-      [num_reporte, id_subcontratista, subcontratista, mes_anio, periodo_inicio, periodo_fin, hh_semana_anterior, hh_semana_actual, usuario_actualizacion, id]
+      [num_reporte, id_subcontratista, subcontratista, mes_anio, periodo_inicio, periodo_fin, hh_semana_anterior, hh_semana_actual, usuario_actualizacion, ahora, id]
     );
 
     // 4. DELETE + re-INSERT ubicaciones

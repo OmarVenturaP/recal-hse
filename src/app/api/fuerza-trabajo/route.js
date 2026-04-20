@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import { trabajadorSchema, patchTrabajadorSchema } from '@/lib/validations/fuerza-trabajo';
 import { registrarAuditoria } from '@/lib/auditoria';
+import { fechaCDMX } from '@/lib/dateUtils';
 
 export async function GET(request) {
   try {
@@ -144,11 +145,11 @@ export async function POST(request) {
 
     const query = `
       INSERT INTO Fuerza_Trabajo 
-      (numero_empleado, nombre_trabajador, apellido_trabajador, puesto_categoria, nss, curp, fecha_ingreso_obra, fecha_alta_imss, origen, id_subcontratista_ft, id_subcontratista_principal, usuario_registro, id_empresa) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (numero_empleado, nombre_trabajador, apellido_trabajador, puesto_categoria, nss, curp, fecha_ingreso_obra, fecha_alta_imss, origen, id_subcontratista_ft, id_subcontratista_principal, usuario_registro, id_empresa, fecha_creacion) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const [result] = await pool.query(query, [
-      numero_empleado, nombre_trabajador, apellido_trabajador || null, puesto_categoria, nss, curp || null, fecha_ingreso_obra, fecha_alta_imss || null, origen, id_subcontratista_ft || null, id_subcontratista_principal || null, id_usuario_actual, idEmpresa 
+      numero_empleado, nombre_trabajador, apellido_trabajador || null, puesto_categoria, nss, curp || null, fecha_ingreso_obra, fecha_alta_imss || null, origen, id_subcontratista_ft || null, id_subcontratista_principal || null, id_usuario_actual, idEmpresa, fechaCDMX()
     ]);
 
     // AUDITORÍA (silenciosa)
@@ -232,8 +233,8 @@ export async function PUT(request) {
       }
     }
 
-    let updateFields = `numero_empleado=?, nombre_trabajador=?, apellido_trabajador=?, puesto_categoria=?, nss=?, curp=?, fecha_ingreso_obra=?, fecha_alta_imss=?, origen=?, id_subcontratista_ft=?, id_subcontratista_principal=?, usuario_actualizacion=?, ultima_modificacion=NOW()`;
-    let queryParams = [numero_empleado, nombre_trabajador, apellido_trabajador || null, puesto_categoria, nss, curp || null, fecha_ingreso_obra, fecha_alta_imss || null, origen, id_subcontratista_ft || null, id_subcontratista_principal || null, id_usuario_actual];
+    let updateFields = `numero_empleado=?, nombre_trabajador=?, apellido_trabajador=?, puesto_categoria=?, nss=?, curp=?, fecha_ingreso_obra=?, fecha_alta_imss=?, origen=?, id_subcontratista_ft=?, id_subcontratista_principal=?, usuario_actualizacion=?, ultima_modificacion=?`;
+    let queryParams = [numero_empleado, nombre_trabajador, apellido_trabajador || null, puesto_categoria, nss, curp || null, fecha_ingreso_obra, fecha_alta_imss || null, origen, id_subcontratista_ft || null, id_subcontratista_principal || null, id_usuario_actual, fechaCDMX()];
 
     if (body.tiene_baja) {
       updateFields += `, fecha_baja=?`;
@@ -296,8 +297,8 @@ export async function PATCH(request) {
     }
 
     if (bActivo !== undefined) {
-      const query = `UPDATE Fuerza_Trabajo SET bActivo = ?, usuario_actualizacion = ?, ultima_modificacion = NOW() WHERE id_trabajador = ?${authFilter}`;
-      await pool.query(query, [bActivo, id_usuario_actual, id_trabajador, ...authParams]);
+      const query = `UPDATE Fuerza_Trabajo SET bActivo = ?, usuario_actualizacion = ?, ultima_modificacion = ? WHERE id_trabajador = ?${authFilter}`;
+      await pool.query(query, [bActivo, id_usuario_actual, fechaCDMX(), id_trabajador, ...authParams]);
 
       // AUDITORÍA (silenciosa)
       await registrarAuditoria({
@@ -314,8 +315,8 @@ export async function PATCH(request) {
     } 
     // Lógica original de Baja
     else if (fecha_baja) {
-      const query = `UPDATE Fuerza_Trabajo SET fecha_baja = ?, usuario_actualizacion = ?, ultima_modificacion = NOW() WHERE id_trabajador = ?${authFilter}`;
-      await pool.query(query, [fecha_baja, id_usuario_actual, id_trabajador, ...authParams]);
+      const query = `UPDATE Fuerza_Trabajo SET fecha_baja = ?, usuario_actualizacion = ?, ultima_modificacion = ? WHERE id_trabajador = ?${authFilter}`;
+      await pool.query(query, [fecha_baja, id_usuario_actual, fechaCDMX(), id_trabajador, ...authParams]);
 
       // AUDITORÍA (silenciosa)
       await registrarAuditoria({

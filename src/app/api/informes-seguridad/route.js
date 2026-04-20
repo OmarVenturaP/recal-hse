@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import { registrarAuditoria } from '@/lib/auditoria';
+import { fechaCDMX } from '@/lib/dateUtils';
 
 // =====================================================================
 // GET: Listar informes por mes (filtro obligatorio)
@@ -131,9 +132,9 @@ export async function POST(request) {
     // 3. INSERT informe principal
     const [result] = await pool.query(
       `INSERT INTO informes_seguridad 
-        (num_reporte, id_subcontratista, subcontratista, mes_anio, periodo_inicio, periodo_fin, hh_semana_anterior, hh_semana_actual, usuario_registro, id_empresa)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [num_reporte, id_subcontratista, subcontratista, mes_anio, periodo_inicio, periodo_fin, hh_semana_anterior, hh_semana_actual, usuario_registro, id_empresa]
+        (num_reporte, id_subcontratista, subcontratista, mes_anio, periodo_inicio, periodo_fin, hh_semana_anterior, hh_semana_actual, usuario_registro, id_empresa, fecha_creacion)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [num_reporte, id_subcontratista, subcontratista, mes_anio, periodo_inicio, periodo_fin, hh_semana_anterior, hh_semana_actual, usuario_registro, id_empresa, fechaCDMX()]
     );
 
     const id_informe = result.insertId;

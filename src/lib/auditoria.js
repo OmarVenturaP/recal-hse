@@ -1,4 +1,5 @@
 import pool from '@/lib/db';
+import { fechaCDMX } from '@/lib/dateUtils';
 
 /**
  * Registra una entrada en el historial de auditoría.
@@ -46,9 +47,8 @@ export async function registrarAuditoria({
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
     `);
 
-    // Calcular la fecha en zona horaria CDMX (UTC-6)
-    const fechaCDMX = new Date(Date.now() - 6 * 60 * 60 * 1000);
-    const fechaFormatted = fechaCDMX.toISOString().slice(0, 19).replace('T', ' ');
+    // Obtener la fecha en zona horaria CDMX (UTC-6)
+    const fechaFormatted = fechaCDMX();
 
     await pool.query(
       `INSERT INTO Historial_Auditoria
