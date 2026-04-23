@@ -11,9 +11,14 @@ export async function GET(request) {
       return NextResponse.json({ error: "Falta el ID de la maquinaria." }, { status: 400 });
     }
 
+    // MIGRACIÓN SILENCIOSA
+    try {
+      await pool.query(`ALTER TABLE Historial_Mantenimiento ADD COLUMN realizado_por VARCHAR(255)`);
+    } catch(e) {}
+
     // Buscamos todos los servicios y los ordenamos por fecha (del más reciente al más antiguo)
     const [rows] = await pool.query(
-      `SELECT id_mantenimiento, id_maquinaria, fecha_mantenimiento, tipo_mantenimiento, horometro_mantenimiento, observaciones 
+      `SELECT id_mantenimiento, id_maquinaria, fecha_mantenimiento, tipo_mantenimiento, horometro_mantenimiento, observaciones, realizado_por 
        FROM Historial_Mantenimiento 
        WHERE id_maquinaria = ? 
        ORDER BY fecha_mantenimiento DESC, id_mantenimiento DESC`,
@@ -32,7 +37,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { id_maquinaria, fecha_mantenimiento, tipo_mantenimiento, horometro_mantenimiento, observaciones } = body;
+    const { id_maquinaria, fecha_mantenimiento, tipo_mantenimiento, horometro_mantenimiento, observaciones, realizado_por } = body;
 
     // Validación de seguridad (Ya NO exigimos el horometro_mantenimiento)
     if (!id_maquinaria || !fecha_mantenimiento || !tipo_mantenimiento) {
@@ -41,8 +46,8 @@ export async function POST(request) {
 
     const query = `
       INSERT INTO Historial_Mantenimiento 
-      (id_maquinaria, fecha_mantenimiento, tipo_mantenimiento, horometro_mantenimiento, observaciones) 
-      VALUES (?, ?, ?, ?, ?)
+      (id_maquinaria, fecha_mantenimiento, tipo_mantenimiento, horometro_mantenimiento, observaciones, realizado_por) 
+      VALUES (?, ?, ?, ?, ?, ?)
     `;
     
     // Si viene vacío o indefinido, enviamos null a MySQL
@@ -53,17 +58,50 @@ export async function POST(request) {
       fecha_mantenimiento, 
       tipo_mantenimiento, 
       horometroFinal, 
-      observaciones || null
+      observaciones || null,
+      realizado_por || null
     ]);
 
-    // Opcional: Actualizar el horómetro principal de la máquina 
-    // SOLO si el usuario ingresó un nuevo horómetro en este servicio.
-    if (horometroFinal !== null) {
-      await pool.query(
-        `UPDATE Maquinaria_Equipo SET horometro = ? WHERE id_maquinaria = ?`,
-        [horometroFinal, id_maquinaria]
-      );
+    // --- CÁLCULO AUTOMÁTICO DE PRÓXIMO MANTENIMIENTO ---
+    try {
+      // 1. Obtener el tipo de unidad
+      const [maquinaRows] = await pool.query('SELECT tipo_unidad FROM Maquinaria_Equipo WHERE id_maquinaria = ?', [id_maquinaria]);
+      
+      if (maquinaRows.length > 0) {
+        const { tipo_unidad } = maquinaRows[0];
+        let fechaProxima = null;
+        const baseDate = new Date(fecha_mantenimiento);
+
+        if (tipo_unidad === 'maquinaria') {
+          // Maquinaria: +36 días naturales
+          fechaProxima = new Date(baseDate);
+          fechaProxima.setDate(fechaProxima.getDate() + 36);
+        } else if (tipo_unidad === 'equipo') {
+          // Equipo Menor: +3 meses
+          fechaProxima = new Date(baseDate);
+          fechaProxima.setMonth(fechaProxima.getMonth() + 3);
+        }
+
+        if (fechaProxima) {
+          // Formatear a YYYY-MM-DD para MySQL
+          const yyyy = fechaProxima.getUTCFullYear();
+          const mm = String(fechaProxima.getUTCMonth() + 1).padStart(2, '0');
+          const dd = String(fechaProxima.getUTCDate()).padStart(2, '0');
+          const fechaSQL = `${yyyy}-${mm}-${dd}`;
+
+          await pool.query(
+            `UPDATE Maquinaria_Equipo SET fecha_proximo_mantenimiento = ? WHERE id_maquinaria = ?`,
+            [fechaSQL, id_maquinaria]
+          );
+        }
+      }
+    } catch (calcError) {
+      console.error("Error calculando próxima fecha:", calcError);
+      // No bloqueamos el flujo principal si falla el cálculo automático
     }
+
+    // NOTA: Se eliminó la actualización automática del horómetro principal de la máquina
+    // para mantener la independencia entre el registro de servicio y la ficha técnica.
 
     return NextResponse.json({ 
       success: true, 
@@ -74,5 +112,64 @@ export async function POST(request) {
   } catch (error) {
     console.error("Error al guardar mantenimiento:", error);
     return NextResponse.json({ success: false, error: "Error al guardar en la base de datos." }, { status: 500 });
+  }
+}
+
+// --- PUT: Actualizar un registro de mantenimiento existente ---
+export async function PUT(request) {
+  try {
+    const body = await request.json();
+    const { id_mantenimiento, fecha_mantenimiento, tipo_mantenimiento, horometro_mantenimiento, observaciones, realizado_por } = body;
+
+    if (!id_mantenimiento || !fecha_mantenimiento || !tipo_mantenimiento) {
+      return NextResponse.json({ error: "Faltan campos obligatorios para actualizar el servicio." }, { status: 400 });
+    }
+
+    const horometroFinal = horometro_mantenimiento ? parseFloat(horometro_mantenimiento) : null;
+
+    const query = `
+      UPDATE Historial_Mantenimiento 
+      SET fecha_mantenimiento = ?, 
+          tipo_mantenimiento = ?, 
+          horometro_mantenimiento = ?, 
+          observaciones = ?, 
+          realizado_por = ? 
+      WHERE id_mantenimiento = ?
+    `;
+
+    await pool.query(query, [
+      fecha_mantenimiento,
+      tipo_mantenimiento,
+      horometroFinal,
+      observaciones || null,
+      realizado_por || null,
+      id_mantenimiento
+    ]);
+
+    return NextResponse.json({ success: true, mensaje: "Mantenimiento actualizado correctamente" });
+
+  } catch (error) {
+    console.error("Error al actualizar mantenimiento:", error);
+    return NextResponse.json({ success: false, error: "Error al actualizar en la base de datos." }, { status: 500 });
+  }
+}
+
+// --- DELETE: Eliminar un registro de mantenimiento ---
+export async function DELETE(request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: "Falta el ID del mantenimiento a eliminar." }, { status: 400 });
+    }
+
+    await pool.query("DELETE FROM Historial_Mantenimiento WHERE id_mantenimiento = ?", [id]);
+
+    return NextResponse.json({ success: true, mensaje: "Registro eliminado correctamente" });
+
+  } catch (error) {
+    console.error("Error al eliminar mantenimiento:", error);
+    return NextResponse.json({ success: false, error: "Error al eliminar de la base de datos." }, { status: 500 });
   }
 }

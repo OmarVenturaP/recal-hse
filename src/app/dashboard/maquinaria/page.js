@@ -7,9 +7,28 @@ import MaquinariaFormModal from '@/components/maquinaria/modals/MaquinariaFormMo
 import MaquinariaBajaModal from '@/components/maquinaria/modals/MaquinariaBajaModal';
 import MaquinariaHistorialModal from '@/components/maquinaria/modals/MaquinariaHistorialModal';
 import MaquinariaImportModal from '@/components/maquinaria/modals/MaquinariaImportModal';
+import MaquinariaInspeccionHerramientaModal from '@/components/maquinaria/modals/MaquinariaInspeccionHerramientaModal';
+
+// CÓDIGO DE COLORES DE INSPECCIÓN MENSUAL PARA HERRAMIENTAS DE PODER
+const COLOR_INSPECCION_POR_MES = {
+  '01': { nombre: 'Azul',      bg: 'bg-blue-500',    text: 'text-white',          border: 'border-blue-600' },
+  '02': { nombre: 'Amarillo',  bg: 'bg-yellow-400',  text: 'text-yellow-900',     border: 'border-yellow-500' },
+  '03': { nombre: 'Blanco',    bg: 'bg-white',       text: 'text-gray-700',       border: 'border-gray-400' },
+  '04': { nombre: 'Verde',     bg: 'bg-green-500',   text: 'text-white',          border: 'border-green-600' },
+  '05': { nombre: 'Azul',      bg: 'bg-blue-500',    text: 'text-white',          border: 'border-blue-600' },
+  '06': { nombre: 'Amarillo',  bg: 'bg-yellow-400',  text: 'text-yellow-900',     border: 'border-yellow-500' },
+  '07': { nombre: 'Blanco',    bg: 'bg-white',       text: 'text-gray-700',       border: 'border-gray-400' },
+  '08': { nombre: 'Verde',     bg: 'bg-green-500',   text: 'text-white',          border: 'border-green-600' },
+  '09': { nombre: 'Azul',      bg: 'bg-blue-500',    text: 'text-white',          border: 'border-blue-600' },
+  '10': { nombre: 'Amarillo',  bg: 'bg-yellow-400',  text: 'text-yellow-900',     border: 'border-yellow-500' },
+  '11': { nombre: 'Blanco',    bg: 'bg-white',       text: 'text-gray-700',       border: 'border-gray-400' },
+  '12': { nombre: 'Verde',     bg: 'bg-green-500',   text: 'text-white',          border: 'border-green-600' },
+};
 
 export default function MaquinariaPage() {
   const topRef = useRef(null); 
+  const tableContainerRef = useRef(null);
+  const configRef = useRef(null);
 
   const [userRole, setUserRole] = useState(null);
   const [userArea, setUserArea] = useState(null); 
@@ -99,6 +118,11 @@ export default function MaquinariaPage() {
   const [isHistorialOpen, setIsHistorialOpen] = useState(false);
   const [maquinaSeleccionada, setMaquinaSeleccionada] = useState(null);
 
+  // Estado para modal de inspecciones de herramientas
+  const [isInspeccionHerramientaOpen, setIsInspeccionHerramientaOpen] = useState(false);
+  const [herramientaSeleccionada, setHerramientaSeleccionada] = useState(null);
+  const [inspeccionesHerramienta, setInspeccionesHerramienta] = useState([]);
+
   // --- CONFIGURACIÓN DE VISIBILIDAD DE COLUMNAS ---
   const [showColumnConfig, setShowColumnConfig] = useState(false);
   const [columnasVisibles, setColumnasVisibles] = useState({
@@ -110,6 +134,7 @@ export default function MaquinariaPage() {
     ingreso: true,
     baja: true,
     area: true,
+    horometro: true,
     ultimoServicio: true,
     estatus: true,
     realizadoPor: true,
@@ -117,12 +142,14 @@ export default function MaquinariaPage() {
     trazabilidad: true
   });
 
+  const isInitialMount = useRef(true);
+
   // Cargar preferencias al montar
   useEffect(() => {
     const saved = localStorage.getItem('recal_maquinaria_columns');
     if (saved) {
       try {
-        setColumnasVisibles(JSON.parse(saved));
+        setColumnasVisibles(prev => ({ ...prev, ...JSON.parse(saved) }));
       } catch (e) {
         console.error("Error al cargar columnas:", e);
       }
@@ -131,8 +158,27 @@ export default function MaquinariaPage() {
 
   // Guardar preferencias ante cambios
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
     localStorage.setItem('recal_maquinaria_columns', JSON.stringify(columnasVisibles));
   }, [columnasVisibles]);
+
+  // Cerrar configuración al hacer click fuera
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (configRef.current && !configRef.current.contains(event.target)) {
+        setShowColumnConfig(false);
+      }
+    };
+    if (showColumnConfig) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showColumnConfig]);
 
   const toggleColumna = (key) => {
     // Evitar ocultar obligatorias
@@ -150,6 +196,7 @@ export default function MaquinariaPage() {
     if (columnasVisibles.ingreso) count++;
     if (columnasVisibles.baja) count++;
     if (columnasVisibles.area && canSeeBothAreas) count++;
+    if (columnasVisibles.horometro) count++;
     if (columnasVisibles.ultimoServicio) count++;
     if (columnasVisibles.estatus) count++;
     if (columnasVisibles.realizadoPor) count++;
@@ -159,8 +206,9 @@ export default function MaquinariaPage() {
   };
   const [historial, setHistorial] = useState([]);
   const [formMantenimiento, setFormMantenimiento] = useState({
-    fecha_mantenimiento: '', tipo_mantenimiento: 'Preventivo', horometro_mantenimiento: '', observaciones: ''
+    fecha_mantenimiento: '', tipo_mantenimiento: 'Preventivo', horometro_mantenimiento: '', observaciones: '', realizado_por: ''
   });
+  const [isEditingMantenimiento, setIsEditingMantenimiento] = useState(false);
 
   const formatDDMMYYYY = (dateString) => {
     if (!dateString) return '';
@@ -219,6 +267,7 @@ export default function MaquinariaPage() {
   useEffect(() => { setCurrentPage(1); }, [busqueda, filtroSub, filtroArea, filtroTipoUnidad, exportMes, exportAnio, exportSemana, userArea, ordenPor, ordenDireccion]);
 
   useEffect(() => {
+    if (tableContainerRef.current) tableContainerRef.current.scrollTop = 0;
     if (topRef.current) topRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [currentPage]);
 
@@ -380,7 +429,8 @@ export default function MaquinariaPage() {
 
   const abrirHistorial = async (maquina) => {
     setMaquinaSeleccionada(maquina);
-    setFormMantenimiento({ fecha_mantenimiento: '', tipo_mantenimiento: 'Preventivo', horometro_mantenimiento: '', observaciones: '' });
+    setFormMantenimiento({ fecha_mantenimiento: '', tipo_mantenimiento: 'Preventivo', horometro_mantenimiento: '', observaciones: '', realizado_por: '' });
+    setIsEditingMantenimiento(false); // Reiniciar estado de edición
     setIsHistorialOpen(true);
     try {
       const res = await fetch(`/api/maquinaria/mantenimiento?id_maquinaria=${maquina.id_maquinaria}`);
@@ -389,30 +439,189 @@ export default function MaquinariaPage() {
     } catch (error) {}
   };
 
+  const handlePrepEditMantenimiento = (m) => {
+    setFormMantenimiento({
+      id_mantenimiento: m.id_mantenimiento,
+      fecha_mantenimiento: formatForInput(m.fecha_mantenimiento),
+      tipo_mantenimiento: m.tipo_mantenimiento,
+      horometro_mantenimiento: m.horometro_mantenimiento || '',
+      realizado_por: m.realizado_por || '',
+      observaciones: m.observaciones || ''
+    });
+    setIsEditingMantenimiento(true);
+  };
+
+  const handleCancelEditMantenimiento = () => {
+    setFormMantenimiento({ 
+      fecha_mantenimiento: '', 
+      tipo_mantenimiento: 'Preventivo', 
+      horometro_mantenimiento: '', 
+      observaciones: '', 
+      realizado_por: '' 
+    });
+    setIsEditingMantenimiento(false);
+  };
+
+  const handleDeleteMantenimiento = async (id) => {
+    const result = await Swal.fire({
+      title: '¿Estás seguro?',
+      text: "Esta acción eliminará el registro de mantenimiento permanentemente.",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (result.isConfirmed) {
+      setSaving(true);
+      try {
+        const res = await fetch(`/api/maquinaria/mantenimiento?id=${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.success) {
+          abrirHistorial(maquinaSeleccionada);
+          fetchMaquinaria();
+          Swal.fire('Eliminado', 'El registro ha sido eliminado.', 'success');
+        }
+      } catch (error) {
+        Swal.fire('Error', 'No se pudo eliminar el registro.', 'error');
+      } finally {
+        setSaving(false);
+      }
+    }
+  };
+
+  const abrirInspeccionHerramienta = async (herramienta) => {
+    setHerramientaSeleccionada(herramienta);
+    setInspeccionesHerramienta([]); // Limpiar historial anterior para evitar datos estancados
+    setIsEditingMantenimiento(false); // Reset de estado por si acaso
+    setIsInspeccionHerramientaOpen(true);
+    try {
+      const res = await fetch(
+        `/api/maquinaria/inspecciones-herramienta?id_maquinaria=${herramienta.id_maquinaria}&mes=${parseInt(exportMes)}&anio=${exportAnio}`
+      );
+      // Obtenemos TODO el historial de esta herramienta (sin filtro de periodo)
+      const resAll = await fetch(
+        `/api/maquinaria/inspecciones-herramienta?id_maquinaria=${herramienta.id_maquinaria}&mes=0&anio=0`
+      );
+      // Usamos el endpoint general que devuelve todas si mes=0
+      const dataAll = await resAll.json();
+      if (dataAll.success && Array.isArray(dataAll.data)) {
+        setInspeccionesHerramienta(dataAll.data);
+      } else {
+        // Si el endpoint no soporta mes=0, cargamos solo la del periodo actual
+        const data = await res.json();
+        setInspeccionesHerramienta(data.data ? [data.data] : []);
+      }
+    } catch (error) { setInspeccionesHerramienta([]); }
+  };
+
+  const handleGuardarInspeccion = async (payload) => {
+    setSaving(true);
+    try {
+      const res = await fetch('/api/maquinaria/inspecciones-herramienta', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (data.success) {
+        Swal.fire('Inspección Guardada', 'La inspección visual se guardó correctamente.', 'success');
+        abrirInspeccionHerramienta(herramientaSeleccionada); // refrescar historial
+      } else {
+        Swal.fire('Error', data.error || 'No se pudo guardar la inspección', 'error');
+      }
+    } catch (error) {
+      Swal.fire('Error', 'Problema de conexión al guardar', 'error');
+    } finally { setSaving(false); }
+  };
+
+  // Alias: abre historial de mtto para maquinaria/vehículo/equipo,
+  // e inspecciones para herramientas
+  const handleHistorialOpen = (maquina) => {
+    if (maquina.tipo_unidad === 'herramienta') {
+      abrirInspeccionHerramienta(maquina);
+    } else {
+      abrirHistorial(maquina);
+    }
+  };
+
   const handleMantenimientoSubmit = async (e) => {
     e.preventDefault(); setSaving(true);
     try {
+      // VALIDACIÓN: Alertar si el horómetro ingresado es mayor al actual
+      if (formMantenimiento.horometro_mantenimiento && !isEditingMantenimiento) {
+        const hIngresado = Number(formMantenimiento.horometro_mantenimiento);
+        const hActual = Number(maquinaSeleccionada.horometro_actual || 0);
+
+        if (hIngresado > hActual) {
+          const result = await Swal.fire({
+            title: '¿Lectura Inconsistente?',
+            text: `El horómetro/kilometraje ingresado (${hIngresado}) es MAYOR al horómetro actual del equipo (${hActual}). ¿Deseas guardar de todos modos?`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: 'var(--recal-blue)',
+            cancelButtonColor: '#d33',
+            confirmButtonText: 'Sí, guardar',
+            cancelButtonText: 'Corregir'
+          });
+
+          if (!result.isConfirmed) {
+            setSaving(false);
+            return;
+          }
+        }
+      }
+
+      const method = isEditingMantenimiento ? 'PUT' : 'POST';
       const res = await fetch('/api/maquinaria/mantenimiento', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method, 
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...formMantenimiento, id_maquinaria: maquinaSeleccionada.id_maquinaria })
       });
       const data = await res.json();
       if (data.success) { 
-        abrirHistorial(maquinaSeleccionada); fetchMaquinaria(); 
-        Swal.fire('Servicio Registrado', 'El mantenimiento se ha guardado exitosamente.', 'success');
+        abrirHistorial(maquinaSeleccionada); 
+        fetchMaquinaria(); 
+        setIsEditingMantenimiento(false);
+        setFormMantenimiento({ fecha_mantenimiento: '', tipo_mantenimiento: 'Preventivo', horometro_mantenimiento: '', observaciones: '', realizado_por: '' });
+        Swal.fire(isEditingMantenimiento ? 'Actualizado' : 'Registrado', data.mensaje, 'success');
       } else {
-        Swal.fire('Error', data.error || 'No se pudo guardar el servicio', 'error');
+        Swal.fire('Error', data.error || 'No se pudo procesar el servicio', 'error');
       }
     } catch (error) { Swal.fire('Error', 'Problema de conexión al guardar el servicio', 'error'); } finally { setSaving(false); }
   };
 
   const renderBadge = (m) => {
-    // PRIORIDAD 1: Fecha de Próximo Mantenimiento (Equipo Menor)
+    const badges = [];
+
+    // 1. Estatus por Horas / Kilometraje (Maquinaria Pesada / Vehículos)
+    if (m.estado_mantenimiento && m.estado_mantenimiento !== 'N/A') {
+      let colorClass = "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
+      if (m.estado_mantenimiento === 'Vencido') colorClass = "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 animate-pulse";
+      else if (m.estado_mantenimiento === 'Próximo') colorClass = "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300";
+      
+      const label = m.estado_mantenimiento === 'Vencido' 
+        ? `Vencido por ${Math.abs(m.horas_restantes)} ${m.tipo_unidad === 'vehiculo' ? 'km' : 'hrs'}` 
+        : `Faltan ${m.horas_restantes} ${m.tipo_unidad === 'vehiculo' ? 'km' : 'hrs'}`;
+
+      badges.push(
+        <span key="horas" className={`px-2 py-0.5 inline-flex text-[10px] leading-4 font-black rounded-md shadow-sm uppercase border border-current opacity-90 ${colorClass}`}>
+          {label}
+        </span>
+      );
+    }
+
+    // 2. Estatus por Fecha Programada
     if (m.fecha_proximo_mantenimiento) {
-      const fechaProx = new Date(m.fecha_proximo_mantenimiento);
-      const hoy = new Date();
-      // Ajustar hoy para ignorar horas para comparación pura de fechas si se desea, 
-      // pero aquí comparamos contra el periodo de exportación si existe
+      // Parsear la fecha manualmente para evitar desfases de zona horaria (UTC vs Local)
+      const dateParts = String(m.fecha_proximo_mantenimiento).split(/[-T ]/);
+      const y = parseInt(dateParts[0]);
+      const mesP = parseInt(dateParts[1]);
+      const d = parseInt(dateParts[2]);
+      
+      const fechaProx = new Date(y, mesP - 1, d); // Fecha local exacta
       const mesFiltro = parseInt(exportMes) - 1;
       const anioFiltro = parseInt(exportAnio);
       const fechaReferencia = new Date(anioFiltro, mesFiltro, 1);
@@ -420,37 +629,30 @@ export default function MaquinariaPage() {
       const esVencido = fechaProx < fechaReferencia;
       const esMesActual = fechaProx.getMonth() === mesFiltro && fechaProx.getFullYear() === anioFiltro;
 
+      let dateColor = "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800";
+      let statusText = "Programado";
+
       if (esVencido) {
-        return (
-          <span className="px-2 py-1 inline-flex text-xs leading-5 font-bold rounded-full shadow-sm bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 animate-pulse">
-            Vencido ({formatDDMMYYYY(m.fecha_proximo_mantenimiento)})
-          </span>
-        );
+        dateColor = "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800 animate-pulse";
+        statusText = "Vencido";
+      } else if (esMesActual) {
+        dateColor = "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/20 dark:text-orange-300 dark:border-orange-800";
+        statusText = "Toca este mes";
       }
-      if (esMesActual) {
-        return (
-          <span className="px-2 py-1 inline-flex text-xs leading-5 font-bold rounded-full shadow-sm bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300">
-            Requiere Mante. ({formatDDMMYYYY(m.fecha_proximo_mantenimiento)})
-          </span>
-        );
-      }
-      return (
-        <span className="px-2 py-1 inline-flex text-xs leading-5 font-bold rounded-full shadow-sm bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
-          Programado ({formatDDMMYYYY(m.fecha_proximo_mantenimiento)})
+
+      badges.push(
+        <span key="fecha" className={`px-2 py-0.5 inline-flex text-[10px] leading-4 font-black rounded-md shadow-sm uppercase border ${dateColor}`}>
+          {statusText}: {formatDDMMYYYY(m.fecha_proximo_mantenimiento)}
         </span>
       );
     }
 
-    // PRIORIDAD 2: Mantenimiento por Horas (Maquinaria Pesada)
-    if (m.estado_mantenimiento === 'N/A') return <span className="text-gray-400 dark:text-gray-500 text-xs">No aplica</span>;
-    let colorClass = "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
-    if (m.estado_mantenimiento === 'Vencido') colorClass = "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 animate-pulse";
-    else if (m.estado_mantenimiento === 'Próximo') colorClass = "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300";
-    
+    if (badges.length === 0) return <span className="text-gray-400 dark:text-gray-500 text-[10px] font-bold uppercase">No aplica</span>;
+
     return (
-      <span className={`px-2 py-1 inline-flex text-xs leading-5 font-bold rounded-full shadow-sm ${colorClass}`}>
-        {m.estado_mantenimiento === 'Vencido' ? `Vencido por ${Math.abs(m.horas_restantes)} hrs` : `Faltan ${m.horas_restantes} hrs`}
-      </span>
+      <div className="flex flex-col items-center md:items-center gap-1.5 py-1">
+        {badges}
+      </div>
     );
   };
 
@@ -467,7 +669,8 @@ export default function MaquinariaPage() {
 
   const handleExportarUtilizacion = (e) => {
     e.preventDefault();
-    const url = `/api/maquinaria/exportar-utilizacion?${userArea === 'Medio Ambiente' ? `mes=${exportMes}&anio=${exportAnio}` : `mes=${exportMes}&anio=${exportAnio}`}&area_usuario=${userArea}&tipo_unidad=${filtroTipoUnidad}`;
+    const endpoint = userArea === 'Medio Ambiente' ? '/api/maquinaria/ambiental/exportar-utilizacion' : '/api/maquinaria/exportar-utilizacion';
+    const url = `${endpoint}?mes=${exportMes}&anio=${exportAnio}&area_usuario=${userArea}&tipo_unidad=${filtroTipoUnidad}`;
     
     const maquinasActivasSinFoto = maquinaria.filter(m => !m.fecha_baja && !m.imagen_url);
     
@@ -550,12 +753,29 @@ export default function MaquinariaPage() {
               <span className="mr-1">📊</span> <span className="hidden sm:inline">Utilización</span><span className="sm:hidden">Util</span>
             </button>
             <button 
-              onClick={() => window.open(`/api/maquinaria/exportar-plan-servicio?${userArea === 'Medio Ambiente' ? `mes=${exportMes}&anio=${exportAnio}` : `mes=${exportMes}&anio=${exportAnio}`}&area_usuario=${userArea}&tipo_unidad=${filtroTipoUnidad}`, '_blank')} 
+              onClick={() => {
+                const endpoint = userArea === 'Medio Ambiente' ? '/api/maquinaria/ambiental/exportar-plan-servicio' : '/api/maquinaria/exportar-plan-servicio';
+                window.open(`${endpoint}?mes=${exportMes}&anio=${exportAnio}&area_usuario=${userArea}&tipo_unidad=${filtroTipoUnidad}`, '_blank');
+              }} 
               className="flex-1 sm:flex-none justify-center bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center"
             >
               <span className="mr-1">🛠️</span> <span className="hidden sm:inline">Servicio</span><span className="sm:hidden">Serv</span>
             </button>
           </div>
+          
+          {/* Badge de color de inspección - solo visible al filtrar herramientas */}
+          {filtroTipoUnidad === 'herramienta' && (() => {
+            const colorInfo = COLOR_INSPECCION_POR_MES[exportMes];
+            if (!colorInfo) return null;
+            return (
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-md border-2 ${colorInfo.bg} ${colorInfo.border} shadow-sm`}>
+                <span className={`text-xs font-black uppercase ${colorInfo.text}`}>🔍 INSPECCIÓN {exportMes}/{exportAnio}</span>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-black border ${colorInfo.bg} ${colorInfo.border} ${colorInfo.text} shadow`}>
+                  {colorInfo.nombre}
+                </span>
+              </div>
+            );
+          })()}
           
           {canManageMaquinaria && (
             <button onClick={handleNewClick} className="w-full sm:w-auto bg-[var(--recal-blue)] hover:bg-[var(--recal-blue-hover)] text-white px-4 py-3 sm:py-2 rounded-md font-medium shadow-sm lg:ml-2">
@@ -612,7 +832,7 @@ export default function MaquinariaPage() {
           </button>
           
           {/* Botón Configurador de Columnas */}
-          <div className="relative">
+          <div className="relative" ref={configRef}>
             <button 
               onClick={() => setShowColumnConfig(!showColumnConfig)}
               className={`p-2 rounded-md border transition-all ${showColumnConfig ? 'bg-orange-100 border-orange-300 text-orange-600' : 'bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200 dark:bg-slate-700 dark:border-slate-600 dark:text-gray-300'}`}
@@ -639,6 +859,7 @@ export default function MaquinariaPage() {
                     { id: 'ingreso', label: 'Fecha Ingreso' },
                     { id: 'baja', label: 'Fecha Baja' },
                     { id: 'area', label: 'Área Asignada', permission: canSeeBothAreas },
+                    { id: 'horometro', label: 'Horómetro' },
                     { id: 'ultimoServicio', label: 'Último Servicio' },
                     { id: 'estatus', label: 'Estatus' },
                     { id: 'realizadoPor', label: 'Realizado por' },
@@ -671,7 +892,7 @@ export default function MaquinariaPage() {
 
       {/* TABLA PRINCIPAL */}
       <div className="bg-white dark:bg-slate-800 shadow-sm rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden">
-        <div className="overflow-auto max-h-[65vh] custom-scrollbar">
+        <div className="overflow-auto max-h-[75vh] custom-scrollbar" ref={tableContainerRef}>
           <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700 relative">
             <thead className="bg-gray-50 dark:bg-slate-900 hidden md:table-header-group sticky top-0 z-10 shadow-sm outline outline-1 outline-gray-200 dark:outline-slate-700">
               <tr>
@@ -712,15 +933,23 @@ export default function MaquinariaPage() {
                     Baja {ordenPor === 'fecha_baja' && (ordenDireccion === 'ASC' ? '↑' : '↓')}
                   </th>
                 )}
-
+                
                 {columnasVisibles.area && canSeeBothAreas && (
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('area')}>
                     Área {ordenPor === 'area' && (ordenDireccion === 'ASC' ? '↑' : '↓')}
                   </th>
                 )}
 
+                {columnasVisibles.horometro && (
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors" onClick={() => manejarOrden('horometro_actual')}>
+                    {filtroTipoUnidad === 'vehiculo' ? 'Kilometraje' : 'Horómetro'} {ordenPor === 'horometro_actual' && (ordenDireccion === 'ASC' ? '↑' : '↓')}
+                  </th>
+                )}
+
                 {columnasVisibles.ultimoServicio && (
-                  <th className="px-4 py-3 text-center text-xs font-medium text-[var(--recal-blue)] dark:text-blue-400 uppercase">Último Servicio</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-[var(--recal-blue)] dark:text-blue-400 uppercase">
+                    {filtroTipoUnidad === 'herramienta' ? 'Última Inspección' : 'Último Servicio'}
+                  </th>
                 )}
 
                 {columnasVisibles.estatus && (
@@ -768,7 +997,19 @@ export default function MaquinariaPage() {
                 {columnasVisibles.categoria && (
                   <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 text-xs font-bold uppercase text-gray-600 dark:text-gray-400 border-b dark:border-slate-700 md:border-none">
                     <span className="md:hidden font-bold">Categoría:</span>
-                    <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-slate-700 rounded border border-gray-200 dark:border-slate-600">{m.tipo_unidad === 'equipo' ? 'Equipo Menor' : (m.tipo_unidad || 'N/A')}</span>
+                    <div className="flex flex-col items-end md:items-start gap-1">
+                      <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-slate-700 rounded border border-gray-200 dark:border-slate-600">{m.tipo_unidad === 'equipo' ? 'Equipo Menor' : (m.tipo_unidad || 'N/A')}</span>
+                      {/* Badge de inspección sólo en herramientas */}
+                      {m.tipo_unidad === 'herramienta' && (() => {
+                        const colorInfo = COLOR_INSPECCION_POR_MES[exportMes];
+                        if (!colorInfo) return null;
+                        return (
+                          <span className={`px-1.5 py-0.5 rounded border text-[10px] font-black flex items-center gap-1 ${colorInfo.bg} ${colorInfo.border} ${colorInfo.text}`}>
+                            🔍 {colorInfo.nombre}
+                          </span>
+                        );
+                      })()}
+                    </div>
                   </td>
                 )}
 
@@ -821,12 +1062,78 @@ export default function MaquinariaPage() {
                   </td>
                 )}
                     
+                {columnasVisibles.horometro && (
+                  <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 border-b dark:border-slate-700 md:border-none">
+                    <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 text-sm">Horómetro:</span>
+                    <div className="flex flex-col items-end md:items-center">
+                      {(m.tipo_unidad === 'herramienta' || m.tipo_unidad === 'equipo') ? (
+                        <span className="text-gray-400 dark:text-gray-500 text-xs font-bold uppercase italic">N/A</span>
+                      ) : (
+                        <div className="bg-gray-50 dark:bg-slate-900/50 p-1.5 rounded-lg border border-gray-100 dark:border-slate-700/50 min-w-[120px]">
+                          <div className="flex justify-between gap-4 text-[10px] text-gray-400 dark:text-gray-500 uppercase font-black">
+                            <span>{m.tipo_unidad === 'vehiculo' ? 'Km Inicial' : 'Inicial'}</span>
+                            <span className="text-gray-600 dark:text-gray-300">{Number(m.horometro_inicial || 0).toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between gap-4 text-[10px] text-gray-400 dark:text-gray-500 uppercase font-black border-y border-gray-100 dark:border-slate-700/50 my-0.5 py-0.5">
+                            <span>{m.tipo_unidad === 'vehiculo' ? 'Mtto Ant. km' : 'Mtto Ant.'}</span>
+                            <span className="text-blue-600 dark:text-blue-400">{Number(m.ultimo_horometro_mantenimiento || 0).toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between gap-4 text-[11px] text-gray-400 dark:text-gray-500 uppercase font-black">
+                            <span>{m.tipo_unidad === 'vehiculo' ? 'Km Actual' : 'Actual'}</span>
+                            <span className="text-orange-600 dark:text-orange-400 font-bold">{Number(m.horometro_actual || 0).toFixed(2)}</span>
+                          </div>
+                          
+                          {/* Campo Restante (Solo para Seguridad) */}
+                          {m.area === 'seguridad' && m.intervalo_mantenimiento > 0 && (
+                            <div className="flex justify-between gap-4 text-[10px] mt-1 pt-0.5 border-t border-dashed border-gray-200 dark:border-slate-700 uppercase font-black italic">
+                              <span className="text-gray-400">Restante:</span>
+                              <span className={`${
+                                (Number(m.ultimo_horometro_mantenimiento || 0) + Number(m.intervalo_mantenimiento)) - Number(m.horometro_actual || 0) <= 24 
+                                  ? 'text-red-600 dark:text-red-400' 
+                                  : 'text-indigo-600 dark:text-indigo-400'
+                              }`}>
+                                {((Number(m.ultimo_horometro_mantenimiento || 0) + Number(m.intervalo_mantenimiento)) - Number(m.horometro_actual || 0)).toFixed(2)}
+                              </span>
+                            </div>
+                          )}
+
+                          <div className="text-[9px] text-center mt-1 text-gray-400 italic">
+                            ({m.tipo_unidad === 'vehiculo' ? 'km' : 'hrs'})
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                )}
+                    
                 {columnasVisibles.ultimoServicio && (
                   <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 border-b dark:border-slate-700 md:border-none">
-                    <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 text-sm">Último Servicio:</span>
-                    <div className="text-right md:text-center">
-                      <div className="text-sm font-semibold text-blue-900 dark:text-blue-400">{m.ultima_fecha_mantenimiento && m.ultima_fecha_mantenimiento != m.fecha_ingreso_obra ? formatDDMMYYYY(m.ultima_fecha_mantenimiento) : 'Sin Registro'}</div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">{m.horometro_actual ? `${m.horometro_actual} ${m.tipo_unidad === 'vehiculo' ? 'km' : 'hrs'}` : ''}</div>
+                    <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 text-sm">
+                      {m.tipo_unidad === 'herramienta' ? 'Última Inspección:' : 'Último Servicio:'}
+                    </span>
+                    <div className="flex flex-col items-end md:items-center mt-1">
+                      <div className="inline-flex flex-col items-center gap-1 bg-blue-50/50 dark:bg-blue-900/10 p-2 rounded-xl border border-blue-100/50 dark:border-blue-800/30 min-w-[140px] shadow-sm">
+                        <div className="text-[9px] text-blue-600 dark:text-blue-400 uppercase font-black tracking-widest w-full text-center border-b border-blue-100/50 dark:border-blue-800/30 pb-1 mb-1">
+                          {m.tipo_unidad === 'herramienta' ? 'Última Inspección' : 'Último Servicio'}
+                        </div>
+                        <div className="text-sm font-black text-blue-900 dark:text-blue-200">
+                          {m.tipo_unidad === 'herramienta' 
+                            ? (m.ultima_fecha_inspeccion ? formatDDMMYYYY(m.ultima_fecha_inspeccion) : 'Sin Registro')
+                            : (m.ultima_fecha_mantenimiento && m.ultima_fecha_mantenimiento != m.fecha_ingreso_obra ? formatDDMMYYYY(m.ultima_fecha_mantenimiento) : 'Sin Registro')
+                          }
+                        </div>
+                        <div className="w-full h-px bg-blue-100/50 dark:bg-blue-800/30 my-0.5"></div>
+                        {m.horometro_actual && (m.tipo_unidad === 'maquinaria' || m.tipo_unidad === 'vehiculo') && (
+                          <div className="mt-1 flex items-center gap-1.5 px-2 py-0.5 bg-white dark:bg-slate-800 rounded-lg border border-blue-100 dark:border-blue-900 shadow-sm animate-in fade-in zoom-in duration-300">
+                            <span className="text-[10px] font-black text-blue-600 dark:text-blue-400">
+                              {m.horometro_actual}
+                            </span>
+                            <span className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase">
+                              {m.tipo_unidad === 'vehiculo' ? 'km' : 'hrs'}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </td>
                 )}
@@ -847,7 +1154,11 @@ export default function MaquinariaPage() {
                 {columnasVisibles.realizadoPor && (
                   <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 text-center border-b dark:border-slate-700 md:border-none">
                     <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 text-xs uppercase">Realizado por:</span>
-                    <span className="text-xs font-semibold text-gray-600 dark:text-gray-300 italic">{m.responsable_ultimo_mantenimiento || 'N/A'}</span>
+                    <span className="text-xs font-semibold text-gray-600 dark:text-gray-300 italic">
+                      {m.tipo_unidad === 'herramienta' 
+                        ? (m.responsable_ultima_inspeccion || '-') 
+                        : (m.responsable_ultimo_mantenimiento || '-')}
+                    </span>
                   </td>
                 )}
                     
@@ -985,7 +1296,10 @@ export default function MaquinariaPage() {
       
       <MaquinariaHistorialModal
         isOpen={isHistorialOpen}
-        onClose={() => setIsHistorialOpen(false)}
+        onClose={() => {
+          setIsHistorialOpen(false);
+          handleCancelEditMantenimiento(); // Limpiar todo al cerrar
+        }}
         maquinaSeleccionada={maquinaSeleccionada}
         formMantenimiento={formMantenimiento}
         setFormMantenimiento={setFormMantenimiento}
@@ -994,6 +1308,11 @@ export default function MaquinariaPage() {
         saving={saving}
         formatDDMMYYYY={formatDDMMYYYY}
         canManageMaquinaria={canManageMaquinaria}
+        // Nuevos props
+        isEditingMantenimiento={isEditingMantenimiento}
+        onEditMantenimiento={handlePrepEditMantenimiento}
+        onDeleteMantenimiento={handleDeleteMantenimiento}
+        onCancelEditMantenimiento={handleCancelEditMantenimiento}
       />
       
       <MaquinariaImportModal
@@ -1010,6 +1329,18 @@ export default function MaquinariaPage() {
         importResumen={importResumen}
         importPreviewData={importPreviewData}
         handleGuardarImportacion={handleGuardarImportacion}
+      />
+
+      <MaquinariaInspeccionHerramientaModal
+        key={herramientaSeleccionada ? `${herramientaSeleccionada.id_maquinaria}-${exportMes}-${exportAnio}` : 'no-tool'}
+        isOpen={isInspeccionHerramientaOpen}
+        onClose={() => setIsInspeccionHerramientaOpen(false)}
+        herramientaSeleccionada={herramientaSeleccionada}
+        inspecciones={inspeccionesHerramienta}
+        exportMes={exportMes}
+        exportAnio={exportAnio}
+        onGuardar={handleGuardarInspeccion}
+        saving={saving}
       />
     </>
   );

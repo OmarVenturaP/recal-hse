@@ -20,39 +20,13 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const mes = searchParams.get('mes');
     const anio = searchParams.get('anio');
-    const tipoUnidad = searchParams.get('tipo_unidad') || 'todos';
 
-    const getTitulo = (tipo) => {
-      switch(tipo) {
-        case 'maquinaria': return 'MAQUINARIA';
-        case 'equipo': return 'EQUIPO';
-        case 'herramienta': return 'HERRAMIENTA';
-        case 'vehiculo': return 'VEHÍCULOS';
-        default: return 'MAQUINARIA Y EQUIPO';
-      }
-    };
-
-    const getTemplateName = (tipo) => {
-      switch(tipo) {
-        case 'maquinaria': return '11_PROG_UTILIZACION_MAQUINARIA.xlsx';
-        case 'vehiculo':   return '11_PROG_UTILIZACION_VEHICULOS.xlsx';
-        case 'equipo':     return '11_PROG_UTILIZACION_EQUIPO.xlsx';
-        case 'herramienta':return '11_PROG_UTILIZACION_HERRAMIENTAS.xlsx';
-        default:           return '11_PROG_UTILIZACION.xlsx';
-      }
-    };
-
-    const tituloUnidad = getTitulo(tipoUnidad);
     const periodoTexto = generarTextoPeriodo(mes, anio);
 
-    const templatePath = path.join(process.cwd(), 'public', 'plantillas', getTemplateName(tipoUnidad));
+    const templatePath = path.join(process.cwd(), 'public', 'plantillas', '11_PROG_UTILIZACION.xlsx');
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile(templatePath);
     const worksheet = workbook.getWorksheet(1); 
-
-    // Escribir el periodo en la celda correcta (C5 para genérico, E2 para tipos específicos)
-    const cellPeriodo = tipoUnidad === 'todos' ? 'E2' : 'E2';
-    worksheet.getCell(cellPeriodo).value = periodoTexto;
 
     // Lógica estricta de filtros de fecha
     let whereClause = "WHERE m.fecha_baja IS NULL"; 
@@ -67,11 +41,6 @@ export async function GET(request) {
       queryParams.push(endDate, startDate);
     }
 
-    if (tipoUnidad !== 'todos') {
-      whereClause += ` AND m.tipo_unidad = ?`;
-      queryParams.push(tipoUnidad);
-    }
-
     const [rows] = await pool.query(`
       SELECT m.*, s.razon_social 
       FROM Maquinaria_Equipo m
@@ -80,7 +49,9 @@ export async function GET(request) {
       ORDER BY m.fecha_ingreso_obra DESC
     `, queryParams);
 
-    let currentRow = 5;
+    worksheet.getCell('E2').value = periodoTexto;
+
+    let currentRow = 5; 
     let index = 1;
 
     for (let i = 0; i < rows.length; i++) {
@@ -193,7 +164,7 @@ export async function GET(request) {
     }
 
     const buffer = await workbook.xlsx.writeBuffer();
-    const nombreArchivo = `11. PROGRAMA DE UTILIZACION DE ${tituloUnidad} ${periodoTexto}.xlsx`;
+    const nombreArchivo = `11. PROGRAMA DE UTILIZACION DE MAQUINARIA Y EQUIPO - AMBIENTAL - ${periodoTexto}.xlsx`;
 
     return new NextResponse(buffer, {
       headers: {
@@ -203,7 +174,7 @@ export async function GET(request) {
     });
 
   } catch (error) {
-    console.error(error);
+    console.error("Error al exportar Utilización Ambiental:", error);
     return NextResponse.json({ success: false, error: "Error" }, { status: 500 });
   }
 }
