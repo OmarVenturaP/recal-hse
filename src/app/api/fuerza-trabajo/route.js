@@ -245,6 +245,9 @@ export async function PUT(request) {
     const [oldRows] = await pool.query("SELECT * FROM Fuerza_Trabajo WHERE id_trabajador = ?", [id_trabajador]);
     const datos_anteriores = oldRows[0] || null;
 
+    // EJECUTAR ACTUALIZACIÓN
+    const query = `UPDATE Fuerza_Trabajo SET ${updateFields} WHERE id_trabajador = ?`;
+    queryParams.push(id_trabajador);
     await pool.query(query, queryParams);
 
     // AUDITORÍA (silenciosa)

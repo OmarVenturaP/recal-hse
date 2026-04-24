@@ -15,6 +15,7 @@ export const usuarioSchema = z.object({
   permisos_dc3: z.number().optional().nullable(),
   permisos_informe: z.number().optional().nullable(),
   permisos_citas: z.number().optional().nullable(),
+  permisos_ia: z.number().optional().nullable(),
 });
 
 export const patchPasswordSchema = z.object({

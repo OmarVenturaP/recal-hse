@@ -15,7 +15,7 @@ export async function GET(request) {
     const query = `
       SELECT 
         p.id_personal, p.nombre, p.cargo, p.correo, p.ultimo_acceso, p.area, p.rol, p.activo, p.debe_cambiar_password, p.id_empresa, 
-        p.permisos_ft, p.permisos_certificados, p.permisos_maquinaria, p.permisos_dc3, p.permisos_informe, p.permisos_citas,
+        p.permisos_ft, p.permisos_certificados, p.permisos_maquinaria, p.permisos_dc3, p.permisos_informe, p.permisos_citas, p.permisos_ia,
         e.nombre_comercial as empresa_nombre 
       FROM Personal_Area p
       LEFT JOIN cat_empresas e ON p.id_empresa = e.id_empresa
@@ -48,7 +48,7 @@ export async function POST(request) {
 
     const { 
       nombre, cargo, correo, area, rol, id_empresa,
-      permisos_ft, permisos_certificados, permisos_maquinaria, permisos_dc3, permisos_informe, permisos_citas 
+      permisos_ft, permisos_certificados, permisos_maquinaria, permisos_dc3, permisos_informe, permisos_citas, permisos_ia
     } = validation.data;
 
     const salt = await bcrypt.genSalt(10);
@@ -57,13 +57,13 @@ export async function POST(request) {
     const query = `
       INSERT INTO Personal_Area (
         nombre, cargo, correo, password, area, rol, activo, debe_cambiar_password, id_empresa,
-        permisos_ft, permisos_certificados, permisos_maquinaria, permisos_dc3, permisos_informe, permisos_citas
+        permisos_ft, permisos_certificados, permisos_maquinaria, permisos_dc3, permisos_informe, permisos_citas, permisos_ia
       ) 
       VALUES (?, ?, ?, ?, ?, ?, 1, 1, ?, ?, ?, ?, ?, ?, ?)
     `;
     await pool.query(query, [
       nombre, cargo, correo, hashedPassword, area, rol, id_empresa,
-      permisos_ft || 0, permisos_certificados || 0, permisos_maquinaria || 0, permisos_dc3 || 0, permisos_informe || 0, permisos_citas || 0
+      permisos_ft || 0, permisos_certificados || 0, permisos_maquinaria || 0, permisos_dc3 || 0, permisos_informe || 0, permisos_citas || 0, permisos_ia || 0
     ]);
 
     return NextResponse.json({ success: true, mensaje: "Usuario creado exitosamente" });
@@ -95,7 +95,7 @@ export async function PUT(request) {
 
     const { 
       id_personal, nombre, cargo, correo, area, rol, activo, id_empresa,
-      permisos_ft, permisos_certificados, permisos_maquinaria, permisos_dc3, permisos_informe, permisos_citas
+      permisos_ft, permisos_certificados, permisos_maquinaria, permisos_dc3, permisos_informe, permisos_citas, permisos_ia
     } = validation.data;
 
     if (!id_personal) {
@@ -105,12 +105,12 @@ export async function PUT(request) {
     const query = `
       UPDATE Personal_Area 
       SET nombre = ?, cargo = ?, correo = ?, area = ?, rol = ?, activo = ?, id_empresa = ?,
-          permisos_ft = ?, permisos_certificados = ?, permisos_maquinaria = ?, permisos_dc3 = ?, permisos_informe = ?, permisos_citas = ?
+          permisos_ft = ?, permisos_certificados = ?, permisos_maquinaria = ?, permisos_dc3 = ?, permisos_informe = ?, permisos_citas = ?, permisos_ia = ?
       WHERE id_personal = ?
     `;
     await pool.query(query, [
       nombre, cargo, correo, area, rol, activo ?? 1, id_empresa,
-      permisos_ft || 0, permisos_certificados || 0, permisos_maquinaria || 0, permisos_dc3 || 0, permisos_informe || 0, permisos_citas || 0,
+      permisos_ft || 0, permisos_certificados || 0, permisos_maquinaria || 0, permisos_dc3 || 0, permisos_informe || 0, permisos_citas || 0, permisos_ia || 0,
       id_personal
     ]);
 

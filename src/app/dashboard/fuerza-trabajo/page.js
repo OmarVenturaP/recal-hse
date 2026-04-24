@@ -139,6 +139,11 @@ export default function FuerzaTrabajoPage() {
   });
   const [generatingDc3, setGeneratingDc3] = useState(false);
 
+  const [isPuestosModalOpen, setIsPuestosModalOpen] = useState(false);
+  const [nuevoPuesto, setNuevoPuesto] = useState('');
+  const [editingPuestoId, setEditingPuestoId] = useState(null);
+  const [nombrePuestoEdit, setNombrePuestoEdit] = useState('');
+
   const formInicial = {
     numero_empleado: '', nombre_trabajador: '', apellido_trabajador: '', puesto_categoria: '', 
     nss: '', curp: '', fecha_ingreso_obra: '', fecha_alta_imss: '', 
@@ -540,20 +545,14 @@ export default function FuerzaTrabajoPage() {
         setIsModalOpen(false); 
         fetchTrabajadores(); 
         
-        // Si fue edición, mostrar el resumen de cambios automáticamente
-        if (isEditing) {
-          const idLog = editId;
-          setTimeout(async () => {
-            const logRes = await fetch(`/api/trazabilidad?limit=1&modulo=Fuerza de Trabajo&id_registro=${idLog}&accion=UPDATE`);
-            const logData = await logRes.json();
-            if (logData.success && logData.data.length > 0) {
-              setSelectedAuditLog(logData.data[0]);
-              setIsTrazabilidadModalOpen(true);
-            }
-          }, 500);
-        } else {
-          Swal.fire('Guardado', 'Los datos del trabajador se guardaron correctamente.', 'success');
-        }
+        // Notificación de éxito universal
+        Swal.fire({
+          title: '¡Guardado!',
+          text: isEditing ? 'Los cambios se actualizaron correctamente.' : 'El trabajador ha sido registrado con éxito.',
+          icon: 'success',
+          timer: 1500,
+          showConfirmButton: false
+        });
       } else {
         if ((data.error?.includes('requiere una fecha de baja') || data.error?.includes('OBLIGATORIO ingresar una fecha de baja')) && !formData.tiene_baja) {
           setFormData(prev => ({ ...prev, tiene_baja: true }));
@@ -973,6 +972,11 @@ const handleDc3Submit = async (e) => {
             </button>
           )}
           
+          {canManageFt && (
+            <button onClick={() => setIsPuestosModalOpen(true)} className="flex-1 sm:flex-none justify-center bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
+              <Settings className="w-4 h-4 mr-1 sm:mr-2" /> Catálogos
+            </button>
+          )}
           {canManageFt && (
             <button onClick={handleOpenImportModal} className="flex-1 sm:flex-none justify-center bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
               <Upload className="w-4 h-4 mr-1 sm:mr-2" /> Importar FT
@@ -1412,7 +1416,7 @@ const handleDc3Submit = async (e) => {
                   >
                     <option value="" className="dark:bg-slate-800">Seleccione un puesto...</option>
                     {(catPuestos || []).map((puesto, index) => (
-                      <option key={index} value={puesto} className="dark:bg-slate-800">{puesto}</option>
+                      <option key={puesto.id || index} value={puesto.nombre} className="dark:bg-slate-800">{puesto.nombre}</option>
                     ))}
                   </select>
                 </div>
@@ -1985,6 +1989,149 @@ const handleDc3Submit = async (e) => {
           </div>
         </div>
       )}
-    </>
+          {/* MODAL 5: GESTIÓN DE PUESTOS */}
+      {isPuestosModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[1000] p-4 w-full h-full">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-lg w-full max-h-[85vh] overflow-hidden flex flex-col border dark:border-slate-700">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center bg-gray-50 dark:bg-slate-900">
+              <h3 className="text-xl font-bold text-gray-800 dark:text-white flex items-center">
+                <Settings className="w-5 h-5 mr-2 text-blue-600" /> Catálogo de Puestos
+              </h3>
+              <button 
+                onClick={() => {
+                  setIsPuestosModalOpen(false);
+                  setEditingPuestoId(null);
+                  setNuevoPuesto('');
+                }} 
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 font-bold text-2xl"
+              >&times;</button>
+            </div>
+            
+            <div className="p-6 flex-1 overflow-y-auto">
+              <div className="mb-6 space-y-3">
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">
+                  {editingPuestoId ? 'Editar Puesto' : 'Agregar Nuevo Puesto'}
+                </label>
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    placeholder="Ej: SOLDADOR, PINTOR..."
+                    className="flex-1 bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 focus:ring-blue-500 outline-none uppercase text-sm"
+                    value={editingPuestoId ? nombrePuestoEdit : nuevoPuesto}
+                    onChange={(e) => editingPuestoId ? setNombrePuestoEdit(e.target.value.toUpperCase()) : setNuevoPuesto(e.target.value.toUpperCase())}
+                  />
+                  <button 
+                    onClick={async () => {
+                      if (editingPuestoId) {
+                        try {
+                          const res = await fetch('/api/fuerza-trabajo/puestos', {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json', 'x-user-id': localStorage.getItem('recal_user_id') },
+                            body: JSON.stringify({ id: editingPuestoId, nombre: nombrePuestoEdit })
+                          });
+                          const d = await res.json();
+                          if (d.success) {
+                            setEditingPuestoId(null);
+                            setNombrePuestoEdit('');
+                            const resP = await fetch('/api/fuerza-trabajo/puestos');
+                            const d2 = await resP.json();
+                            if (d2.success) setCatPuestos(d2.puestos);
+                            Swal.fire('Actualizado', 'Puesto actualizado correctamente', 'success');
+                          }
+                        } catch (e) {}
+                      } else {
+                        try {
+                          const res = await fetch('/api/fuerza-trabajo/puestos', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'x-user-id': localStorage.getItem('recal_user_id') },
+                            body: JSON.stringify({ nombre: nuevoPuesto })
+                          });
+                          const d = await res.json();
+                          if (d.success) {
+                            setNuevoPuesto('');
+                            const resP = await fetch('/api/fuerza-trabajo/puestos');
+                            const d2 = await resP.json();
+                            if (d2.success) setCatPuestos(d2.puestos);
+                            Swal.fire('Guardado', 'Nuevo puesto agregado al catálogo', 'success');
+                          }
+                        } catch (e) {}
+                      }
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-bold text-sm shadow-md transition-all active:scale-95"
+                  >
+                    {editingPuestoId ? 'Guardar' : 'Agregar'}
+                  </button>
+                  {editingPuestoId && (
+                    <button 
+                      onClick={() => {
+                        setEditingPuestoId(null);
+                        setNombrePuestoEdit('');
+                      }}
+                      className="bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 px-3 py-2 rounded-md text-sm border dark:border-slate-600"
+                    >
+                      Cancelar
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Lista de Puestos Registrados</p>
+                {catPuestos.map(p => (
+                  <div key={p.id} className="flex items-center justify-between p-3 bg-white dark:bg-slate-700/50 rounded-lg border border-gray-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-900 group transition-all">
+                    <span className="text-sm font-bold text-gray-700 dark:text-gray-200">{p.nombre}</span>
+                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={() => {
+                          setEditingPuestoId(p.id);
+                          setNombrePuestoEdit(p.nombre);
+                        }}
+                        className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button 
+                        onClick={async () => {
+                          const result = await Swal.fire({
+                            title: '¿Desactivar puesto?',
+                            text: "Esto lo eliminará del catálogo de opciones futuras.",
+                            icon: 'warning',
+                            showCancelButton: true,
+                            confirmButtonText: 'Sí, desactivar',
+                            cancelButtonText: 'Cancelar'
+                          });
+                          if (result.isConfirmed) {
+                            const res = await fetch(`/api/fuerza-trabajo/puestos?id=${p.id}`, { 
+                              method: 'DELETE',
+                              headers: { 'x-user-id': localStorage.getItem('recal_user_id') }
+                            });
+                            if (res.ok) {
+                              const resP = await fetch('/api/fuerza-trabajo/puestos');
+                              const d = await resP.json();
+                              if (d.success) setCatPuestos(d.puestos);
+                              Swal.fire('Desactivado', 'El puesto ha sido removido del catálogo', 'success');
+                            }
+                          }
+                        }}
+                        className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {catPuestos.length === 0 && (
+                  <p className="text-center text-sm text-gray-500 py-4 italic">No hay puestos registrados.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-gray-200 dark:border-slate-700 bg-gray-100 dark:bg-slate-900 text-center">
+              <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase font-black spacing-widest">Gestor de Catálogo Obras OS</p>
+            </div>
+          </div>
+        </div>
+      )}
+</>
   );
 }

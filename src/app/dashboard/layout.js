@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import ModalPlanDetalles from '@/components/ModalPlanDetalles';
 import DemoSystem from '@/components/DemoSystem';
+import AIChatWidget from '@/components/ai/AIChatWidget';
 
 export default function DashboardLayout({ children }) {
   const router = useRouter();
@@ -36,6 +37,7 @@ export default function DashboardLayout({ children }) {
   const [userDcPermission, setUserDcPermission] = useState(0);
   const [userFtPermission, setUserFtPermission] = useState(0);
   const [userPermisoInforme, setUserPermisoInforme] = useState(0);
+  const [userPermisoIA, setUserPermisoIA] = useState(0);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -79,6 +81,7 @@ export default function DashboardLayout({ children }) {
           setUserDcPermission(data.data[0].permisos_dc3);
           setUserFtPermission(data.data[0].permisos_ft);
           setUserPermisoInforme(data.data[0].permisos_informe || 0);
+          setUserPermisoIA(data.data[0].permisos_ia || 0);
         }
       });
 
@@ -383,6 +386,11 @@ export default function DashboardLayout({ children }) {
         onClose={() => setIsPlanModalOpen(false)} 
         currentPlan={{ name: userPlan, empresaNombre: userEmpresaNombre }}
       />
+      
+      {/* WIDGET RECALITO */}
+      {(userPermisoIA === 1 || userRol === 'Master') && (
+        <AIChatWidget />
+      )}
     </div>
     </DemoSystem>
   );

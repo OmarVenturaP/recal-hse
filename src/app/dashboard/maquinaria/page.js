@@ -603,8 +603,8 @@ export default function MaquinariaPage() {
       else if (m.estado_mantenimiento === 'Próximo') colorClass = "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300";
       
       const label = m.estado_mantenimiento === 'Vencido' 
-        ? `Vencido por ${Math.abs(m.horas_restantes)} ${m.tipo_unidad === 'vehiculo' ? 'km' : 'hrs'}` 
-        : `Faltan ${m.horas_restantes} ${m.tipo_unidad === 'vehiculo' ? 'km' : 'hrs'}`;
+        ? `Vencido por ${Math.abs(m.horas_restantes).toFixed(2)} ${m.tipo_unidad === 'vehiculo' ? 'km' : 'hrs'}` 
+        : `Faltan ${Number(m.horas_restantes).toFixed(2)} ${m.tipo_unidad === 'vehiculo' ? 'km' : 'hrs'}`;
 
       badges.push(
         <span key="horas" className={`px-2 py-0.5 inline-flex text-[10px] leading-4 font-black rounded-md shadow-sm uppercase border border-current opacity-90 ${colorClass}`}>

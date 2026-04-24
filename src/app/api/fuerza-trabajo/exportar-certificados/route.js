@@ -72,7 +72,7 @@ export async function GET(request) {
     // 1. Consultar médicos (solo si no es ruta de validación)
     let medicos = [];
     if (!validar) {
-        let medQuery = 'SELECT * FROM Medicos_Empresa WHERE bActivo = 1';
+        let medQuery = 'SELECT *, binario_plantilla FROM Medicos_Empresa WHERE bActivo = 1';
         const medParams = [];
 
         if (userRol !== 'Master' && idEmpresa) {
@@ -136,20 +136,13 @@ export async function GET(request) {
       return NextResponse.json({ success: false, error: 'Todos los trabajadores fueron omitidos por falta de CURP.' }, { status: 400 });
     }
 
-    // 3. Agrupar por plantilla
-    const gruposPorPlantilla = {};
+    // 3. Agrupar por médico (y su plantilla binaria)
+    const gruposPorMedico = {}; // id_medico -> { medico, trabajadores: [] }
     const inicioFiltroDate = new Date(fechaInicio);
     const finFiltroDate = new Date(fechaFin);
 
     trabajadoresAProcesar.forEach(t => {
-      // Elegir médico (y su plantilla)
       const medico = medicos[Math.floor(Math.random() * medicos.length)];
-      let plantilla = medico.nombre_plantilla || 'CERTIFICADO_MEDICO.docx';
-      
-      // Normalizar extensión
-      if (plantilla && !plantilla.toLowerCase().endsWith('.docx')) {
-        plantilla += '.docx';
-      }
       
       const ingresoDate = new Date(t.fecha_ingreso_obra);
       const isNuevoIngreso = ingresoDate >= inicioFiltroDate && ingresoDate <= finFiltroDate;
@@ -179,40 +172,52 @@ export async function GET(request) {
         fecha_texto: formatearFechaTexto(fechaCertificado)
       };
 
-      if (!gruposPorPlantilla[plantilla]) gruposPorPlantilla[plantilla] = [];
-      gruposPorPlantilla[plantilla].push(dato);
+      if (!gruposPorMedico[medico.id_medico]) {
+        gruposPorMedico[medico.id_medico] = { medico, datos: [] };
+      }
+      gruposPorMedico[medico.id_medico].datos.push(dato);
     });
 
-    const plantillasUtilizadas = Object.keys(gruposPorPlantilla);
+    const medicosConDatos = Object.values(gruposPorMedico);
 
-    if (plantillasUtilizadas.length === 1) {
-      // --- UN SOLO FORMATO: Retornar DOCX directo ---
-      const plantilla = plantillasUtilizadas[0];
-      let templatePath = path.join(process.cwd(), 'public', 'plantillas', plantilla);
+    // FUNCIÓN PARA OBTENER EL BUFFER DE PLANTILLA (DB o Fallback)
+    const getPlantillaBuffer = (medico) => {
+      if (medico.binario_plantilla) {
+        return medico.binario_plantilla;
+      }
+      // Fallback a disco solo para la plantilla base del repo
+      const fallbackPath = path.join(process.cwd(), 'public', 'plantillas', 'CERTIFICADO_MEDICO.docx');
+      if (fs.existsSync(fallbackPath)) {
+        return fs.readFileSync(fallbackPath);
+      }
+      return null;
+    };
+
+    if (medicosConDatos.length === 1) {
+      // --- UN SOLO MÉDICO: Retornar DOCX directo ---
+      const { medico, datos } = medicosConDatos[0];
+      const bufferPlantilla = getPlantillaBuffer(medico);
       
-      if (!fs.existsSync(templatePath)) {
-        // Fallback al genérico si no existe el personalizado
-        templatePath = path.join(process.cwd(), 'public', 'plantillas', 'CERTIFICADO_MEDICO.docx');
-        if (!fs.existsSync(templatePath)) return NextResponse.json({ success: false, error: `Falta plantilla ${plantilla} y también la genérica.` }, { status: 404 });
+      if (!bufferPlantilla) {
+        return NextResponse.json({ success: false, error: 'No se encontró la plantilla para generar el certificado.' }, { status: 404 });
       }
 
-      const content = fs.readFileSync(templatePath, 'binary');
-      const zip = new PizZip(content);
+      const zip = new PizZip(bufferPlantilla);
       const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
-      doc.render({ trabajadores: gruposPorPlantilla[plantilla] });
+      doc.render({ trabajadores: datos });
       const bufferResult = doc.getZip().generate({ type: 'nodebuffer' });
 
       const fileName = id_trabajador 
         ? `Certificado_${trabajadoresAProcesar[0].apellido_trabajador?.replace(/ /g, '_') || 'Trabajador'}.docx`
-        : `Certificados_${plantilla}`;
+        : `Certificados_${medico.nombre.replace(/ /g, '_')}.docx`;
 
-      // AUDITORÍA - Rastreo de descarga (silenciosa)
+      // AUDITORÍA
       await registrarAuditoria({
         modulo: 'Certificados Médicos',
         accion: 'EXPORT',
         id_registro: id_trabajador || 'masivo',
-        descripcion: `Descarga certificado: ${fileName} | Trabajadores: ${trabajadoresAProcesar.length} | Plantilla: ${plantilla}`,
-        datos_nuevos: { archivo: fileName, plantilla, total_trabajadores: trabajadoresAProcesar.length },
+        descripcion: `Descarga certificado: ${fileName} | Trab: ${trabajadoresAProcesar.length}`,
+        datos_nuevos: { archivo: fileName, medico: medico.nombre, total_trabajadores: trabajadoresAProcesar.length },
         id_usuario: request.headers.get('x-user-id'),
         id_empresa: request.headers.get('x-empresa-id'),
       });
@@ -226,39 +231,32 @@ export async function GET(request) {
       });
 
     } else {
-      // --- MÚLTIPLES FORMATOS: Generar ZIP ---
+      // --- MÚLTIPLES MÉDICOS: Generar ZIP ---
       const archive = archiver('zip', { zlib: { level: 9 } });
-
-      // Convertimos el archiver a un stream legible para Next.js
-      const { Readable } = await import('stream');
       const stream = Readable.from(archive);
 
-      for (const plantilla of plantillasUtilizadas) {
-        let nombreArchivoNorm = plantilla.toLowerCase().endsWith('.docx') ? plantilla : `${plantilla}.docx`;
-        let templatePath = path.join(process.cwd(), 'public', 'plantillas', nombreArchivoNorm);
-        if (!fs.existsSync(templatePath)) {
-           templatePath = path.join(process.cwd(), 'public', 'plantillas', 'CERTIFICADO_MEDICO.docx');
-        }
+      for (const item of medicosConDatos) {
+        const { medico, datos } = item;
+        const bufferPlantilla = getPlantillaBuffer(medico);
         
-        if (fs.existsSync(templatePath)) {
-          const content = fs.readFileSync(templatePath, 'binary');
-          const zip = new PizZip(content);
+        if (bufferPlantilla) {
+          const zip = new PizZip(bufferPlantilla);
           const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
-          doc.render({ trabajadores: gruposPorPlantilla[plantilla] });
+          doc.render({ trabajadores: datos });
           const bufferPart = doc.getZip().generate({ type: 'nodebuffer' });
-          archive.append(bufferPart, { name: `Certificados_${nombreArchivoNorm}` });
+          archive.append(bufferPart, { name: `Certificados_${medico.nombre.replace(/ /g, '_')}.docx` });
         }
       }
 
       archive.finalize();
 
-      // AUDITORÍA - Rastreo de descarga ZIP (silenciosa)
+      // AUDITORÍA
       await registrarAuditoria({
         modulo: 'Certificados Médicos',
         accion: 'EXPORT',
         id_registro: 'masivo-zip',
-        descripcion: `Descarga ZIP con ${plantillasUtilizadas.length} formatos | Trabajadores: ${trabajadoresAProcesar.length}`,
-        datos_nuevos: { plantillas: plantillasUtilizadas, total_trabajadores: trabajadoresAProcesar.length },
+        descripcion: `Descarga ZIP con ${medicosConDatos.length} médicos | Trab: ${trabajadoresAProcesar.length}`,
+        datos_nuevos: { total_trabajadores: trabajadoresAProcesar.length },
         id_usuario: request.headers.get('x-user-id'),
         id_empresa: request.headers.get('x-empresa-id'),
       });
@@ -267,7 +265,7 @@ export async function GET(request) {
         status: 200,
         headers: {
           'Content-Type': 'application/zip',
-          'Content-Disposition': `attachment; filename="Certificados_Masivos_Multiformat.zip"`,
+          'Content-Disposition': `attachment; filename="Certificados_Masivos.zip"`,
         },
       });
     }

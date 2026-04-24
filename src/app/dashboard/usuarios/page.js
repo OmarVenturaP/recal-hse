@@ -21,7 +21,7 @@ export default function UsuariosPage() {
     id_personal: null, nombre: '', cargo: '', correo: '', 
     area: 'Seguridad', rol: 'Usuario', activo: 1, id_empresa: 1,
     permisos_ft: 0, permisos_certificados: 0, permisos_maquinaria: 0,
-    permisos_dc3: 0, permisos_informe: 0, permisos_citas: 0
+    permisos_dc3: 0, permisos_informe: 0, permisos_citas: 0, permisos_ia: 0
   };
   const [formData, setFormData] = useState(formInicial);
 
@@ -71,7 +71,8 @@ export default function UsuariosPage() {
       permisos_maquinaria: usuario.permisos_maquinaria || 0,
       permisos_dc3: usuario.permisos_dc3 || 0,
       permisos_informe: usuario.permisos_informe || 0,
-      permisos_citas: usuario.permisos_citas || 0
+      permisos_citas: usuario.permisos_citas || 0,
+      permisos_ia: usuario.permisos_ia || 0
     });
     setIsEditing(true);
     setIsModalOpen(true);
@@ -360,6 +361,7 @@ export default function UsuariosPage() {
                       { id: 'permisos_certificados', label: 'Gestión Médicos/Otros', minPlan: 'Intermedio' },
                       { id: 'permisos_informe', label: 'Informes Seguridad', minPlan: 'Total' },
                       { id: 'permisos_dc3', label: 'Certificados y DC-3', minPlan: 'Total' },
+                      { id: 'permisos_ia', label: 'Asistente IA (RECALITO)', minPlan: 'Free' },
                       // Solo para RECAL (id_empresa === 1)
                       ...(formData.id_empresa === 1 ? [{ id: 'permisos_citas', label: 'Citas Dossier [RECAL]', minPlan: 'Free' }] : [])
                     ].filter(perm => {

@@ -62,6 +62,8 @@ export async function POST(request) {
       [parseInt(idPrincipal)]
     );
 
+    const nssEnExcel = new Set(); // Para evitar duplicados dentro del mismo archivo
+
     worksheet.eachRow((row, rowNumber) => {
       if (rowNumber >= 5) {
         const nombre = row.getCell(2).value?.toString().trim();
@@ -69,6 +71,12 @@ export async function POST(request) {
 
         const nssRaw = row.getCell(4).value;
         const nss = nssRaw ? nssRaw.toString().replace(/\D/g, '') : '';
+
+        // --- FILTRO DE DUPLICADOS DENTRO DEL EXCEL ---
+        if (nss && nssEnExcel.has(nss)) {
+          return; // Saltamos esta fila porque el NSS ya fue procesado en este archivo
+        }
+        if (nss) nssEnExcel.add(nss);
         
         const fechaIngresoRaw = row.getCell(6).value;
         const fechaIngreso = parseExcelDate(fechaIngresoRaw);

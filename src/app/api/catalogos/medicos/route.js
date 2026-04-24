@@ -16,11 +16,26 @@ export async function GET(request) {
       queryParams.push(idEmpresa);
     }
 
-    // Migración silenciosa
+    // Migración robusta compatible con versiones antiguas de MySQL
     try {
-      await pool.query(`ALTER TABLE Medicos_Empresa ADD COLUMN IF NOT EXISTS nombre_plantilla VARCHAR(255) DEFAULT 'CERTIFICADO_MEDICO.docx' AFTER ciudad`);
+      const [columns] = await pool.query(`
+        SELECT COLUMN_NAME 
+        FROM INFORMATION_SCHEMA.COLUMNS 
+        WHERE TABLE_SCHEMA = DATABASE() 
+        AND TABLE_NAME = 'Medicos_Empresa' 
+        AND COLUMN_NAME = 'binario_plantilla'
+      `);
+      
+      if (columns.length === 0) {
+        // No existe, intentamos crear ambas
+        try {
+          await pool.query(`ALTER TABLE Medicos_Empresa ADD COLUMN nombre_plantilla VARCHAR(255) DEFAULT 'CERTIFICADO_MEDICO.docx' AFTER ciudad`);
+        } catch (e) {} // Ignorar si nombre_plantilla ya existía
+        
+        await pool.query(`ALTER TABLE Medicos_Empresa ADD COLUMN binario_plantilla LONGBLOB AFTER nombre_plantilla`);
+      }
     } catch (e) {
-      // Ignorar si falla (ya existe o permisos)
+      console.error("Error en migración de médicos:", e);
     }
 
     const query = `
@@ -31,7 +46,8 @@ export async function GET(request) {
         especialidad, 
         universidad, 
         ciudad,
-        nombre_plantilla
+        nombre_plantilla,
+        (binario_plantilla IS NOT NULL) as tiene_archivo
       FROM Medicos_Empresa
       WHERE ${whereClause}
       ORDER BY nombre ASC
@@ -68,23 +84,20 @@ export async function POST(request) {
     
     const [result] = await pool.query(queryInsert, [cedula, nombre, especialidad, universidad, ciudad, nombre_plantilla, idEmpresa || 1]);
 
-    // --- MANEJO DE ARCHIVO ---
+    // --- MANEJO DE ARCHIVO (EN BASE DE DATOS) ---
     const archivo_plantilla = formData.get('archivo_plantilla');
     if (archivo_plantilla && typeof archivo_plantilla !== 'string') {
       try {
         const buffer = Buffer.from(await archivo_plantilla.arrayBuffer());
-        const ext = '.docx';
-        const finalFilename = `plantilla_medico_${result.insertId}${ext}`;
-        const uploadDir = path.join(process.cwd(), 'public', 'plantillas');
+        const finalFilename = `plantilla_medico_${result.insertId}.docx`;
         
-        if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-        
-        fs.writeFileSync(path.join(uploadDir, finalFilename), buffer);
-        
-        // Actualizar el nombre definitivo
-        await pool.query('UPDATE Medicos_Empresa SET nombre_plantilla = ? WHERE id_medico = ?', [finalFilename, result.insertId]);
+        // Guardar binario y nombre final en DB
+        await pool.query(
+          'UPDATE Medicos_Empresa SET binario_plantilla = ?, nombre_plantilla = ? WHERE id_medico = ?', 
+          [buffer, finalFilename, result.insertId]
+        );
       } catch (uploadError) {
-        console.error("Error al guardar archivo en POST:", uploadError);
+        console.error("Error al guardar archivo en DB (POST):", uploadError);
       }
     }
 
@@ -132,24 +145,19 @@ export async function PUT(request) {
     
     await pool.query(queryUpdate, [cedula, nombre, especialidad, universidad, ciudad, nombre_plantilla, id_medico]);
 
-    // --- MANEJO DE ARCHIVO (PUT) ---
+    // --- MANEJO DE ARCHIVO (PUT EN BASE DE DATOS) ---
     const archivo_plantilla = formData.get('archivo_plantilla');
     if (archivo_plantilla && typeof archivo_plantilla !== 'string') {
       try {
         const buffer = Buffer.from(await archivo_plantilla.arrayBuffer());
-        const ext = '.docx';
-        const finalFilename = `plantilla_medico_${id_medico}${ext}`;
-        const uploadDir = path.join(process.cwd(), 'public', 'plantillas');
+        const finalFilename = `plantilla_medico_${id_medico}.docx`;
         
-        if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-        
-        // Eliminar archivo previo si es distinto al nuevo (aunque aquí el nombre será el mismo por ID)
-        // Pero si el nombre en DB era distinto (ej. el genérico), lo actualizamos
-        fs.writeFileSync(path.join(uploadDir, finalFilename), buffer);
-        
-        await pool.query('UPDATE Medicos_Empresa SET nombre_plantilla = ? WHERE id_medico = ?', [finalFilename, id_medico]);
+        await pool.query(
+          'UPDATE Medicos_Empresa SET binario_plantilla = ?, nombre_plantilla = ? WHERE id_medico = ?', 
+          [buffer, finalFilename, id_medico]
+        );
       } catch (uploadError) {
-        console.error("Error al guardar archivo en PUT:", uploadError);
+        console.error("Error al guardar archivo en DB (PUT):", uploadError);
       }
     }
 
