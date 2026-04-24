@@ -45,6 +45,13 @@ export async function GET(request) {
 
     if (modulo) { where += ' AND h.modulo = ?'; params.push(modulo); }
     if (accion) { where += ' AND h.accion = ?'; params.push(accion); }
+    
+    // Filtro por ID de registro específico
+    const idRegistro = searchParams.get('id_registro');
+    if (idRegistro) {
+      where += ' AND h.id_registro = ?';
+      params.push(idRegistro);
+    }
 
     if (fechaInicio) {
       where += ' AND h.fecha_cambio >= ?';

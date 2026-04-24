@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Pencil, Trash2, Upload, FileSpreadsheet, Users, Settings, Eye, Check } from 'lucide-react';
+import { Users, Upload, Pencil, Trash2, FileSpreadsheet, Settings, Eye, Check, ChevronDown, ChevronRight, ClipboardList, History } from 'lucide-react';
+import TrazabilidadModal from '@/components/fuerza-trabajo/modals/TrazabilidadModal';
 import Swal from 'sweetalert2';
 
 // FUNCIÓN DE UTILIDAD: Verifica si una fecha de alta es anterior al inicio del periodo filtrado (SUA anterior)
@@ -24,6 +25,7 @@ const esMesAnterior = (fechaAltaStr, fechaInicioPeriodoStr) => {
 
 export default function FuerzaTrabajoPage() {
   const topRef = useRef(null); 
+  const configRef = useRef(null); // Ref for column config dropdown
   const [userRole, setUserRole] = useState(null);
   const [userPlan, setUserPlan] = useState('Free'); // NUEVO
   const [userFtPermission, setUserFtPermission] = useState(null); 
@@ -84,6 +86,12 @@ export default function FuerzaTrabajoPage() {
   const [soloFaltaCurp, setSoloFaltaCurp] = useState(false);
   const [soloFaltaCuadrilla, setSoloFaltaCuadrilla] = useState(false);
   const [soloAltas, setSoloAltas] = useState(false);
+
+  // Estados de Trazabilidad
+  const [isTrazabilidadModalOpen, setIsTrazabilidadModalOpen] = useState(false);
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [selectedAuditLog, setSelectedAuditLog] = useState(null);
+  const [loadingAudit, setLoadingAudit] = useState(false);
   const [busqueda, setBusqueda] = useState('');
 
   const [ordenPor, setOrdenPor] = useState('fecha_ingreso_obra');
@@ -155,13 +163,15 @@ export default function FuerzaTrabajoPage() {
     acciones: true,      // Obligatorio
     trazabilidad: true
   });
+  
+  const isInitialMount = useRef(true);
 
   // Cargar preferencias al montar
   useEffect(() => {
     const saved = localStorage.getItem('recal_ft_columns');
     if (saved) {
       try {
-        setColumnasVisibles(JSON.parse(saved));
+        setColumnasVisibles(prev => ({ ...prev, ...JSON.parse(saved) }));
       } catch (e) {
         console.error("Error al cargar columnas FT:", e);
       }
@@ -170,8 +180,27 @@ export default function FuerzaTrabajoPage() {
 
   // Guardar preferencias ante cambios
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
     localStorage.setItem('recal_ft_columns', JSON.stringify(columnasVisibles));
   }, [columnasVisibles]);
+
+  // Cerrar configuración al hacer click fuera
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (configRef.current && !configRef.current.contains(event.target)) {
+        setShowColumnConfig(false);
+      }
+    };
+    if (showColumnConfig) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showColumnConfig]);
 
   const toggleColumna = (key) => {
     // Evitar ocultar obligatorias
@@ -508,8 +537,23 @@ export default function FuerzaTrabajoPage() {
       const data = await res.json();
       
       if (data.success) { 
-        setIsModalOpen(false); fetchTrabajadores(); 
-        Swal.fire('Guardado', 'Los datos del trabajador se guardaron correctamente.', 'success');
+        setIsModalOpen(false); 
+        fetchTrabajadores(); 
+        
+        // Si fue edición, mostrar el resumen de cambios automáticamente
+        if (isEditing) {
+          const idLog = editId;
+          setTimeout(async () => {
+            const logRes = await fetch(`/api/trazabilidad?limit=1&modulo=Fuerza de Trabajo&id_registro=${idLog}&accion=UPDATE`);
+            const logData = await logRes.json();
+            if (logData.success && logData.data.length > 0) {
+              setSelectedAuditLog(logData.data[0]);
+              setIsTrazabilidadModalOpen(true);
+            }
+          }, 500);
+        } else {
+          Swal.fire('Guardado', 'Los datos del trabajador se guardaron correctamente.', 'success');
+        }
       } else {
         if ((data.error?.includes('requiere una fecha de baja') || data.error?.includes('OBLIGATORIO ingresar una fecha de baja')) && !formData.tiene_baja) {
           setFormData(prev => ({ ...prev, tiene_baja: true }));
@@ -603,6 +647,24 @@ export default function FuerzaTrabajoPage() {
     }
   };
 
+  const handleVerTrazabilidad = async (idTrabajador) => {
+    setLoadingAudit(true);
+    try {
+      const res = await fetch(`/api/trazabilidad?limit=20&modulo=Fuerza de Trabajo&id_registro=${idTrabajador}`);
+      const data = await res.json();
+      if (data.success && data.data.length > 0) {
+        setSelectedAuditLog(data.data[0]); // Mostrar el más reciente
+        setIsTrazabilidadModalOpen(true);
+      } else {
+        Swal.fire('Sin registros', 'No se encontró historial detallado para este trabajador.', 'info');
+      }
+    } catch (error) {
+      console.error("Error al obtener trazabilidad:", error);
+    } finally {
+      setLoadingAudit(false);
+    }
+  };
+
   const handleUpdateSuaName = (type, index, newName) => {
     const data = { ...suaPreview };
     if (type === 'nuevo') {
@@ -660,8 +722,17 @@ export default function FuerzaTrabajoPage() {
         const res = await fetch(`/api/fuerza-trabajo?id=${id}`, { method: 'DELETE' });
         const data = await res.json();
         if (data.success) {
-          Swal.fire('Eliminado', data.mensaje, 'success');
           fetchTrabajadores();
+          
+          // Mostrar el resumen del registro eliminado
+          const logRes = await fetch(`/api/trazabilidad?limit=1&modulo=Fuerza de Trabajo&id_registro=${id}&accion=DELETE`);
+          const logData = await logRes.json();
+          if (logData.success && logData.data.length > 0) {
+            setSelectedAuditLog(logData.data[0]);
+            setIsTrazabilidadModalOpen(true);
+          } else {
+            Swal.fire('Eliminado', data.mensaje, 'success');
+          }
         } else {
           Swal.fire('Operación Cancelada', data.error, 'error');
         }
@@ -970,7 +1041,7 @@ const handleDc3Submit = async (e) => {
             </button>
 
             {/* Configuración de Columnas */}
-            <div className="relative">
+            <div className="relative" ref={configRef}>
               <button 
                 onClick={() => setShowColumnConfig(!showColumnConfig)}
                 className={`p-2 rounded-md border transition-all ${showColumnConfig ? 'bg-blue-100 border-blue-300 text-blue-600' : 'bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200 dark:bg-slate-700 dark:border-slate-600 dark:text-gray-300'}`}
@@ -1241,7 +1312,14 @@ const handleDc3Submit = async (e) => {
                       {columnasVisibles.trazabilidad && (userRole === 'Admin' || userRole === 'Master') && (
                         <td className="flex justify-between items-center md:table-cell px-2 md:px-4 py-2 md:py-4 border-b dark:border-slate-700 md:border-none">
                           <span className="md:hidden font-bold text-gray-500 dark:text-gray-400 text-sm">Trazabilidad:</span>
-                          <div className="flex flex-col items-end md:items-start gap-1 max-w-[65%] md:max-w-none">
+                          <div 
+                            className="flex flex-col items-end md:items-start gap-1 max-w-[65%] md:max-w-none cursor-pointer group"
+                            onClick={() => handleVerTrazabilidad(t.id_trabajador)}
+                          >
+                            <div className="flex items-center gap-1 mb-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <History className="w-3 h-3 text-blue-500" />
+                                <span className="text-[9px] font-bold text-blue-500 uppercase">Ver Historial</span>
+                            </div>
                             {t.creador ? (
                               <span className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 px-2 py-0.5 rounded text-[10px] font-bold border border-green-200 dark:border-green-800 flex-wrap break-words inline-block" title="Registrado por">
                                 Agregó: {t.creador}
@@ -1426,6 +1504,13 @@ const handleDc3Submit = async (e) => {
           </div>
         </div>
       )}
+
+      {/* --- MODAL DE TRAZABILIDAD (LOGS) --- */}
+      <TrazabilidadModal 
+        isOpen={isTrazabilidadModalOpen}
+        onClose={() => setIsTrazabilidadModalOpen(false)}
+        log={selectedAuditLog}
+      />
 
       {/* --- MODAL 3: IMPORTACIÓN DE EXCEL (Carga Masiva) --- */}
       {isImportModalOpen && (

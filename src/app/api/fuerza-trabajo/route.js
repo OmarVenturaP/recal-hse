@@ -241,15 +241,10 @@ export async function PUT(request) {
       queryParams.push(body.fecha_baja || null);
     }
 
-    let query = `UPDATE Fuerza_Trabajo SET ${updateFields} WHERE id_trabajador=?`;
-    queryParams.push(id_trabajador);
+    // OBTENER ESTADO ANTERIOR PARA AUDITORÍA
+    const [oldRows] = await pool.query("SELECT * FROM Fuerza_Trabajo WHERE id_trabajador = ?", [id_trabajador]);
+    const datos_anteriores = oldRows[0] || null;
 
-    // AISLAMIENTO: Un usuario normal solo puede actualizar de su empresa
-    if (userRol !== 'Master' && idEmpresa) {
-      query += ` AND id_empresa=?`;
-      queryParams.push(idEmpresa);
-    }
-    
     await pool.query(query, queryParams);
 
     // AUDITORÍA (silenciosa)
@@ -258,7 +253,12 @@ export async function PUT(request) {
       accion: 'UPDATE',
       id_registro: id_trabajador,
       descripcion: `Edición de trabajador ID ${id_trabajador}: ${nombre_trabajador} ${apellido_trabajador || ''} | NSS: ${nss || 'N/D'}`,
-      datos_nuevos: { nombre_trabajador, apellido_trabajador, nss, curp, puesto_categoria, fecha_ingreso_obra },
+      datos_anteriores,
+      datos_nuevos: { 
+        numero_empleado, nombre_trabajador, apellido_trabajador, puesto_categoria, nss, curp, 
+        fecha_ingreso_obra, fecha_alta_imss, origen, id_subcontratista_ft, id_subcontratista_principal,
+        fecha_baja: body.tiene_baja ? (body.fecha_baja || null) : (datos_anteriores?.fecha_baja)
+      },
       id_usuario: id_usuario_actual,
       id_empresa: idEmpresa,
     });
@@ -297,6 +297,10 @@ export async function PATCH(request) {
     }
 
     if (bActivo !== undefined) {
+      // OBTENER ESTADO ANTERIOR
+      const [oldRows] = await pool.query(`SELECT bActivo FROM Fuerza_Trabajo WHERE id_trabajador = ?${authFilter}`, [id_trabajador, ...authParams]);
+      const datos_anteriores = oldRows[0] || null;
+
       const query = `UPDATE Fuerza_Trabajo SET bActivo = ?, usuario_actualizacion = ?, ultima_modificacion = ? WHERE id_trabajador = ?${authFilter}`;
       await pool.query(query, [bActivo, id_usuario_actual, fechaCDMX(), id_trabajador, ...authParams]);
 
@@ -306,6 +310,7 @@ export async function PATCH(request) {
         accion: 'UPDATE',
         id_registro: id_trabajador,
         descripcion: `Cambio de estado (bActivo=${bActivo}) al trabajador ID ${id_trabajador}`,
+        datos_anteriores,
         datos_nuevos: { bActivo },
         id_usuario: id_usuario_actual,
         id_empresa: idEmpresa,
@@ -315,6 +320,10 @@ export async function PATCH(request) {
     } 
     // Lógica original de Baja
     else if (fecha_baja) {
+      // OBTENER ESTADO ANTERIOR
+      const [oldRows] = await pool.query(`SELECT fecha_baja FROM Fuerza_Trabajo WHERE id_trabajador = ?${authFilter}`, [id_trabajador, ...authParams]);
+      const datos_anteriores = oldRows[0] || null;
+
       const query = `UPDATE Fuerza_Trabajo SET fecha_baja = ?, usuario_actualizacion = ?, ultima_modificacion = ? WHERE id_trabajador = ?${authFilter}`;
       await pool.query(query, [fecha_baja, id_usuario_actual, fechaCDMX(), id_trabajador, ...authParams]);
 
@@ -324,6 +333,7 @@ export async function PATCH(request) {
         accion: 'UPDATE',
         id_registro: id_trabajador,
         descripcion: `Baja de trabajador ID ${id_trabajador} con fecha ${fecha_baja}`,
+        datos_anteriores,
         datos_nuevos: { fecha_baja },
         id_usuario: id_usuario_actual,
         id_empresa: idEmpresa,
@@ -362,13 +372,15 @@ export async function DELETE(request) {
       return NextResponse.json({ success: false, error: "Solo los administradores pueden eliminar registros permanentemente." }, { status: 403 });
     }
 
-    let query = "DELETE FROM Fuerza_Trabajo WHERE id_trabajador = ?";
-    const queryParams = [id_trabajador];
+    // OBTENER DATOS DEL TRABAJADOR Y EMPRESA ANTES DE ELIMINAR PARA AUDITORÍA
+    const [workerData] = await pool.query(`
+      SELECT f.*, s.razon_social AS razon_social_empresa 
+      FROM Fuerza_Trabajo f
+      LEFT JOIN Subcontratistas s ON f.id_subcontratista_principal = s.id_subcontratista
+      WHERE f.id_trabajador = ?
+    `, [id_trabajador]);
 
-    if (userRol !== 'Master' && idEmpresa) {
-      query += " AND id_empresa = ?";
-      queryParams.push(idEmpresa);
-    }
+    const datos_anteriores = workerData[0] || null;
 
     const [result] = await pool.query(query, queryParams);
 
@@ -381,7 +393,8 @@ export async function DELETE(request) {
       modulo: 'Fuerza de Trabajo',
       accion: 'DELETE',
       id_registro: id_trabajador,
-      descripcion: `Eliminación permanente de trabajador ID ${id_trabajador}`,
+      descripcion: `Eliminación permanente de trabajador ID ${id_trabajador} | ${datos_anteriores?.nombre_trabajador} ${datos_anteriores?.apellido_trabajador || ''}`,
+      datos_anteriores,
       id_usuario: id_usuario_actual,
       id_empresa: idEmpresa,
     });
