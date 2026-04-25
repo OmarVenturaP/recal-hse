@@ -251,12 +251,14 @@ export async function GET(request) {
     const mes = searchParams.get('mes');
     const anio = searchParams.get('anio');
     const tipoUnidad = searchParams.get('tipo_unidad') || 'todos';
+    const userRol = request.headers.get('x-user-rol');
+    const idEmpresa = request.headers.get('x-empresa-id');
 
     const config = CONFIG_POR_TIPO[tipoUnidad] || CONFIG_POR_TIPO.todos;
     const periodoTexto = generarTextoPeriodo(mes, anio);
 
     // ─── Construir query ─────────────────────────────────────────────────────
-    let whereClause = 'WHERE m.fecha_baja IS NULL';
+    let whereClause = 'WHERE 1=1'; // Cambiado de m.fecha_baja IS NULL para manejarlo dinámicamente
     const queryParams = [];
     let endDate = null;
 
@@ -266,6 +268,14 @@ export async function GET(request) {
       const startDate = `${anio}-${String(mes).padStart(2,'0')}-01`;
       whereClause = `WHERE DATE(m.fecha_ingreso_obra) <= ? AND (m.fecha_baja IS NULL OR DATE(m.fecha_baja) > ?)`;
       queryParams.push(endDate, startDate);
+    } else {
+      whereClause += ` AND m.fecha_baja IS NULL`;
+    }
+
+    // Aislamiento Multi-Tenant
+    if (userRol !== 'Master' && idEmpresa) {
+      whereClause += ` AND m.id_empresa = ?`;
+      queryParams.push(idEmpresa);
     }
 
     if (tipoUnidad !== 'todos') {
@@ -356,20 +366,29 @@ export async function GET(request) {
       // Copiar estilos de la fila base para las filas posteriores
       if (i > 0) {
         const filaBase = worksheet.getRow(config.filaBase);
+        let detenerCopia = false;
         filaBase.eachCell({ includeEmpty: true }, (baseCell, colNumber) => {
+          if (detenerCopia) return;
           let val = baseCell.value;
           if (val && typeof val === 'object' && val.richText) val = val.richText.map(rt => rt.text).join('');
           if (val && typeof val === 'object' && val.result) val = val.result;
-          if (val && String(val).toUpperCase().includes('OBSERVACION')) return;
+          if (val && (String(val).toUpperCase().includes('OBSERVACION') || String(val).toUpperCase().includes('OBRSERVACION'))) {
+            detenerCopia = true;
+            return;
+          }
           row.getCell(colNumber).style = JSON.parse(JSON.stringify(baseCell.style));
+          row.getCell(colNumber).alignment = { vertical: 'bottom', horizontal: 'center', wrapText: true };
         });
       } else {
         row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
           let val = cell.value;
           if (val && typeof val === 'object' && val.richText) val = val.richText.map(rt => rt.text).join('');
           if (val && typeof val === 'object' && val.result) val = val.result;
-          if (val && String(val).toUpperCase().includes('OBSERVACION')) return;
-          cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+          if (val && (String(val).toUpperCase().includes('OBSERVACION') || String(val).toUpperCase().includes('OBRSERVACION'))) {
+            detenerCopia = true;
+            return;
+          }
+          cell.alignment = { vertical: 'bottom', horizontal: 'center', wrapText: true };
         });
       }
 

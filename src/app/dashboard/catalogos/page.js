@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Building2, UserCheck, GraduationCap, Plus, Search, Edit, Trash2, Loader2, Image as ImageIcon, X, Pencil, Users, Stethoscope, Sparkles, Lock, ShieldAlert, FileText, Upload } from 'lucide-react';
+import { Building2, UserCheck, GraduationCap, Plus, Search, Edit, Trash2, Loader2, Image as ImageIcon, X, Pencil, Users, Stethoscope, Sparkles, Lock, ShieldAlert, FileText, Upload, ClipboardList, FileSpreadsheet } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 export default function CatalogosPage() {
@@ -322,6 +322,46 @@ export default function CatalogosPage() {
     );
   };
 
+  const BitacoraPicker = ({ label, fieldName }) => {
+    const currentFile = filesToUpload[fieldName];
+    const existingName = formData.nombre_archivo_bitacora;
+
+    return (
+      <div className="flex flex-col gap-2 w-full">
+        <label className="text-sm font-bold text-orange-600 dark:text-orange-400 flex items-center gap-2">
+          <ClipboardList className="w-4 h-4" /> {label}
+        </label>
+        <div className="flex items-center gap-3 p-4 bg-orange-50/50 dark:bg-orange-900/10 border border-orange-100 dark:border-orange-900/30 rounded-xl">
+          <div className="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
+            <FileSpreadsheet className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+              {currentFile ? currentFile.name : (existingName || 'Sin plantilla cargada')}
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">
+              {currentFile ? 'Listo para subir' : (existingName ? 'Plantilla actual' : 'Usará formato por defecto')}
+            </p>
+          </div>
+          <label className="cursor-pointer bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-700 dark:text-gray-200 transition-colors shadow-sm flex items-center gap-2 shadow-orange-100 dark:shadow-none">
+            <Upload className="h-3 w-3" />
+            {currentFile ? 'Cambiar' : 'Subir Plantilla'}
+            <input 
+              type="file" 
+              className="hidden" 
+              accept=".docx,.xlsx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" 
+              onChange={(e) => {
+                const file = e.target.files[0];
+                if (file) setFilesToUpload(prev => ({ ...prev, [fieldName]: file }));
+              }} 
+            />
+          </label>
+        </div>
+        <p className="text-[10px] text-gray-400 italic">Formatos permitidos: Word (.docx) y Excel (.xlsx).</p>
+      </div>
+    );
+  };
+
   const renderModalForm = () => {
     if (modalType === 'contratista') {
       return (
@@ -357,6 +397,10 @@ export default function CatalogosPage() {
             <ImagePicker label="Logo Empresa" fieldName="logo_empresa" />
             <ImagePicker label="Firma Rep. Legal" fieldName="firma_representante_legal" />
             <ImagePicker label="Firma Rep. Trabajadores" fieldName="firma_representante_trabajadores" />
+          </div>
+
+          <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
+            <BitacoraPicker label="Plantilla Bitácora de Mantenimiento" fieldName="archivo_bitacora" />
           </div>
 
           <div className="border-t border-gray-200 dark:border-gray-700 pt-6">

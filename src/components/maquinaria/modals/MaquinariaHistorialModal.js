@@ -95,6 +95,7 @@ export default function MaquinariaHistorialModal({
               <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
                 <thead className="bg-[var(--recal-gray)] dark:bg-slate-850">
                   <tr>
+                    <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Folio</th>
                     <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Fecha</th>
                     <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Tipo</th>
                     <th className="px-4 py-3 text-center text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Lectura</th>
@@ -105,10 +106,13 @@ export default function MaquinariaHistorialModal({
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-slate-700/50 bg-white dark:bg-slate-800">
                   {historial.length === 0 ? (
-                    <tr key="no-data"><td colSpan={canManageMaquinaria ? "6" : "5"} className="px-4 py-12 text-center text-sm text-gray-500 dark:text-gray-400 italic">No hay servicios registrados para esta unidad.</td></tr>
+                    <tr key="no-data"><td colSpan={canManageMaquinaria ? "7" : "6"} className="px-4 py-12 text-center text-sm text-gray-500 dark:text-gray-400 italic">No hay servicios registrados para esta unidad.</td></tr>
                   ) : (
                     historial.map((h, i) => (
                       <tr key={h.id_mantenimiento || i} className={`hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors ${isEditingMantenimiento && h.id_mantenimiento === formMantenimiento.id_mantenimiento ? 'bg-amber-50 dark:bg-amber-900/10' : ''}`}>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200 font-mono">
+                          {h.folio_mtto ? String(h.folio_mtto).padStart(5, '0') : '-'}
+                        </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200 font-bold">{formatDDMMYYYY(h.fecha_mantenimiento)}</td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm">
                           <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-tighter ${h.tipo_mantenimiento === 'Preventivo' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300'}`}>

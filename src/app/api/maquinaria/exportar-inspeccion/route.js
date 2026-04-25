@@ -16,17 +16,27 @@ const generarTextoPeriodo = (mes, anio) => {
 }
 
 export async function GET(request) {
-  const { searchParams } = new URL(request.url);
-  const mes = searchParams.get('mes');
-  const anio = searchParams.get('anio');
-  const periodoTexto = generarTextoPeriodo(mes, anio);
-  const id = searchParams.get('id');
+    const { searchParams } = new URL(request.url);
+    const mes = searchParams.get('mes');
+    const anio = searchParams.get('anio');
+    const periodoTexto = generarTextoPeriodo(mes, anio);
+    const id = searchParams.get('id');
+    const userRol = request.headers.get('x-user-rol');
+    const idEmpresa = request.headers.get('x-empresa-id');
 
-  if (!id) return NextResponse.json({ success: false, error: 'ID requerido' }, { status: 400 });
+    if (!id) return NextResponse.json({ success: false, error: 'ID requerido' }, { status: 400 });
 
-  try {
-    const [rows] = await pool.query('SELECT * FROM Maquinaria_Equipo WHERE id_maquinaria = ?', [id]);
-    if (rows.length === 0) return NextResponse.json({ success: false, error: 'Equipo no encontrado' }, { status: 404 });
+    try {
+      let queryMaq = 'SELECT * FROM Maquinaria_Equipo WHERE id_maquinaria = ?';
+      const paramsMaq = [id];
+
+      if (userRol !== 'Master' && idEmpresa) {
+        queryMaq += ' AND id_empresa = ?';
+        paramsMaq.push(idEmpresa);
+      }
+
+      const [rows] = await pool.query(queryMaq, paramsMaq);
+      if (rows.length === 0) return NextResponse.json({ success: false, error: 'Equipo no encontrado o no pertenece a su empresa' }, { status: 404 });
     
     const equipo = rows[0];
 

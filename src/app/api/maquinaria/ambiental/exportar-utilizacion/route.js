@@ -20,6 +20,8 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const mes = searchParams.get('mes');
     const anio = searchParams.get('anio');
+    const userRol = request.headers.get('x-user-rol');
+    const idEmpresa = request.headers.get('x-empresa-id');
 
     const periodoTexto = generarTextoPeriodo(mes, anio);
 
@@ -39,6 +41,12 @@ export async function GET(request) {
       
       whereClause = `WHERE DATE(m.fecha_ingreso_obra) <= ? AND (m.fecha_baja IS NULL OR DATE(m.fecha_baja) >= ?)`;
       queryParams.push(endDate, startDate);
+    }
+
+    // Aislamiento Multi-Tenant
+    if (userRol !== 'Master' && idEmpresa) {
+      whereClause += ` AND m.id_empresa = ?`;
+      queryParams.push(idEmpresa);
     }
 
     const [rows] = await pool.query(`
@@ -112,7 +120,7 @@ export async function GET(request) {
           
           const imageId = workbook.addImage({ buffer: buffer, extension: 'jpeg' });
           worksheet.addImage(imageId, {
-            tl: { col: 7.80, row: currentRow - 0.95 }, 
+            tl: { col: 7.1, row: currentRow - 0.95 }, 
             ext: { width: 190, height: 190 }, 
             editAs: 'oneCell' 
           });
@@ -134,12 +142,13 @@ export async function GET(request) {
           if (val && typeof val === 'object' && val.richText) val = val.richText.map(rt => rt.text).join('');
           if (val && typeof val === 'object' && val.result) val = val.result;
           
-          if (val && String(val).toUpperCase().includes('OBSERVACION')) {
+          if (val && (String(val).toUpperCase().includes('OBSERVACION') || String(val).toUpperCase().includes('OBRSERVACION'))) {
             detenerCopia = true;
             return; 
           }
 
-          row.getCell(colNumber).style = baseCell.style;
+          row.getCell(colNumber).style = JSON.parse(JSON.stringify(baseCell.style));
+          row.getCell(colNumber).alignment = { vertical: 'bottom', horizontal: 'center', wrapText: true };
         });
       } else {
         let detenerCopia = false;
@@ -150,12 +159,12 @@ export async function GET(request) {
           if (val && typeof val === 'object' && val.richText) val = val.richText.map(rt => rt.text).join('');
           if (val && typeof val === 'object' && val.result) val = val.result;
 
-          if (val && String(val).toUpperCase().includes('OBSERVACION')) {
+          if (val && (String(val).toUpperCase().includes('OBSERVACION') || String(val).toUpperCase().includes('OBRSERVACION'))) {
             detenerCopia = true;
             return;
           }
 
-          if(colNumber !== 7) cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+          cell.alignment = { vertical: 'bottom', horizontal: 'center', wrapText: true };
         });
       }
 

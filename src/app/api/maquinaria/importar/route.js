@@ -58,25 +58,38 @@ export async function POST(request) {
     const seriesList = [];
     const erroresValidacion = [];
 
+    let haEmpezadoLectura = false;
     let detenerLectura = false; 
 
     worksheet.eachRow((row, rowNumber) => {
       if (detenerLectura) return; 
 
-      if (rowNumber >= 7) {
-        if (row.getCell(2).isMerged || row.getCell(3).isMerged) {
-          detenerLectura = true;
-          return;
-        }
+      const cell1 = parseCell(row.getCell(1)).toUpperCase();
+      const cell2 = parseCell(row.getCell(2)).toUpperCase();
 
-        const tipo = parseCell(row.getCell(2)).toUpperCase();
-        
-        if (tipo.includes('ELABORO') || tipo.includes('ELABORÓ') || tipo.includes('REVISO') || tipo.includes('OBSERVACION')) {
-          detenerLectura = true;
-          return;
+      // 1. Detectar el inicio de la tabla (Cabecera)
+      if (!haEmpezadoLectura) {
+        if (cell1 === 'NO.' || cell1 === 'NO' || cell2 === 'TIPO') {
+          haEmpezadoLectura = true;
+          return; // Saltamos la fila de cabecera
         }
+        return; // Seguimos buscando
+      }
 
-        if (!tipo) return;
+      // 2. Si ya empezamos, validar si debemos detenernos (Merged cells o palabras clave)
+      if (row.getCell(2).isMerged || row.getCell(3).isMerged) {
+        detenerLectura = true;
+        return;
+      }
+
+      const tipo = cell2;
+      
+      if (tipo.includes('ELABORO') || tipo.includes('ELABORÓ') || tipo.includes('REVISO') || tipo.includes('OBSERVACION')) {
+        detenerLectura = true;
+        return;
+      }
+
+      if (!tipo || tipo === '') return; // Fila vacía dentro de la tabla
 
         const marca = parseCell(row.getCell(3)) || 'S/N';
         const anio = parseCell(row.getCell(4)) || '';
@@ -103,7 +116,6 @@ export async function POST(request) {
         });
 
         if (serie) seriesList.push(serie);
-      }
     });
 
     if (excelMaquinaria.length === 0) {
@@ -145,6 +157,7 @@ export async function POST(request) {
 export async function PUT(request) {
   try {
     const id_usuario_actual = request.headers.get('x-user-id');
+    const id_empresa_actual = request.headers.get('x-empresa-id') || 1;
     
     if (!id_usuario_actual) {
       return NextResponse.json({ error: "Usuario no identificado" }, { status: 401 });
@@ -170,8 +183,8 @@ export async function PUT(request) {
     for (const m of maquinarias) {
       await pool.query(`
         INSERT INTO Maquinaria_Equipo 
-        (tipo, marca, modelo, anio, serie, placa, color, fecha_ingreso_obra, id_subcontratista, area, usuario_registro)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (tipo, marca, modelo, anio, serie, placa, color, fecha_ingreso_obra, id_subcontratista, area, usuario_registro, id_empresa, fecha_creacion, bActivo, tipo_unidad)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 1, 'maquinaria')
       `, [
         m.tipo, 
         m.marca, 
@@ -183,7 +196,8 @@ export async function PUT(request) {
         fechaIngresoActual, 
         m.id_subcontratista_principal,
         areaAsignada,
-        id_usuario_actual
+        id_usuario_actual,
+        id_empresa_actual
       ]);
     }
 

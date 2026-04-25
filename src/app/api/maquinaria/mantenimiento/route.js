@@ -15,10 +15,13 @@ export async function GET(request) {
     try {
       await pool.query(`ALTER TABLE Historial_Mantenimiento ADD COLUMN realizado_por VARCHAR(255)`);
     } catch(e) {}
+    try {
+      await pool.query(`ALTER TABLE Historial_Mantenimiento ADD COLUMN folio_mtto INT`);
+    } catch(e) {}
 
     // Buscamos todos los servicios y los ordenamos por fecha (del más reciente al más antiguo)
     const [rows] = await pool.query(
-      `SELECT id_mantenimiento, id_maquinaria, fecha_mantenimiento, tipo_mantenimiento, horometro_mantenimiento, observaciones, realizado_por 
+      `SELECT id_mantenimiento, id_maquinaria, fecha_mantenimiento, tipo_mantenimiento, horometro_mantenimiento, observaciones, realizado_por, folio_mtto 
        FROM Historial_Mantenimiento 
        WHERE id_maquinaria = ? 
        ORDER BY fecha_mantenimiento DESC, id_mantenimiento DESC`,
@@ -44,10 +47,35 @@ export async function POST(request) {
       return NextResponse.json({ error: "Faltan campos obligatorios para registrar el servicio." }, { status: 400 });
     }
 
+    // --- GENERACIÓN DE FOLIO CONSECUTIVO POR EMPRESA ---
+    let folioFinal = null;
+    try {
+      // 1. Obtener el id_subcontratista de la maquinaria
+      const [maqRows] = await pool.query('SELECT id_subcontratista FROM Maquinaria_Equipo WHERE id_maquinaria = ?', [id_maquinaria]);
+      if (maqRows.length > 0) {
+        const id_sub = maqRows[0].id_subcontratista;
+        
+        // 2. Buscar el máximo folio para esa empresa
+        const [folioRows] = await pool.query(`
+          SELECT MAX(h.folio_mtto) as max_folio 
+          FROM Historial_Mantenimiento h
+          JOIN Maquinaria_Equipo m ON h.id_maquinaria = m.id_maquinaria
+          WHERE m.id_subcontratista = ?
+        `, [id_sub]);
+
+        const maxFolio = folioRows[0].max_folio;
+        // Comenzar arriba del 00100 (101) si no hay folios
+        folioFinal = maxFolio ? maxFolio + 1 : 101;
+        if (folioFinal <= 100) folioFinal = 101;
+      }
+    } catch (folioErr) {
+      console.error("Error al generar folio:", folioErr);
+    }
+
     const query = `
       INSERT INTO Historial_Mantenimiento 
-      (id_maquinaria, fecha_mantenimiento, tipo_mantenimiento, horometro_mantenimiento, observaciones, realizado_por) 
-      VALUES (?, ?, ?, ?, ?, ?)
+      (id_maquinaria, fecha_mantenimiento, tipo_mantenimiento, horometro_mantenimiento, observaciones, realizado_por, folio_mtto) 
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
     
     // Si viene vacío o indefinido, enviamos null a MySQL
@@ -59,7 +87,8 @@ export async function POST(request) {
       tipo_mantenimiento, 
       horometroFinal, 
       observaciones || null,
-      realizado_por || null
+      realizado_por || null,
+      folioFinal
     ]);
 
     // --- CÁLCULO AUTOMÁTICO DE PRÓXIMO MANTENIMIENTO ---

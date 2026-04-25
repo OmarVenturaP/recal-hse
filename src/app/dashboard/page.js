@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Tractor, Users, CalendarDays, BookOpen, Clock, Activity, Zap, ShieldCheck, FileBarChart, Crown, Lock, Database, Loader2 } from 'lucide-react';
+import { Tractor, Users, CalendarDays, BookOpen, Clock, Activity, Zap, ShieldCheck, FileBarChart, Crown, Lock, Database, Loader2, X } from 'lucide-react';
 import Swal from 'sweetalert2';
 import Link from 'next/link';
 import ModalPlanDetalles from '@/components/ModalPlanDetalles';
@@ -14,6 +14,19 @@ export default function DashboardHome() {
   const [greeting, setGreeting] = useState('');
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
   const [isBackingUp, setIsBackingUp] = useState(false);
+  const [showTutorialCard, setShowTutorialCard] = useState(false);
+
+  useEffect(() => {
+    const hasSeen = localStorage.getItem('recal_hse_announcement_machinery_v1');
+    if (!hasSeen) {
+      setShowTutorialCard(true);
+    }
+  }, []);
+
+  const closeTutorialCard = () => {
+    localStorage.setItem('recal_hse_announcement_machinery_v1', 'true');
+    setShowTutorialCard(false);
+  };
 
   useEffect(() => {
     // Generar saludo basado en la hora local
@@ -373,7 +386,56 @@ export default function DashboardHome() {
           )}
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:col-span-3 gap-6 lg:gap-8">
+          
+          {/* TARJETA DE ANUNCIO: NUEVA FUNCIONALIDAD MAQUINARIA */}
+          {showTutorialCard && (
+            <div className="md:col-span-2 lg:col-span-3 bg-gradient-to-r from-orange-500 to-orange-700 rounded-[2rem] p-6 text-white shadow-xl shadow-orange-500/30 relative overflow-hidden animate-in slide-in-from-top-8 duration-700">
+              <div className="absolute top-0 right-0 p-4">
+                <button 
+                  onClick={closeTutorialCard}
+                  className="text-white/60 hover:text-white transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="flex flex-col md:flex-row items-center gap-6 relative z-10">
+                <div className="w-20 h-20 bg-white/20 backdrop-blur-md rounded-3xl flex items-center justify-center shrink-0 shadow-lg">
+                  <Zap className="w-10 h-10 text-white" />
+                </div>
+                
+                <div className="flex-1 text-center md:text-left">
+                  <div className="flex flex-wrap justify-center md:justify-start items-center gap-2 mb-2">
+                    <span className="bg-white text-orange-600 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-[0.2em] shadow-sm">Nueva Funcionalidad</span>
+                    <h2 className="text-2xl font-black tracking-tight">Gestión Inteligente de Bitácoras</h2>
+                  </div>
+                  <p className="text-orange-50 font-medium text-sm md:text-base max-w-2xl opacity-90">
+                    Hemos actualizado el módulo de Maquinaria. Ahora puedes generar bitácoras masivas en ZIP, asignar folios automáticos por empresa y usar plantillas personalizadas.
+                  </p>
+                </div>
+                
+                <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                  <button 
+                    onClick={closeTutorialCard}
+                    className="px-6 py-3 bg-orange-800/40 hover:bg-orange-800/60 border border-white/20 rounded-2xl text-xs font-black uppercase tracking-widest transition-all"
+                  >
+                    Omitir
+                  </button>
+                  <Link 
+                    href="/dashboard/maquinaria?tutorial=true"
+                    onClick={closeTutorialCard}
+                    className="px-8 py-3 bg-white text-orange-600 hover:bg-orange-50 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl transition-all hover:-translate-y-1 active:scale-95 text-center"
+                  >
+                    Explorar y Ver Tutorial
+                  </Link>
+                </div>
+              </div>
+
+              {/* Decoración abstracta */}
+              <div className="absolute -right-10 bottom-0 w-64 h-64 bg-white/10 rounded-full blur-3xl pointer-events-none"></div>
+            </div>
+          )}
 
           <ModuleCard
             href="/dashboard/maquinaria"

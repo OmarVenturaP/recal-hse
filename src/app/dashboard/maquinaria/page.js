@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
-import { ClipboardList, Pencil, Trash2, Upload, Tractor, FileSpreadsheet, FolderDown, Settings, Eye, Check } from 'lucide-react';
+import { useState, useEffect, useRef, Suspense } from 'react';
+import { ClipboardList, Pencil, Trash2, Upload, Tractor, FileSpreadsheet, FolderDown, Settings, Eye, Check, ArrowRight, X, Zap } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import Swal from 'sweetalert2';
 import MaquinariaFormModal from '@/components/maquinaria/modals/MaquinariaFormModal';
 import MaquinariaBajaModal from '@/components/maquinaria/modals/MaquinariaBajaModal';
 import MaquinariaHistorialModal from '@/components/maquinaria/modals/MaquinariaHistorialModal';
 import MaquinariaImportModal from '@/components/maquinaria/modals/MaquinariaImportModal';
 import MaquinariaInspeccionHerramientaModal from '@/components/maquinaria/modals/MaquinariaInspeccionHerramientaModal';
+import MaquinariaExportBitacoraModal from '@/components/maquinaria/modals/MaquinariaExportBitacoraModal';
 
 // CÓDIGO DE COLORES DE INSPECCIÓN MENSUAL PARA HERRAMIENTAS DE PODER
 const COLOR_INSPECCION_POR_MES = {
@@ -26,6 +28,14 @@ const COLOR_INSPECCION_POR_MES = {
 };
 
 export default function MaquinariaPage() {
+  return (
+    <Suspense fallback={<div className="p-10 text-center">Cargando...</div>}>
+      <MaquinariaPageContent />
+    </Suspense>
+  );
+}
+
+function MaquinariaPageContent() {
   const topRef = useRef(null); 
   const tableContainerRef = useRef(null);
   const configRef = useRef(null);
@@ -54,7 +64,34 @@ export default function MaquinariaPage() {
       });
   }, []);
 
-  const canManageMaquinaria = userMaquinariaPermission === 1 || userRole === 'Admin' || userRole === 'Master';
+  const searchParams = useSearchParams();
+  const [tutorialStep, setTutorialStep] = useState(null);
+
+  // Refs para el tutorial
+  const refZipBitacoras = useRef(null);
+  const refImportar = useRef(null);
+  const refFiltroPeriodo = useRef(null);
+  const refConfiguracion = useRef(null);
+  const refExportarIndividual = useRef(null);
+
+  useEffect(() => {
+    // Solo activamos el tutorial cuando el rol del usuario ha cargado
+    if (userRole) {
+      const hasSeen = localStorage.getItem('recal_hse_tutorial_machinery_v1');
+      if (searchParams.get('tutorial') === 'true' || !hasSeen) {
+        setTutorialStep(1);
+      }
+    }
+  }, [searchParams, userRole]);
+
+  const nextStep = () => setTutorialStep(prev => prev + 1);
+  const closeTutorial = () => {
+    localStorage.setItem('recal_hse_tutorial_machinery_v1', 'true');
+    setTutorialStep(null);
+  };
+
+  const canManageMaquinaria = userRole === 'Admin' || userRole === 'Master';
+  const canOnlyDownload = userMaquinariaPermission === 1 && userRole !== 'Admin' && userRole !== 'Master';
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
@@ -122,6 +159,8 @@ export default function MaquinariaPage() {
   const [isInspeccionHerramientaOpen, setIsInspeccionHerramientaOpen] = useState(false);
   const [herramientaSeleccionada, setHerramientaSeleccionada] = useState(null);
   const [inspeccionesHerramienta, setInspeccionesHerramienta] = useState([]);
+
+  const [isExportBitacoraOpen, setIsExportBitacoraOpen] = useState(false);
 
   // --- CONFIGURACIÓN DE VISIBILIDAD DE COLUMNAS ---
   const [showColumnConfig, setShowColumnConfig] = useState(false);
@@ -663,12 +702,18 @@ export default function MaquinariaPage() {
     setFiltroTipoUnidad('todos');
   };
 
-  const handleGenerarInspeccion = (id_maquina) => {
-    window.open(`/api/maquinaria/exportar-inspeccion?id=${id_maquina}&mes=${exportMes}&anio=${exportAnio}`, '_blank');
-  };
-
   const handleExportarUtilizacion = (e) => {
     e.preventDefault();
+    if (filtroTipoUnidad === 'todos') {
+      Swal.fire('Atención', 'Debes elegir un tipo de unidad específico (Maquinaria, Vehículo, etc.) para exportar el programa de utilización.', 'warning');
+      return;
+    }
+
+    if (maquinaria.length === 0) {
+      Swal.fire('Sin registros', 'No se han encontrado resultados con los filtros actuales para exportar.', 'warning');
+      return;
+    }
+
     const endpoint = userArea === 'Medio Ambiente' ? '/api/maquinaria/ambiental/exportar-utilizacion' : '/api/maquinaria/exportar-utilizacion';
     const url = `${endpoint}?mes=${exportMes}&anio=${exportAnio}&area_usuario=${userArea}&tipo_unidad=${filtroTipoUnidad}`;
     
@@ -681,7 +726,8 @@ export default function MaquinariaPage() {
         text: `Tienes ${maquinasActivasSinFoto.length} equipos activos que no cuentan con fotografía. Los recuadros de las imágenes aparecerán vacíos en el Excel. ¿Deseas descargar el reporte de Utilización de todas formas?`,
         showCancelButton: true,
         confirmButtonText: 'Sí, descargar',
-        cancelButtonText: 'Cancelar'
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: 'var(--recal-blue)',
       }).then((result) => {
         if (result.isConfirmed) {
           window.open(url, '_blank');
@@ -689,6 +735,97 @@ export default function MaquinariaPage() {
       });
     } else {
       window.open(url, '_blank');
+    }
+  };
+
+  const handleOpenExportBitacora = async (m) => {
+    setMaquinaSeleccionada(m);
+    // Cargar historial
+    try {
+      const res = await fetch(`/api/maquinaria/mantenimiento?id_maquinaria=${m.id_maquinaria}`);
+      const data = await res.json();
+      if (data.success) {
+        setHistorial(data.data);
+        setIsExportBitacoraOpen(true);
+      }
+    } catch (error) {
+      Swal.fire('Error', 'No se pudo cargar el historial para la bitácora', 'error');
+    }
+  };
+
+  const handleExportBitacoraFinal = (idMaq, idMtto) => {
+    let url = `/api/maquinaria/exportar-bitacora?id_maquinaria=${idMaq}`;
+    if (idMtto) url += `&id_mantenimiento=${idMtto}`;
+    window.open(url, '_blank');
+    setIsExportBitacoraOpen(false);
+  };
+
+  const handleExportarBitacorasMasivas = async () => {
+    if (filtroTipoUnidad === 'todos') {
+      Swal.fire('Atención', 'Debes elegir un tipo de unidad específico para realizar la exportación masiva de bitácoras.', 'warning');
+      return;
+    }
+
+    if (maquinaria.length === 0) {
+      Swal.fire('Sin registros', 'No se han encontrado resultados con los filtros actuales para generar bitácoras.', 'warning');
+      return;
+    }
+
+    const url = `/api/maquinaria/exportar-bitacoras-masivas?mes=${exportMes}&anio=${exportAnio}&tipo_unidad=${filtroTipoUnidad}&area_usuario=${userArea}`;
+    
+    // Mostrar feedback inicial
+    Swal.fire({
+      title: 'Procesando...',
+      text: 'Generando paquete de bitácoras, por favor espera.',
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
+
+    try {
+      const res = await fetch(url);
+      
+      if (res.status === 404) {
+        const data = await res.json();
+        Swal.fire('Sin registros', data.error || 'No se encontraron mantenimientos durante el periodo.', 'warning');
+        return;
+      }
+      
+      if (!res.ok) {
+        throw new Error("Error en la descarga");
+      }
+
+      // Actualizar mensaje a descarga
+      Swal.update({
+        title: 'Descargando...',
+        text: 'El servidor ha terminado de procesar, preparando tu descarga.',
+      });
+
+      // Descargar el archivo
+      const blob = await res.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.setAttribute('download', `Bitacoras_Masivas_${exportMes}_${exportAnio}.zip`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+
+      Swal.fire({
+        title: '¡Éxito!',
+        text: 'Las bitácoras se han generado correctamente.',
+        icon: 'success',
+        timer: 2000,
+        showConfirmButton: false,
+        toast: true,
+        position: 'top-end'
+      });
+
+    } catch (error) {
+      console.error("Error en exportación masiva:", error);
+      Swal.fire('Error', 'Hubo un problema al generar las bitácoras masivas. Inténtalo de nuevo.', 'error');
     }
   };
   return (
@@ -708,6 +845,24 @@ export default function MaquinariaPage() {
         </div>
 
         <div className="space-y-6 relative">
+
+        {/* NUEVA FUNCIONALIDAD: EXPORTACIÓN MASIVA */}
+        <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-800/50 rounded-2xl p-4 flex items-start gap-4 mb-2 shadow-sm animate-in slide-in-from-top duration-700">
+          <div className="bg-orange-100 dark:bg-orange-900/30 p-2 rounded-xl text-orange-600 dark:text-orange-400">
+            <FolderDown className="w-5 h-5" />
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="bg-orange-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">Nueva Funcionalidad</span>
+              <h3 className="text-sm font-bold text-orange-900 dark:text-orange-300">Exportación Masiva de Bitácoras (ZIP)</h3>
+            </div>
+            <p className="text-xs text-orange-700 dark:text-orange-400 leading-relaxed">
+              Ahora puedes descargar todas las bitácoras de mantenimiento del periodo filtrado en un solo archivo ZIP. 
+              El sistema generará automáticamente los documentos (Excel o Word) usando la <b>plantilla de cada empresa</b> o la <b>plantilla por defecto</b> si no tienen una.
+              Los datos se toman del historial de mantenimientos registrados y se asigna un <b>Folio Consecutivo</b> único por empresa.
+            </p>
+          </div>
+        </div>
       
       {/* BOTONES RESPONSIVOS */}
       <div className="flex flex-col lg:flex-row justify-end items-start lg:items-center space-y-4 lg:space-y-0">
@@ -715,7 +870,7 @@ export default function MaquinariaPage() {
         <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full lg:w-auto">
           
           {canManageMaquinaria && (
-            <button onClick={handleOpenImportModal} className="flex-1 sm:flex-none justify-center bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
+            <button ref={refImportar} onClick={handleOpenImportModal} className="flex-1 sm:flex-none justify-center bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
               <Upload className="w-4 h-4 mr-1 sm:mr-2" /> Importar Excel
             </button>
           )}
@@ -732,7 +887,7 @@ export default function MaquinariaPage() {
               />
             </div>
           ) : (
-            <div className="flex items-center justify-between sm:justify-start space-x-1 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 p-1 rounded-md shadow-sm w-full sm:w-auto">
+            <div ref={refFiltroPeriodo} className="flex items-center justify-between sm:justify-start space-x-1 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 p-1 rounded-md shadow-sm w-full sm:w-auto">
               <select className="text-sm bg-transparent border-gray-300 dark:border-slate-600 dark:text-gray-200 rounded py-1 pl-2 pr-6 focus:ring-[var(--recal-blue)] outline-none flex-1 sm:flex-none" value={exportMes} onChange={(e) => setExportMes(e.target.value)}>
                 <option value="01">Ene</option><option value="02">Feb</option><option value="03">Mar</option><option value="04">Abr</option>
                 <option value="05">May</option><option value="06">Jun</option><option value="07">Jul</option><option value="08">Ago</option>
@@ -744,24 +899,61 @@ export default function MaquinariaPage() {
             </div>
           )}
           {(userArea === 'Medio Ambiente' || userRole === 'Master') && (
-            <button onClick={() => window.open(`/api/maquinaria/exportar-inspecciones-masivas?mes=${exportMes}&anio=${exportAnio}`, '_blank')} className="flex-1 sm:flex-none justify-center bg-teal-600 hover:bg-teal-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
+            <button 
+              onClick={() => {
+                if (maquinaria.length === 0) {
+                  Swal.fire('Sin registros', 'No se han encontrado resultados con los filtros actuales para generar el paquete de inspecciones.', 'warning');
+                  return;
+                }
+                window.open(`/api/maquinaria/exportar-inspecciones-masivas?mes=${exportMes}&anio=${exportAnio}`, '_blank');
+              }} 
+              className="flex-1 sm:flex-none justify-center bg-teal-600 hover:bg-teal-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center"
+            >
               <FolderDown className="w-4 h-4 mr-1 sm:mr-2" /> ZIP Inspecciones
             </button>
           )}
-          <div className="flex gap-1 w-full sm:w-auto">
-            <button onClick={handleExportarUtilizacion} className="flex-1 sm:flex-none justify-center bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
-              <span className="mr-1">📊</span> <span className="hidden sm:inline">Utilización</span><span className="sm:hidden">Util</span>
-            </button>
-            <button 
-              onClick={() => {
-                const endpoint = userArea === 'Medio Ambiente' ? '/api/maquinaria/ambiental/exportar-plan-servicio' : '/api/maquinaria/exportar-plan-servicio';
-                window.open(`${endpoint}?mes=${exportMes}&anio=${exportAnio}&area_usuario=${userArea}&tipo_unidad=${filtroTipoUnidad}`, '_blank');
-              }} 
-              className="flex-1 sm:flex-none justify-center bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center"
-            >
-              <span className="mr-1">🛠️</span> <span className="hidden sm:inline">Servicio</span><span className="sm:hidden">Serv</span>
-            </button>
-          </div>
+          {canManageMaquinaria && (
+            <div className="flex gap-1 w-full sm:w-auto">
+              <button onClick={handleExportarUtilizacion} className="flex-1 sm:flex-none justify-center bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
+                <span className="mr-1">📊</span> <span className="hidden sm:inline">Utilización</span><span className="sm:hidden">Util</span>
+              </button>
+              <button 
+                onClick={() => {
+                  if (filtroTipoUnidad === 'todos') {
+                    Swal.fire('Atención', 'Debes elegir un tipo de unidad específico para exportar el programa de servicio.', 'warning');
+                    return;
+                  }
+                  if (maquinaria.length === 0) {
+                    Swal.fire('Sin registros', 'No se han encontrado resultados con los filtros actuales para exportar el programa de servicio.', 'warning');
+                    return;
+                  }
+                  const endpoint = userArea === 'Medio Ambiente' ? '/api/maquinaria/ambiental/exportar-plan-servicio' : '/api/maquinaria/exportar-plan-servicio';
+                  window.open(`${endpoint}?mes=${exportMes}&anio=${exportAnio}&area_usuario=${userArea}&tipo_unidad=${filtroTipoUnidad}`, '_blank');
+                }} 
+                className="flex-1 sm:flex-none justify-center bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center"
+              >
+                <span className="mr-1">🛠️</span> <span className="hidden sm:inline">Servicio</span><span className="sm:hidden">Serv</span>
+              </button>
+              <button 
+                ref={refZipBitacoras}
+                onClick={handleExportarBitacorasMasivas} 
+                className="flex-1 sm:flex-none justify-center bg-orange-600 hover:bg-orange-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center"
+              >
+                <FolderDown className="w-4 h-4 mr-1 sm:mr-2" /> ZIP Bitácoras
+              </button>
+            </div>
+          )}
+          {(canManageMaquinaria || canOnlyDownload) && !canManageMaquinaria && (
+            <div className="flex gap-1 w-full sm:w-auto mt-2 sm:mt-0">
+               <button 
+                ref={refZipBitacoras}
+                onClick={handleExportarBitacorasMasivas} 
+                className="flex-1 sm:flex-none justify-center bg-orange-600 hover:bg-orange-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center"
+              >
+                <FolderDown className="w-4 h-4 mr-1 sm:mr-2" /> ZIP Bitácoras
+              </button>
+            </div>
+          )}
           
           {/* Badge de color de inspección - solo visible al filtrar herramientas */}
           {filtroTipoUnidad === 'herramienta' && (() => {
@@ -834,6 +1026,7 @@ export default function MaquinariaPage() {
           {/* Botón Configurador de Columnas */}
           <div className="relative" ref={configRef}>
             <button 
+              ref={refConfiguracion}
               onClick={() => setShowColumnConfig(!showColumnConfig)}
               className={`p-2 rounded-md border transition-all ${showColumnConfig ? 'bg-orange-100 border-orange-300 text-orange-600' : 'bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200 dark:bg-slate-700 dark:border-slate-600 dark:text-gray-300'}`}
               title="Configurar Columnas"
@@ -978,7 +1171,7 @@ export default function MaquinariaPage() {
                     <p className="text-sm font-medium text-gray-900 dark:text-gray-200">No se han encontrado resultados</p>
                   </td>
                 </tr>
-              ) : maquinariaPaginada.map((m) => (
+              ) : maquinariaPaginada.map((m, index) => (
                   <tr key={m.id_maquinaria} className="block md:table-row border border-gray-200 dark:border-slate-700 md:border-none mb-4 md:mb-0 rounded-lg shadow-sm md:shadow-none p-4 md:p-0 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
                     
                 {columnasVisibles.foto && (
@@ -1180,14 +1373,30 @@ export default function MaquinariaPage() {
                           )}
 
                           <div className="relative group flex items-center justify-center">
-                            <button onClick={() => handleHistorialOpen(m)} className="text-[var(--recal-blue)] dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 p-2 rounded-md transition-colors">
-                              <ClipboardList className="w-4 h-4 sm:w-5 sm:h-5" />
+                            <button 
+                              ref={index === 0 ? refExportarIndividual : null}
+                              onClick={() => handleOpenExportBitacora(m)} 
+                              className="text-orange-600 dark:text-orange-400 hover:text-orange-800 hover:bg-orange-50 dark:hover:bg-orange-900/20 p-2 rounded-md transition-colors"
+                            >
+                              <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
                             </button>
                             <div className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
-                              Historial de Servicio
+                              Generar Bitácora
                               <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-gray-800"></div>
                             </div>
                           </div>
+
+                          {canManageMaquinaria && (
+                            <div className="relative group flex items-center justify-center">
+                              <button onClick={() => handleHistorialOpen(m)} className="text-[var(--recal-blue)] dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 p-2 rounded-md transition-colors">
+                                <ClipboardList className="w-4 h-4 sm:w-5 sm:h-5" />
+                              </button>
+                              <div className="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md z-50">
+                                Historial de Servicio
+                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-gray-800"></div>
+                              </div>
+                            </div>
+                          )}
 
                           {canManageMaquinaria && (
                             <div className="relative group flex items-center justify-center">
@@ -1270,7 +1479,7 @@ export default function MaquinariaPage() {
       </div>
     </div>
 
-            {/* MODALES REFACTORIZADOS */}
+      {/* MODALES REFACTORIZADOS */}
       <MaquinariaFormModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -1342,6 +1551,112 @@ export default function MaquinariaPage() {
         onGuardar={handleGuardarInspeccion}
         saving={saving}
       />
+
+      <MaquinariaExportBitacoraModal
+        isOpen={isExportBitacoraOpen}
+        onClose={() => setIsExportBitacoraOpen(false)}
+        maquina={maquinaSeleccionada}
+        historial={historial}
+        onExport={handleExportBitacoraFinal}
+      />
+      <TutorialOverlay 
+        step={tutorialStep} 
+        onNext={nextStep} 
+        onClose={closeTutorial} 
+        refs={{ refZipBitacoras, refImportar, refFiltroPeriodo, refConfiguracion, refExportarIndividual }} 
+      />
     </>
+  );
+}
+
+// Componente para el tutorial interactivo
+function TutorialOverlay({ step, onNext, onClose, refs }) {
+  if (!step) return null;
+
+  const steps = [
+    {
+      target: refs.refZipBitacoras,
+      title: "Exportación Masiva (ZIP)",
+      text: "Haz clic aquí para descargar todas las bitácoras de mantenimiento del mes seleccionado en un solo paquete ZIP.",
+      pos: "bottom"
+    },
+    {
+      target: refs.refFiltroPeriodo,
+      title: "Control de Periodo",
+      text: "Ajusta el mes y el año aquí para filtrar qué mantenimientos se incluirán en la exportación masiva.",
+      pos: "bottom"
+    },
+    {
+      target: refs.refExportarIndividual,
+      title: "Exportación Individual",
+      text: "Puedes generar la bitácora de un solo equipo específico. Aquí podrás elegir una fecha de servicio para generar el archivo.",
+      pos: "bottom"
+    },
+    {
+      target: refs.refConfiguracion,
+      title: "Personalizar Vista",
+      text: "Usa este botón para ocultar o mostrar columnas de la tabla. Tus preferencias se guardarán automáticamente.",
+      pos: "bottom"
+    }
+  ];
+
+  const current = steps[step - 1];
+  if (!current || !current.target || !current.target.current) return null;
+
+  const rect = current.target.current.getBoundingClientRect();
+
+  return (
+    <div className="fixed inset-0 z-[100] pointer-events-none">
+      {/* Overlay oscuro con hueco */}
+      <div className="absolute inset-0 bg-black/60 pointer-events-auto" onClick={onClose} />
+      
+      {/* Elemento resaltado */}
+      <div 
+        className="absolute bg-white/10 border-4 border-orange-500 rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.6)] z-[101] transition-all duration-500"
+        style={{
+          top: rect.top - 8,
+          left: rect.left - 8,
+          width: rect.width + 16,
+          height: rect.height + 16
+        }}
+      />
+
+      {/* Popover de información */}
+      <div 
+        className="absolute z-[102] bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-2xl border border-orange-200 dark:border-orange-900/50 w-72 pointer-events-auto transition-all duration-500"
+        style={{
+          top: Math.min(window.innerHeight - 300, rect.bottom + 24),
+          left: Math.min(window.innerWidth - 300, Math.max(20, rect.left + rect.width / 2 - 144))
+        }}
+      >
+        <div className="flex justify-between items-start mb-4">
+          <div className="bg-orange-100 dark:bg-orange-900/30 p-2 rounded-xl text-orange-600">
+            <Zap className="w-5 h-5" />
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        
+        <h4 className="text-lg font-black text-gray-900 dark:text-white mb-2">{current.title}</h4>
+        <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed mb-6">
+          {current.text}
+        </p>
+
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Paso {step} de {steps.length}</span>
+          <button 
+            onClick={step === steps.length ? onClose : onNext}
+            className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-orange-600/20"
+          >
+            {step === steps.length ? 'Finalizar' : 'Siguiente'}
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Flecha indicadora */}
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[12px] border-l-transparent border-r-[12px] border-r-transparent border-b-[12px] border-b-white dark:border-b-slate-800" />
+      </div>
+    </div>
   );
 }

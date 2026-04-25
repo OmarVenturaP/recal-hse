@@ -19,10 +19,21 @@ const generarTextoPeriodo = (mes, anio) => {
 
 export async function GET(request) {
   try {
-    const [equipos] = await pool.query(`
+    const userRol = request.headers.get('x-user-rol');
+    const idEmpresa = request.headers.get('x-empresa-id');
+
+    let query = `
       SELECT * FROM Maquinaria_Equipo 
       WHERE area = 'ambiental' AND fecha_baja IS NULL
-    `);
+    `;
+    const params = [];
+
+    if (userRol !== 'Master' && idEmpresa) {
+      query += ` AND id_empresa = ?`;
+      params.push(idEmpresa);
+    }
+
+    const [equipos] = await pool.query(query, params);
 
     if (equipos.length === 0) {
       return NextResponse.json({ success: false, error: 'No hay maquinaria activa para exportar.' }, { status: 404 });

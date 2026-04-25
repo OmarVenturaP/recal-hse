@@ -44,7 +44,8 @@ export async function GET(request) {
 
     const query = `
       SELECT id_subcontratista, razon_social, rfc, nombre_fiscal, telefono, correo, representante_legal, 
-      firma_representante_legal, representante_trabajadores, firma_representante_trabajadores, nombre_fiscal, logo_empresa, fecha_corte
+      firma_representante_legal, representante_trabajadores, firma_representante_trabajadores, nombre_fiscal, logo_empresa, fecha_corte,
+      nombre_archivo_bitacora
       FROM Subcontratistas 
       WHERE ${whereClause}
       ORDER BY razon_social ASC
@@ -80,16 +81,27 @@ export async function POST(request) {
     const firma_representante_trabajadores = await uploadImage(formData.get('firma_representante_trabajadores'), 'recal_hse_firmas');
     const fecha_corte = formData.get('fecha_corte') || null;
 
+    // --- CARGA DE BITÁCORA BINARIA ---
+    const archivo_bitacora = formData.get('archivo_bitacora');
+    let binario_bitacora = null;
+    let nombre_archivo_bitacora = null;
+
+    if (isFile(archivo_bitacora) && archivo_bitacora.size > 0) {
+      nombre_archivo_bitacora = archivo_bitacora.name;
+      const bytes = await archivo_bitacora.arrayBuffer();
+      binario_bitacora = Buffer.from(bytes);
+    }
+
     await connection.beginTransaction();
 
     const queryInsert = `
       INSERT INTO Subcontratistas 
-      (razon_social, rfc, telefono, correo, representante_legal, representante_trabajadores, logo_empresa, firma_representante_legal, firma_representante_trabajadores, nombre_fiscal, id_empresa, fecha_corte)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (razon_social, rfc, telefono, correo, representante_legal, representante_trabajadores, logo_empresa, firma_representante_legal, firma_representante_trabajadores, nombre_fiscal, id_empresa, fecha_corte, binario_bitacora, nombre_archivo_bitacora)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const [result] = await connection.query(queryInsert, [
       razon_social, rfc, telefono, correo, representante_legal, representante_trabajadores, 
-      logo_empresa, firma_representante_legal, firma_representante_trabajadores, nombre_fiscal, idEmpresa || 1, fecha_corte
+      logo_empresa, firma_representante_legal, firma_representante_trabajadores, nombre_fiscal, idEmpresa || 1, fecha_corte, binario_bitacora, nombre_archivo_bitacora
     ]);
     
     const nuevoId = result.insertId;
@@ -152,20 +164,42 @@ export async function PUT(request) {
     if (isFile(firma_representante_trabajadores)) firma_representante_trabajadores = await uploadImage(firma_representante_trabajadores, 'recal_hse_firmas');
     else firma_representante_trabajadores = (typeof firma_representante_trabajadores === 'string' && firma_representante_trabajadores !== 'null') ? firma_representante_trabajadores : null;
 
+    // --- CARGA DE BITÁCORA BINARIA (Opcional en PUT) ---
+    const archivo_bitacora = formData.get('archivo_bitacora');
+    let binario_bitacora = null;
+    let nombre_archivo_bitacora = null;
+    let updateBitacora = false;
+
+    if (isFile(archivo_bitacora) && archivo_bitacora.size > 0) {
+      nombre_archivo_bitacora = archivo_bitacora.name;
+      const bytes = await archivo_bitacora.arrayBuffer();
+      binario_bitacora = Buffer.from(bytes);
+      updateBitacora = true;
+    }
+
     await connection.beginTransaction();
 
     const fecha_corte = formData.get('fecha_corte') || null;
 
-    const queryUpdate = `
+    let queryUpdate = `
       UPDATE Subcontratistas SET 
         razon_social=?, rfc=?, telefono=?, correo=?, representante_legal=?, representante_trabajadores=?,
         logo_empresa=?, firma_representante_legal=?, firma_representante_trabajadores=?, nombre_fiscal=?, fecha_corte=?
-      WHERE id_subcontratista=?
     `;
-    await connection.query(queryUpdate, [
+    const paramsUpdate = [
       razon_social, rfc, telefono, correo, representante_legal, representante_trabajadores, 
-      logo_empresa, firma_representante_legal, firma_representante_trabajadores, nombre_fiscal, fecha_corte, id_subcontratista
-    ]);
+      logo_empresa, firma_representante_legal, firma_representante_trabajadores, nombre_fiscal, fecha_corte
+    ];
+
+    if (updateBitacora) {
+      queryUpdate += `, binario_bitacora=?, nombre_archivo_bitacora=?`;
+      paramsUpdate.push(binario_bitacora, nombre_archivo_bitacora);
+    }
+
+    queryUpdate += ` WHERE id_subcontratista=?`;
+    paramsUpdate.push(id_subcontratista);
+
+    await connection.query(queryUpdate, paramsUpdate);
 
     const cuadrillasRaw = formData.get('cuadrillas');
     if (cuadrillasRaw) {
