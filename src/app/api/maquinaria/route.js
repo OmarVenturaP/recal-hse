@@ -24,15 +24,6 @@ export async function GET(request) {
     const [userRows] = await pool.query('SELECT area FROM Personal_Area WHERE id_personal = ?', [id_usuario_actual]);
     const areaUsuario = userRows.length > 0 ? userRows[0].area : 'Ambas';
 
-    // --- MIGRACIÓN SILENCIOSA DE FECHAS DE TRAZABILIDAD ---
-    try {
-      try { await pool.query(`ALTER TABLE Maquinaria_Equipo ADD COLUMN fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP`); } catch(e) {}
-      try { await pool.query(`ALTER TABLE Maquinaria_Equipo ADD COLUMN ultima_modificacion DATETIME`); } catch(e) {}
-      try { await pool.query(`ALTER TABLE Maquinaria_Equipo ADD COLUMN tipo_unidad VARCHAR(50) DEFAULT 'maquinaria'`); } catch(e) {}
-      try { await pool.query(`ALTER TABLE Maquinaria_Equipo ADD COLUMN horometro_inicial DECIMAL(10,2) DEFAULT 0`); } catch(e) {}
-      try { await pool.query(`ALTER TABLE Historial_Mantenimiento ADD COLUMN realizado_por VARCHAR(255)`); } catch(e) {}
-    } catch (e) { /* Ignorar errores de migración */ }
-
     const { searchParams } = new URL(request.url);
     const idSubcontratista = searchParams.get('subcontratista');
     const mes = searchParams.get('mes');
@@ -42,6 +33,11 @@ export async function GET(request) {
     const tipoUnidad = searchParams.get('tipo_unidad');
     const ordenPor = searchParams.get('ordenPor') || 'fecha_ingreso_obra';
     const ordenDireccion = searchParams.get('ordenDireccion') || 'DESC';
+
+    // BLINDAJE: Lista blanca para ordenamiento dinámico (Previene Inyección SQL)
+    const columnasPermitidas = ['fecha_ingreso_obra', 'tipo_unidad', 'tipo', 'marca', 'num_economico', 'horometro_actual'];
+    const sortColumn = columnasPermitidas.includes(ordenPor) ? ordenPor : 'fecha_ingreso_obra';
+    const sortDir = ordenDireccion.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
     let whereClause = "WHERE 1=1";
     const queryParams = [];
@@ -113,7 +109,7 @@ export async function GET(request) {
       LEFT JOIN Personal_Area u1 ON m.usuario_registro = u1.id_personal
       LEFT JOIN Personal_Area u2 ON m.usuario_actualizacion = u2.id_personal
       ${whereClause}
-      ORDER BY ${ordenPor} ${ordenDireccion}
+      ORDER BY ${sortColumn} ${sortDir}
     `;
     
     const [rows] = await pool.query(query, queryParams);

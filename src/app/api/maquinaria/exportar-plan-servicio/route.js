@@ -283,13 +283,23 @@ export async function GET(request) {
       queryParams.push(tipoUnidad);
     }
 
-    // Para las subqueries period-aware necesitamos pasar endDate como parámetro adicional.
-    // Lo pasamos al final del queryParams array y referenciamos con ? en las subqueries.
-    // Usamos una variable separada para no alterar el WHERE.
-    const dateFilter = endDate ? `AND DATE(hm.fecha_mantenimiento) <= '${endDate}'` : '';
+    // BLINDAJE: Usamos parámetros '?' para el filtro de fecha en subconsultas (Previene Inyección SQL)
+    const dateFilter = endDate ? `AND DATE(hm.fecha_mantenimiento) <= ?` : 'AND (1=?)';
+    const dateVal = endDate || 1;
 
     const mesInt = parseInt(mes || 0);
     const anioInt = parseInt(anio || 0);
+
+    // Preparamos los parámetros para las 5 subconsultas + las 2 de inspección + los parámetros del WHERE principal
+    const finalParams = [
+      dateVal, // para ultimo_tipo_mantenimiento
+      dateVal, // para ultima_fecha_mantenimiento
+      dateVal, // para realizo
+      dateVal, // para horometro_ultimo_mtto
+      dateVal, // para horometro_mtto_anterior
+      mesInt, anioInt, mesInt, anioInt, // para inspecciones
+      ...queryParams
+    ];
 
     const [rows] = await pool.query(`
       SELECT 
@@ -331,7 +341,7 @@ export async function GET(request) {
       FROM Maquinaria_Equipo m
       ${whereClause}
       ORDER BY m.fecha_ingreso_obra DESC
-    `, [mesInt, anioInt, mesInt, anioInt, ...queryParams]);
+    `, finalParams);
 
     // ─── Cargar plantilla ────────────────────────────────────────────────────
     const templatePath = path.join(process.cwd(), 'public', 'plantillas', config.plantilla);
