@@ -387,7 +387,7 @@ export async function GET(request) {
             return;
           }
           row.getCell(colNumber).style = JSON.parse(JSON.stringify(baseCell.style));
-          row.getCell(colNumber).alignment = { vertical: 'bottom', horizontal: 'center', wrapText: true };
+          row.getCell(colNumber).alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
         });
       } else {
         row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
@@ -398,7 +398,7 @@ export async function GET(request) {
             detenerCopia = true;
             return;
           }
-          cell.alignment = { vertical: 'bottom', horizontal: 'center', wrapText: true };
+          cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
         });
       }
 

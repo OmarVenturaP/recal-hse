@@ -113,15 +113,15 @@ export async function GET(request) {
       if (maquina.imagen_url) {
         try {
           // Ajustamos la imagen a 190x190px para que encaje con un pequeño margen dentro de los 157pt de alto
-          const urlOptimizada = maquina.imagen_url.replace('/upload/', '/upload/c_fill,w_190,h_190,q_auto/');
+          const urlOptimizada = maquina.imagen_url.replace('/upload/', '/upload/c_fill,w_200,h_200,q_auto/');
           const imageResponse = await fetch(urlOptimizada);
           const arrayBuffer = await imageResponse.arrayBuffer();
           const buffer = Buffer.from(arrayBuffer);
           
           const imageId = workbook.addImage({ buffer: buffer, extension: 'jpeg' });
           worksheet.addImage(imageId, {
-            tl: { col: 7.1, row: currentRow - 0.95 }, 
-            ext: { width: 190, height: 190 }, 
+            tl: { col: 7.7, row: currentRow - 0.95 }, 
+            ext: { width: 200, height: 200 }, 
             editAs: 'oneCell' 
           });
         } catch (imgError) {
@@ -148,7 +148,7 @@ export async function GET(request) {
           }
 
           row.getCell(colNumber).style = JSON.parse(JSON.stringify(baseCell.style));
-          row.getCell(colNumber).alignment = { vertical: 'bottom', horizontal: 'center', wrapText: true };
+          row.getCell(colNumber).alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
         });
       } else {
         let detenerCopia = false;
@@ -164,7 +164,7 @@ export async function GET(request) {
             return;
           }
 
-          cell.alignment = { vertical: 'bottom', horizontal: 'center', wrapText: true };
+          cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
         });
       }
 
