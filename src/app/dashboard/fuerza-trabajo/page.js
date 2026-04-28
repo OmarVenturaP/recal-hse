@@ -87,6 +87,7 @@ export default function FuerzaTrabajoPage() {
   const [soloFaltaCurp, setSoloFaltaCurp] = useState(false);
   const [soloFaltaCuadrilla, setSoloFaltaCuadrilla] = useState(false);
   const [soloAltas, setSoloAltas] = useState(false);
+  const [verOcultos, setVerOcultos] = useState(false);
 
   // Estados de Trazabilidad
   const [isTrazabilidadModalOpen, setIsTrazabilidadModalOpen] = useState(false);
@@ -289,6 +290,7 @@ export default function FuerzaTrabajoPage() {
       if (filtroSub) url += `subcontratista=${filtroSub}&`; 
       if (fechaInicio && fechaFin) url += `fechaInicio=${fechaInicio}&fechaFin=${fechaFin}&`;
       if (busqueda) url += `busqueda=${encodeURIComponent(busqueda)}&`;
+      if (verOcultos) url += `verOcultos=true&`;
 
       const res = await fetch(url);
       const json = await res.json();
@@ -299,8 +301,8 @@ export default function FuerzaTrabajoPage() {
     }
   };
 
-  useEffect(() => { fetchTrabajadores(); }, [filtroSub, fechaInicio, fechaFin, busqueda, ordenPor, ordenDireccion]);
-  useEffect(() => { setCurrentPage(1); }, [filtroSub, fechaInicio, fechaFin, busqueda, ordenPor, ordenDireccion]);
+  useEffect(() => { fetchTrabajadores(); }, [filtroSub, fechaInicio, fechaFin, busqueda, ordenPor, ordenDireccion, verOcultos]);
+  useEffect(() => { setCurrentPage(1); }, [filtroSub, fechaInicio, fechaFin, busqueda, ordenPor, ordenDireccion, verOcultos]);
 
   useEffect(() => {
     if (topRef.current) topRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -724,15 +726,7 @@ export default function FuerzaTrabajoPage() {
         if (data.success) {
           fetchTrabajadores();
           
-          // Mostrar el resumen del registro eliminado
-          const logRes = await fetch(`/api/trazabilidad?limit=1&modulo=Fuerza de Trabajo&id_registro=${id}&accion=DELETE`);
-          const logData = await logRes.json();
-          if (logData.success && logData.data.length > 0) {
-            setSelectedAuditLog(logData.data[0]);
-            setIsTrazabilidadModalOpen(true);
-          } else {
-            Swal.fire('Eliminado', data.mensaje, 'success');
-          }
+          Swal.fire('Eliminado', data.mensaje, 'success');
         } else {
           Swal.fire('Operación Cancelada', data.error, 'error');
         }
@@ -906,13 +900,38 @@ const handleDc3Submit = async (e) => {
     }
   };
 
-  const handleToggleActivo = async (id, currentStatus) => {
-    const newStatus = currentStatus === 0 ? 1 : 0; 
+  const handleToggleActivo = async (id, currentIsHidden) => {
+    // Determinar periodo actual de forma segura (YYYY-MM-DD)
+    const [anio, mes] = fechaInicio.split('-').map(Number);
+    const mesesNombres = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
+    // Si currentIsHidden es 1 (inactivo), el nuevo estatus será 1 (activo)
+    // Si currentIsHidden es 0 (activo), el nuevo estatus será 0 (inactivo)
+    const newStatus = currentIsHidden === 1 ? 1 : 0; 
+
+    if (newStatus === 0) {
+      const confirm = await Swal.fire({
+        title: '¿Ocultar trabajador?',
+        text: `El trabajador se marcará como INACTIVO únicamente para el periodo de ${mesesNombres[mes-1]} ${anio}. No aparecerá en reportes ni listas de este mes, pero seguirá visible en periodos anteriores o futuros.`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, ocultar este mes',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#eab308'
+      });
+      if (!confirm.isConfirmed) return;
+    }
+
     try {
       const res = await fetch('/api/fuerza-trabajo', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id_trabajador: id, bActivo: newStatus })
+        body: JSON.stringify({ 
+          id_trabajador: id, 
+          bActivo: newStatus,
+          mes,
+          anio
+        })
       });
       const data = await res.json();
       
@@ -1069,6 +1088,13 @@ const handleDc3Submit = async (e) => {
               title="Personal sin cuadrilla"
             >
               {soloFaltaCuadrilla ? 'VER TODO' : 'S/CUADRILLA'}
+            </button>
+            <button 
+              onClick={() => setVerOcultos(!verOcultos)} 
+              className={`flex-1 text-[10px] font-black border px-2 py-2 rounded-md transition-all duration-300 ${verOcultos ? 'bg-orange-500 text-white border-orange-600 shadow-md' : 'bg-gray-50 dark:bg-slate-700 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-slate-600 hover:bg-gray-100'}`}
+              title="Mostrar solo trabajadores que han sido ocultados este mes"
+            >
+              {verOcultos ? 'VER ACTIVOS' : 'VER OCULTOS'}
             </button>
           </div>
           
@@ -1228,12 +1254,12 @@ const handleDc3Submit = async (e) => {
                                   <input 
                                     type="checkbox" 
                                     className="sr-only peer" 
-                                    checked={t.bActivo !== 0}
-                                    onChange={() => handleToggleActivo(t.id_trabajador, t.bActivo)} 
+                                    checked={t.is_hidden === 0}
+                                    onChange={() => handleToggleActivo(t.id_trabajador, t.is_hidden)} 
                                   />
                                   <div className="w-7 h-4 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all dark:border-gray-500 peer-checked:bg-[var(--recal-blue)]"></div>
                                   <span className="ml-2 text-[10px] font-bold text-gray-600 dark:text-gray-400">
-                                    {t.bActivo !== 0 ? 'ON' : 'OFF'}
+                                    {t.is_hidden === 0 ? 'ON' : 'OFF'}
                                   </span>
                                 </label>
                               )}

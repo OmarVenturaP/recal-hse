@@ -11,6 +11,7 @@ export async function GET(request) {
     const fechaInicio = searchParams.get('fechaInicio');
     const fechaFin = searchParams.get('fechaFin');
     const busqueda = searchParams.get('busqueda');
+    const verOcultos = searchParams.get('verOcultos') === 'true';
     
     // BLINDAJE: Allowlist para evitar Inyección SQL en ORDER BY
     const allowedSortFields = ['fecha_ingreso_obra', 'nombre_trabajador', 'apellido_trabajador', 'nss', 'id_trabajador'];
@@ -29,6 +30,20 @@ export async function GET(request) {
     try {
       try { await pool.query(`ALTER TABLE Fuerza_Trabajo ADD COLUMN fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP`); } catch(e) {}
       try { await pool.query(`ALTER TABLE Fuerza_Trabajo ADD COLUMN ultima_modificacion DATETIME`); } catch(e) {}
+      // NUEVA TABLA DE INACTIVIDAD POR PERIODO
+      try { 
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS FT_Inactividad (
+            id_inactividad INT AUTO_INCREMENT PRIMARY KEY,
+            id_trabajador INT NOT NULL,
+            mes INT NOT NULL,
+            anio INT NOT NULL,
+            id_empresa INT NOT NULL,
+            fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP,
+            INDEX (id_trabajador, mes, anio)
+          )
+        `); 
+      } catch(e) {}
     } catch (e) { /* Ignorar errores de migración */ }
 
     let whereClause = "WHERE 1=1";
@@ -58,12 +73,39 @@ export async function GET(request) {
       queryParams.push(textoBuscado, textoBuscado, textoBuscado, textoBuscado);
     }
 
+    // --- FILTRADO DE INACTIVIDAD POR PERIODO ---
+    // Extraer mes y año de forma segura evitando desfases de zona horaria
+    const [anioFiltro, mesFiltro] = fechaInicio ? fechaInicio.split('-').map(Number) : [new Date().getFullYear(), new Date().getMonth() + 1];
+
+    if (fechaInicio) {
+      if (verOcultos) {
+        // Mostrar SOLO los ocultos para este mes
+        whereClause += ` AND EXISTS (
+          SELECT 1 FROM FT_Inactividad i 
+          WHERE i.id_trabajador = f.id_trabajador 
+            AND i.mes = ? 
+            AND i.anio = ?
+        )`;
+        queryParams.push(mesFiltro, anioFiltro);
+      } else {
+        // Filtrado normal: Ocultar los que están en FT_Inactividad
+        whereClause += ` AND NOT EXISTS (
+          SELECT 1 FROM FT_Inactividad i 
+          WHERE i.id_trabajador = f.id_trabajador 
+            AND i.mes = ? 
+            AND i.anio = ?
+        )`;
+        queryParams.push(mesFiltro, anioFiltro);
+      }
+    }
+
     const query = `
       SELECT 
         f.*,
         u1.nombre AS creador, 
         u2.nombre AS modificador,
-        s.razon_social AS nombre_subcontratista
+        s.razon_social AS nombre_subcontratista,
+        (SELECT COUNT(*) FROM FT_Inactividad i2 WHERE i2.id_trabajador = f.id_trabajador AND i2.mes = ? AND i2.anio = ?) as is_hidden
       FROM Fuerza_Trabajo f
       LEFT JOIN Subcontratistas s ON f.id_subcontratista_principal = s.id_subcontratista
       LEFT JOIN Personal_Area u1 ON f.usuario_registro = u1.id_personal
@@ -71,6 +113,9 @@ export async function GET(request) {
       ${whereClause}
       ORDER BY ${ordenPor} ${ordenDireccion}
     `;
+
+    // Parámetros para el subquery is_hidden (siempre al inicio)
+    queryParams.unshift(mesFiltro, anioFiltro);
 
     const [rows] = await pool.query(query, queryParams);
     return NextResponse.json({ success: true, data: rows });
@@ -300,26 +345,56 @@ export async function PATCH(request) {
     }
 
     if (bActivo !== undefined) {
-      // OBTENER ESTADO ANTERIOR
-      const [oldRows] = await pool.query(`SELECT bActivo FROM Fuerza_Trabajo WHERE id_trabajador = ?${authFilter}`, [id_trabajador, ...authParams]);
-      const datos_anteriores = oldRows[0] || null;
+      // Si se envía mes y anio, la inactividad es temporal
+      const { mes, anio } = body;
 
-      const query = `UPDATE Fuerza_Trabajo SET bActivo = ?, usuario_actualizacion = ?, ultima_modificacion = ? WHERE id_trabajador = ?${authFilter}`;
-      await pool.query(query, [bActivo, id_usuario_actual, fechaCDMX(), id_trabajador, ...authParams]);
+      if (mes && anio) {
+        if (bActivo === 0) {
+          // Marcar como inactivo en este periodo
+          await pool.query(
+            `INSERT IGNORE INTO FT_Inactividad (id_trabajador, mes, anio, id_empresa) VALUES (?, ?, ?, ?)`,
+            [id_trabajador, mes, anio, idEmpresa]
+          );
+        } else {
+          // Reactivar en este periodo
+          await pool.query(
+            `DELETE FROM FT_Inactividad WHERE id_trabajador = ? AND mes = ? AND anio = ? AND id_empresa = ?`,
+            [id_trabajador, mes, anio, idEmpresa]
+          );
+        }
+        
+        await registrarAuditoria({
+          modulo: 'Fuerza de Trabajo',
+          accion: 'UPDATE',
+          id_registro: id_trabajador,
+          descripcion: `Estado temporal actualizado (Activo=${bActivo}) para el periodo ${mes}/${anio}`,
+          datos_nuevos: { bActivo, mes, anio },
+          id_usuario: id_usuario_actual,
+          id_empresa: idEmpresa,
+        });
 
-      // AUDITORÍA (silenciosa)
-      await registrarAuditoria({
-        modulo: 'Fuerza de Trabajo',
-        accion: 'UPDATE',
-        id_registro: id_trabajador,
-        descripcion: `Cambio de estado (bActivo=${bActivo}) al trabajador ID ${id_trabajador}`,
-        datos_anteriores,
-        datos_nuevos: { bActivo },
-        id_usuario: id_usuario_actual,
-        id_empresa: idEmpresa,
-      });
+        return NextResponse.json({ success: true, mensaje: "Inactividad por periodo actualizada" });
+      } else {
+        // Lógica Global (Legacy)
+        const [oldRows] = await pool.query(`SELECT bActivo FROM Fuerza_Trabajo WHERE id_trabajador = ?${authFilter}`, [id_trabajador, ...authParams]);
+        const datos_anteriores = oldRows[0] || null;
 
-      return NextResponse.json({ success: true, mensaje: "Estado actualizado" });
+        const query = `UPDATE Fuerza_Trabajo SET bActivo = ?, usuario_actualizacion = ?, ultima_modificacion = ? WHERE id_trabajador = ?${authFilter}`;
+        await pool.query(query, [bActivo, id_usuario_actual, fechaCDMX(), id_trabajador, ...authParams]);
+
+        await registrarAuditoria({
+          modulo: 'Fuerza de Trabajo',
+          accion: 'UPDATE',
+          id_registro: id_trabajador,
+          descripcion: `Cambio de estado global (bActivo=${bActivo}) al trabajador ID ${id_trabajador}`,
+          datos_anteriores,
+          datos_nuevos: { bActivo },
+          id_usuario: id_usuario_actual,
+          id_empresa: idEmpresa,
+        });
+
+        return NextResponse.json({ success: true, mensaje: "Estado global actualizado" });
+      }
     } 
     // Lógica original de Baja
     else if (fecha_baja) {
@@ -385,7 +460,8 @@ export async function DELETE(request) {
 
     const datos_anteriores = workerData[0] || null;
 
-    const [result] = await pool.query(query, queryParams);
+    // EJECUTAR ELIMINACIÓN
+    const [result] = await pool.query(`DELETE FROM Fuerza_Trabajo WHERE id_trabajador = ?`, [id_trabajador]);
 
     if (result.affectedRows === 0) {
       return NextResponse.json({ success: false, error: "No se encontró el registro o no tienes permisos para eliminarlo." }, { status: 404 });
