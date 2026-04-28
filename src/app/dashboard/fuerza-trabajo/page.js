@@ -61,6 +61,7 @@ export default function FuerzaTrabajoPage() {
   const canManageFt = planAllowsFT && (userFtPermission === 1 || isMaster);
   const canManageCert = planAllowsCert && (userCertPermission === 1 || isMaster);
   const canManageDc3 = planAllowsDC3 && (userDcPermission === 1 || isMaster);
+  const canManagePuestos = userRole === 'Admin' || userRole === 'Master'; 
 
   const [trabajadores, setTrabajadores] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -962,25 +963,65 @@ const handleDc3Submit = async (e) => {
               value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} />
           </div>
 
-          <button onClick={handleExportarClick} className="flex-1 sm:flex-none justify-center bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
-            <span className="mr-1 sm:mr-2">📊</span> Exportar
-          </button>
+          {canManageFt && (
+            <div className="relative group">
+              <button onClick={handleOpenImportModal} className="flex-1 sm:flex-none justify-center bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
+                <Upload className="w-4 h-4 mr-1 sm:mr-2" /> Importar FT
+              </button>
+              {/* Tooltip */}
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-[10px] rounded shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 text-center leading-tight">
+                Carga masiva de personal desde un archivo Excel siguiendo la estructura oficial de Fuerza de Trabajo.
+                <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-gray-900"></div>
+              </div>
+            </div>
+          )}
+          <div className="relative group">
+            <button onClick={handleExportarClick} className="flex-1 sm:flex-none justify-center bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
+              <span className="mr-1 sm:mr-2">📊</span> Exportar
+            </button>
+            {/* Tooltip */}
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-[10px] rounded shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 text-center leading-tight">
+              Exporta el listado de personal activo en formato Excel según el periodo y filtros seleccionados.
+              <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-gray-900"></div>
+            </div>
+          </div>
           
           {(canManageDc3 || canManageCert) && (
-            <button onClick={() => { setShowSuaModal(true); setSuaFase(1); }} className="flex-1 sm:flex-none justify-center bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
-              <span className="mr-1 sm:mr-2">📄</span> Importar SUA
-            </button>
+            <div className="relative group">
+              <button onClick={() => { setShowSuaModal(true); setSuaFase(1); }} className="flex-1 sm:flex-none justify-center bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
+                <span className="mr-1 sm:mr-2">📄</span> Importar SUA
+              </button>
+              {/* Tooltip */}
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-[10px] rounded shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 text-center leading-tight">
+                Sincroniza los datos del Sistema Único de Autodeterminación (SUA) mediante archivos PDF para actualizar registros del personal en la FT.
+                <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-gray-900"></div>
+              </div>
+            </div>
           )}
           
-          {canManageFt && (
-            <button onClick={() => setIsPuestosModalOpen(true)} className="flex-1 sm:flex-none justify-center bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
-              <Settings className="w-4 h-4 mr-1 sm:mr-2" /> Catálogos
-            </button>
+          {canManageCert && (
+            <div className="relative group">
+              <button onClick={handleGenerarCertificadosMasivo} className="flex-1 sm:flex-none justify-center bg-indigo-100 hover:bg-indigo-200 text-indigo-700 hover:text-indigo-800 px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
+                <span className="mr-1 sm:mr-2">🩺</span>Certificados
+              </button>
+              {/* Tooltip */}
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-[10px] rounded shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 text-center leading-tight">
+                Genera masivamente los certificados médicos de aptitud para el personal de nuevo ingreso en el periodo.
+                <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-gray-900"></div>
+              </div>
+            </div>
           )}
-          {canManageFt && (
-            <button onClick={handleOpenImportModal} className="flex-1 sm:flex-none justify-center bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
-              <Upload className="w-4 h-4 mr-1 sm:mr-2" /> Importar FT
-            </button>
+          {canManagePuestos && (
+            <div className="relative group">
+              <button onClick={() => setIsPuestosModalOpen(true)} className="flex-1 sm:flex-none justify-center bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
+                <Settings className="w-4 h-4 mr-1 sm:mr-2" /> Categorias
+              </button>
+              {/* Tooltip */}
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-[10px] rounded shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 text-center leading-tight">
+                Gestiona los puestos disponibles en el sistema.
+                <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-gray-900"></div>
+              </div>
+            </div>
           )}
           {canManageFt && (
             <button onClick={handleNewClick} className="flex-1 sm:flex-none justify-center bg-[var(--recal-blue)] hover:bg-[var(--recal-blue-hover)] text-white px-3 py-2 rounded-md font-medium shadow-sm xl:ml-2">
@@ -988,11 +1029,6 @@ const handleDc3Submit = async (e) => {
             </button>
           )}
 
-          {canManageCert && (
-            <button onClick={handleGenerarCertificadosMasivo} className="flex-1 sm:flex-none justify-center bg-indigo-100 hover:bg-indigo-200 text-indigo-700 hover:text-indigo-800 px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
-              <span className="mr-1 sm:mr-2">🩺</span>Certificados
-            </button>
-          )}
         </div>
       </div>
 

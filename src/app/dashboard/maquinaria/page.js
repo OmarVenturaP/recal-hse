@@ -67,30 +67,6 @@ function MaquinariaPageContent() {
   }, []);
 
   const searchParams = useSearchParams();
-  const [tutorialStep, setTutorialStep] = useState(null);
-
-  // Refs para el tutorial
-  const refZipBitacoras = useRef(null);
-  const refImportar = useRef(null);
-  const refFiltroPeriodo = useRef(null);
-  const refConfiguracion = useRef(null);
-  const refExportarIndividual = useRef(null);
-
-  useEffect(() => {
-    // Solo activamos el tutorial cuando el rol del usuario ha cargado
-    if (userRole) {
-      const hasSeen = localStorage.getItem('recal_hse_tutorial_machinery_v1');
-      if (searchParams.get('tutorial') === 'true' || !hasSeen) {
-        setTutorialStep(1);
-      }
-    }
-  }, [searchParams, userRole]);
-
-  const nextStep = () => setTutorialStep(prev => prev + 1);
-  const closeTutorial = () => {
-    localStorage.setItem('recal_hse_tutorial_machinery_v1', 'true');
-    setTutorialStep(null);
-  };
 
   const canManageMaquinaria = userRole === 'Admin' || userRole === 'Master' || (userRole === 'Usuario' && userMaquinariaPermission === 1);
   const canOnlyDownload = false; // Ya no es necesario este estado separado si el permiso 1 permite gestión
@@ -781,6 +757,56 @@ function MaquinariaPageContent() {
     setIsExportBitacoraOpen(false);
   };
 
+  const handleExportarBitServicio = async () => {
+    try {
+      Swal.fire({
+        title: 'Generando Bitácora de Servicio...',
+        text: 'Estamos procesando los registros, por favor espera.',
+        allowOutsideClick: false,
+        didOpen: () => { Swal.showLoading(); }
+      });
+
+      const res = await fetch(`/api/maquinaria/ambiental/exportar-bit-servicio?mes=${exportMes}&anio=${exportAnio}`);
+      
+      // Intentar parsear como JSON por si es un error controlado (ej. sin mantenimientos)
+      const clonedRes = res.clone();
+      try {
+        const data = await clonedRes.json();
+        if (data && data.success === false) {
+          Swal.fire('Atención', data.error || 'No hay mantenimientos registrados en este periodo.', 'warning');
+          return;
+        }
+      } catch (e) {
+        // Si no es JSON, es el stream del archivo o un error de red
+      }
+
+      if (!res.ok) throw new Error("Error en el servidor");
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `BIT_SERVICIO_AMBIENTAL_${exportMes}_${exportAnio}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+      Swal.fire({
+        title: '¡Éxito!',
+        text: 'La bitácora se ha generado correctamente.',
+        icon: 'success',
+        timer: 2000,
+        showConfirmButton: false,
+        toast: true,
+        position: 'top-end'
+      });
+    } catch (error) {
+      console.error(error);
+      Swal.fire('Error', 'No se pudo generar el reporte.', 'error');
+    }
+  };
+
   const handleExportarBitacorasMasivas = async () => {
     if (filtroTipoUnidad === 'todos') {
       Swal.fire('Atención', 'Debes elegir un tipo de unidad específico para realizar la exportación masiva de bitácoras.', 'warning');
@@ -866,35 +892,12 @@ function MaquinariaPageContent() {
         </div>
 
         <div className="space-y-6 relative">
-
-        {/* NUEVA FUNCIONALIDAD: EXPORTACIÓN MASIVA */}
-        <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-800/50 rounded-2xl p-4 flex items-start gap-4 mb-2 shadow-sm animate-in slide-in-from-top duration-700">
-          <div className="bg-orange-100 dark:bg-orange-900/30 p-2 rounded-xl text-orange-600 dark:text-orange-400">
-            <FolderDown className="w-5 h-5" />
-          </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="bg-orange-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">Nueva Funcionalidad</span>
-              <h3 className="text-sm font-bold text-orange-900 dark:text-orange-300">Exportación Masiva de Bitácoras (ZIP)</h3>
-            </div>
-            <p className="text-xs text-orange-700 dark:text-orange-400 leading-relaxed">
-              Ahora puedes descargar todas las bitácoras de mantenimiento del periodo filtrado en un solo archivo ZIP. 
-              El sistema generará automáticamente los documentos (Excel o Word) usando la <b>plantilla de cada empresa</b> o la <b>plantilla por defecto</b> si no tienen una.
-              Los datos se toman del historial de mantenimientos registrados y se asigna un <b>Folio Consecutivo</b> único por empresa.
-            </p>
-          </div>
-        </div>
       
       {/* BOTONES RESPONSIVOS */}
       <div className="flex flex-col lg:flex-row justify-end items-start lg:items-center space-y-4 lg:space-y-0">
         
         <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full lg:w-auto">
-          
-          {canManageMaquinaria && (
-            <button ref={refImportar} onClick={handleOpenImportModal} className="flex-1 sm:flex-none justify-center bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
-              <Upload className="w-4 h-4 mr-1 sm:mr-2" /> Importar Excel
-            </button>
-          )}
+        
 
           {/* --- AJUSTE: MUESTRA SEMANA PARA AMBIENTAL SUBCONTRATISTAS, MES/AÑO PARA RECAL Y SEGURIDAD --- */}
           {(userArea === 'Medio Ambiente' && userIdEmpresa !== 1) ? (
@@ -908,7 +911,7 @@ function MaquinariaPageContent() {
               />
             </div>
           ) : (
-            <div ref={refFiltroPeriodo} className="flex items-center justify-between sm:justify-start space-x-1 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 p-1 rounded-md shadow-sm w-full sm:w-auto">
+            <div className="flex items-center justify-between sm:justify-start space-x-1 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 p-1 rounded-md shadow-sm w-full sm:w-auto">
               <select className="text-sm bg-transparent border-gray-300 dark:border-slate-600 dark:text-gray-200 rounded py-1 pl-2 pr-6 focus:ring-[var(--recal-blue)] outline-none flex-1 sm:flex-none" value={exportMes} onChange={(e) => setExportMes(e.target.value)}>
                 <option value="01">Ene</option><option value="02">Feb</option><option value="03">Mar</option><option value="04">Abr</option>
                 <option value="05">May</option><option value="06">Jun</option><option value="07">Jul</option><option value="08">Ago</option>
@@ -919,73 +922,134 @@ function MaquinariaPageContent() {
               </select>
             </div>
           )}
+                    {canManageMaquinaria && (
+            <div className="relative group">
+              <button onClick={handleOpenImportModal} className="flex-1 sm:flex-none justify-center bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
+                <Upload className="w-4 h-4 mr-1 sm:mr-2" /> Importar Excel
+              </button>
+              {/* Tooltip */}
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-[10px] rounded shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 text-center leading-tight">
+                Importa tu plan de maquinaria desde tu Excel, adecuado al formato oficial de RECAL.
+                <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-gray-900"></div>
+              </div>
+            </div>
+          )}
           {(userArea === 'Medio Ambiente' || userRole === 'Master') && (
-            <button 
-              onClick={() => {
-                if (maquinaria.length === 0) {
-                  Swal.fire('Sin registros', 'No se han encontrado resultados con los filtros actuales para generar el paquete de inspecciones.', 'warning');
-                  return;
-                }
-                const isAmbiental = userArea === 'Medio Ambiente';
-                const isAmbientalSub = isAmbiental && userIdEmpresa !== 1;
-                
-                let exportUrl = "";
-                if (isAmbiental) {
-                  exportUrl = isAmbientalSub 
-                    ? `/api/maquinaria/ambiental/exportar-inspecciones?semana=${exportSemana}&tipo_unidad=${filtroTipoUnidad}`
-                    : `/api/maquinaria/ambiental/exportar-inspecciones?mes=${exportMes}&anio=${exportAnio}&tipo_unidad=${filtroTipoUnidad}`;
-                } else {
-                  // Fallback para Master o Admin en Seguridad (Herramientas)
-                  exportUrl = `/api/maquinaria/exportar-inspecciones-masivas?mes=${exportMes}&anio=${exportAnio}&tipo_unidad=${filtroTipoUnidad}`;
-                }
-                
-                window.open(exportUrl, '_blank');
-              }} 
-              className="flex-1 sm:flex-none justify-center bg-teal-600 hover:bg-teal-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center"
-            >
-              <FolderDown className="w-4 h-4 mr-1 sm:mr-2" /> ZIP Inspecciones
-            </button>
+            <div className="relative group">
+              <button 
+                onClick={() => {
+                  if (maquinaria.length === 0) {
+                    Swal.fire('Sin registros', 'No se han encontrado resultados con los filtros actuales para generar el paquete de inspecciones.', 'warning');
+                    return;
+                  }
+                  const isAmbiental = userArea === 'Medio Ambiente';
+                  const isAmbientalSub = isAmbiental && userIdEmpresa !== 1;
+                  
+                  let exportUrl = "";
+                  if (isAmbiental) {
+                    exportUrl = isAmbientalSub 
+                      ? `/api/maquinaria/ambiental/exportar-inspecciones?semana=${exportSemana}&tipo_unidad=${filtroTipoUnidad}`
+                      : `/api/maquinaria/ambiental/exportar-inspecciones?mes=${exportMes}&anio=${exportAnio}&tipo_unidad=${filtroTipoUnidad}`;
+                  } else {
+                    // Fallback para Master o Admin en Seguridad (Herramientas)
+                    exportUrl = `/api/maquinaria/exportar-inspecciones-masivas?mes=${exportMes}&anio=${exportAnio}&tipo_unidad=${filtroTipoUnidad}`;
+                  }
+                  
+                  window.open(exportUrl, '_blank');
+                }} 
+                className="flex-1 sm:flex-none justify-center bg-teal-600 hover:bg-teal-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center"
+              >
+                <FolderDown className="w-4 h-4 mr-1 sm:mr-2" /> ZIP Inspecciones
+              </button>
+              {/* Tooltip */}
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-[10px] rounded shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 text-center leading-tight">
+                Descarga el ZIP con todas las inspecciones semanales/mensuales del periodo para el área de ambiental.
+                <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-gray-900"></div>
+              </div>
+            </div>
           )}
           {canManageMaquinaria && (
             <div className="flex gap-1 w-full sm:w-auto">
-              <button onClick={handleExportarUtilizacion} className="flex-1 sm:flex-none justify-center bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
-                <span className="mr-1">📊</span> <span className="hidden sm:inline">Utilización</span><span className="sm:hidden">Util</span>
-              </button>
-              <button 
-                onClick={() => {
-                  if (filtroTipoUnidad === 'todos') {
-                    Swal.fire('Atención', 'Debes elegir un tipo de unidad específico para exportar el programa de servicio.', 'warning');
-                    return;
-                  }
-                  if (maquinaria.length === 0) {
-                    Swal.fire('Sin registros', 'No se han encontrado resultados con los filtros actuales para exportar el programa de servicio.', 'warning');
-                    return;
-                  }
-                  const endpoint = userArea === 'Medio Ambiente' ? '/api/maquinaria/ambiental/exportar-plan-servicio' : '/api/maquinaria/exportar-plan-servicio';
-                  window.open(`${endpoint}?mes=${exportMes}&anio=${exportAnio}&area_usuario=${userArea}&tipo_unidad=${filtroTipoUnidad}`, '_blank');
-                }} 
-                className="flex-1 sm:flex-none justify-center bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center"
-              >
-                <span className="mr-1">🛠️</span> <span className="hidden sm:inline">Servicio</span><span className="sm:hidden">Serv</span>
-              </button>
-              <button 
-                ref={refZipBitacoras}
-                onClick={handleExportarBitacorasMasivas} 
-                className="flex-1 sm:flex-none justify-center bg-orange-600 hover:bg-orange-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center"
-              >
-                <FolderDown className="w-4 h-4 mr-1 sm:mr-2" /> ZIP Bitácoras
-              </button>
+              <div className="relative group">
+                <button onClick={handleExportarUtilizacion} className="flex-1 sm:flex-none justify-center bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center">
+                  <span className="mr-1">📊</span> <span className="hidden sm:inline">Utilización</span><span className="sm:hidden">Util</span>
+                </button>
+                {/* Tooltip */}
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-[10px] rounded shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 text-center leading-tight">
+                  Exporta el programa de utilización para el periodo elegido, cada formato adecuado al área correspondiente.
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-gray-900"></div>
+                </div>
+              </div>
+              <div className="relative group">
+                <button 
+                  onClick={() => {
+                    if (filtroTipoUnidad === 'todos') {
+                      Swal.fire('Atención', 'Debes elegir un tipo de unidad específico para exportar el programa de servicio.', 'warning');
+                      return;
+                    }
+                    if (maquinaria.length === 0) {
+                      Swal.fire('Sin registros', 'No se han encontrado resultados con los filtros actuales para exportar el programa de servicio.', 'warning');
+                      return;
+                    }
+                    const endpoint = userArea === 'Medio Ambiente' ? '/api/maquinaria/ambiental/exportar-plan-servicio' : '/api/maquinaria/exportar-plan-servicio';
+                    window.open(`${endpoint}?mes=${exportMes}&anio=${exportAnio}&area_usuario=${userArea}&tipo_unidad=${filtroTipoUnidad}`, '_blank');
+                  }} 
+                  className="flex-1 sm:flex-none justify-center bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center"
+                >
+                  <span className="mr-1">🛠️</span> <span className="hidden sm:inline">Servicio</span><span className="sm:hidden">Serv</span>
+                </button>
+                {/* Tooltip */}
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-[10px] rounded shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 text-center leading-tight">
+                  Genera el plan de mantenimiento preventivo para el tipo de unidad seleccionado, adecuado para ambas áreas.
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-gray-900"></div>
+                </div>
+              </div>
+              <div className="relative group">
+                <button 
+                  onClick={handleExportarBitacorasMasivas} 
+                  className="flex-1 sm:flex-none justify-center bg-orange-600 hover:bg-orange-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center"
+                >
+                  <FolderDown className="w-4 h-4 mr-1 sm:mr-2" /> ZIP MTTOS
+                </button>
+                {/* Tooltip */}
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-[10px] rounded shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 text-center leading-tight">
+                  Descarga todos los mantenimientos correspondientes a cada maquinaria, equipo o vehículo individuales de mantenimiento del mes en un archivo ZIP.
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-gray-900"></div>
+                </div>
+              </div>
+
+              {(userArea === 'Medio Ambiente' || userRole === 'Master' || userRole === 'Admin') && filtroTipoUnidad === 'todos' && (
+                <div className="relative group">
+                  <button 
+                    onClick={handleExportarBitServicio} 
+                    className="flex-1 sm:flex-none justify-center bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 mr-1 sm:mr-2" /> BIT SERVICIO
+                  </button>
+                  {/* Tooltip */}
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-[10px] rounded shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 text-center leading-tight">
+                    Descarga la Bitácora de servicio a maquinaria y vehículos del periodo seleccionado para el área ambiental.
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-gray-900"></div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
           {(canManageMaquinaria || canOnlyDownload) && !canManageMaquinaria && (
             <div className="flex gap-1 w-full sm:w-auto mt-2 sm:mt-0">
-               <button 
-                ref={refZipBitacoras}
-                onClick={handleExportarBitacorasMasivas} 
-                className="flex-1 sm:flex-none justify-center bg-orange-600 hover:bg-orange-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center"
-              >
-                <FolderDown className="w-4 h-4 mr-1 sm:mr-2" /> ZIP Bitácoras
-              </button>
+              <div className="relative group">
+                <button 
+                  onClick={handleExportarBitacorasMasivas} 
+                  className="flex-1 sm:flex-none justify-center bg-orange-600 hover:bg-orange-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center"
+                >
+                  <FolderDown className="w-4 h-4 mr-1 sm:mr-2" /> ZIP MTTOS
+                </button>
+                {/* Tooltip */}
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-[10px] rounded shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 text-center leading-tight">
+                  Descarga todas las bitácoras individuales de mantenimiento del mes en un archivo ZIP.
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-gray-900"></div>
+                </div>
+              </div>
             </div>
           )}
           
@@ -1060,7 +1124,6 @@ function MaquinariaPageContent() {
           {/* Botón Configurador de Columnas */}
           <div className="relative" ref={configRef}>
             <button 
-              ref={refConfiguracion}
               onClick={() => setShowColumnConfig(!showColumnConfig)}
               className={`p-2 rounded-md border transition-all ${showColumnConfig ? 'bg-orange-100 border-orange-300 text-orange-600' : 'bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200 dark:bg-slate-700 dark:border-slate-600 dark:text-gray-300'}`}
               title="Configurar Columnas"
@@ -1408,7 +1471,6 @@ function MaquinariaPageContent() {
 
                           <div className="relative group flex items-center justify-center">
                             <button 
-                              ref={index === 0 ? refExportarIndividual : null}
                               onClick={() => handleOpenExportBitacora(m)} 
                               className="text-orange-600 dark:text-orange-400 hover:text-orange-800 hover:bg-orange-50 dark:hover:bg-orange-900/20 p-2 rounded-md transition-colors"
                             >
@@ -1593,104 +1655,7 @@ function MaquinariaPageContent() {
         historial={historial}
         onExport={handleExportBitacoraFinal}
       />
-      <TutorialOverlay 
-        step={tutorialStep} 
-        onNext={nextStep} 
-        onClose={closeTutorial} 
-        refs={{ refZipBitacoras, refImportar, refFiltroPeriodo, refConfiguracion, refExportarIndividual }} 
-      />
     </>
   );
 }
 
-// Componente para el tutorial interactivo
-function TutorialOverlay({ step, onNext, onClose, refs }) {
-  if (!step) return null;
-
-  const steps = [
-    {
-      target: refs.refZipBitacoras,
-      title: "Exportación Masiva (ZIP)",
-      text: "Haz clic aquí para descargar todas las bitácoras de mantenimiento del mes seleccionado en un solo paquete ZIP.",
-      pos: "bottom"
-    },
-    {
-      target: refs.refFiltroPeriodo,
-      title: "Control de Periodo",
-      text: "Ajusta el mes y el año aquí para filtrar qué mantenimientos se incluirán en la exportación masiva.",
-      pos: "bottom"
-    },
-    {
-      target: refs.refExportarIndividual,
-      title: "Exportación Individual",
-      text: "Puedes generar la bitácora de un solo equipo específico. Aquí podrás elegir una fecha de servicio para generar el archivo.",
-      pos: "bottom"
-    },
-    {
-      target: refs.refConfiguracion,
-      title: "Personalizar Vista",
-      text: "Usa este botón para ocultar o mostrar columnas de la tabla. Tus preferencias se guardarán automáticamente.",
-      pos: "bottom"
-    }
-  ];
-
-  const current = steps[step - 1];
-  if (!current || !current.target || !current.target.current) return null;
-
-  const rect = current.target.current.getBoundingClientRect();
-
-  return (
-    <div className="fixed inset-0 z-[100] pointer-events-none">
-      {/* Overlay oscuro con hueco */}
-      <div className="absolute inset-0 bg-black/60 pointer-events-auto" onClick={onClose} />
-      
-      {/* Elemento resaltado */}
-      <div 
-        className="absolute bg-white/10 border-4 border-orange-500 rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.6)] z-[101] transition-all duration-500"
-        style={{
-          top: rect.top - 8,
-          left: rect.left - 8,
-          width: rect.width + 16,
-          height: rect.height + 16
-        }}
-      />
-
-      {/* Popover de información */}
-      <div 
-        className="absolute z-[102] bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-2xl border border-orange-200 dark:border-orange-900/50 w-72 pointer-events-auto transition-all duration-500"
-        style={{
-          top: Math.min(window.innerHeight - 300, rect.bottom + 24),
-          left: Math.min(window.innerWidth - 300, Math.max(20, rect.left + rect.width / 2 - 144))
-        }}
-      >
-        <div className="flex justify-between items-start mb-4">
-          <div className="bg-orange-100 dark:bg-orange-900/30 p-2 rounded-xl text-orange-600">
-            <Zap className="w-5 h-5" />
-          </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        
-        <h4 className="text-lg font-black text-gray-900 dark:text-white mb-2">{current.title}</h4>
-        <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed mb-6">
-          {current.text}
-        </p>
-
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Paso {step} de {steps.length}</span>
-          <button 
-            onClick={step === steps.length ? onClose : onNext}
-            className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-orange-600/20"
-          >
-            {step === steps.length ? 'Finalizar' : 'Siguiente'}
-            <ArrowRight className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Flecha indicadora */}
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[12px] border-l-transparent border-r-[12px] border-r-transparent border-b-[12px] border-b-white dark:border-b-slate-800" />
-      </div>
-    </div>
-  );
-}
