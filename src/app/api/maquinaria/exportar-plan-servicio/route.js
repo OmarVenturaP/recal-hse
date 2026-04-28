@@ -85,7 +85,7 @@ function escribirFilaMaquinaria(row, maquina, index) {
 function escribirFilaVehiculo(row, maquina, index) {
   // A=NO | B=TIPO | C=MARCA | D=AÑO | E=MODELO | F=SERIE | G=PLACA
   // H=KM INICIAL | I=KM ÚLTIMO MTTO | J=KM ACTUAL
-  // K=TIPO MTTO | L=REALIZÓ | M=FECHA ÚLTIMO MTTO | N=PRÓXIMO MTTO | O=RESTANTE
+  // K=TIPO MTTO | L=REALIZÓ | M=FECHA ÚLTIMO MTTO | N=PRÓXIMO MTTO
   row.getCell('A').value = index;
   row.getCell('B').value = toUpper(maquina.tipo);
   row.getCell('C').value = toUpper(maquina.marca);
@@ -107,25 +107,18 @@ function escribirFilaVehiculo(row, maquina, index) {
     maquina.ultima_fecha_mantenimiento !== maquina.fecha_ingreso_obra;
   row.getCell('M').value = fechaUltimo ? formatFecha(maquina.ultima_fecha_mantenimiento) : 'N/A';
 
-  // PRÓXIMO MANTENIMIENTO: Priorizar fecha_proximo_mantenimiento
+  // N = PRÓXIMO MANTENIMIENTO: Priorizar fecha_proximo_mantenimiento
+  // Si no existe, y hay fechaUltimo, calcular +3 meses.
   if (maquina.fecha_baja) {
     row.getCell('N').value = 'N/A POR BAJA';
   } else if (maquina.fecha_proximo_mantenimiento) {
     row.getCell('N').value = formatFecha(maquina.fecha_proximo_mantenimiento);
-  } else if (maquina.intervalo_mantenimiento) {
-    row.getCell('N').value = `CADA ${maquina.intervalo_mantenimiento} KM`;
+  } else if (fechaUltimo) {
+    const proxima = new Date(maquina.ultima_fecha_mantenimiento);
+    proxima.setMonth(proxima.getMonth() + 3);
+    row.getCell('N').value = formatFecha(proxima);
   } else {
     row.getCell('N').value = 'CADA QUE SE REQUIERA';
-  }
-
-  // O = RESTANTE
-  if (maquina.intervalo_mantenimiento && maquina.horometro != null) {
-      const base = maquina.horometro_ultimo_mtto || maquina.horometro_inicial || 0;
-      const proximo = Number(base) + Number(maquina.intervalo_mantenimiento);
-      const restante = proximo - Number(maquina.horometro);
-      row.getCell('O').value = `${Number(restante).toFixed(2)} KM`;
-  } else {
-      row.getCell('O').value = 'N/A';
   }
 }
 

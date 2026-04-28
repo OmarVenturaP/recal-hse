@@ -20,25 +20,35 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const mes = searchParams.get('mes');
     const anio = searchParams.get('anio');
+    const tipoUnidad = searchParams.get('tipo_unidad');
     const userRol = request.headers.get('x-user-rol');
     const idEmpresa = request.headers.get('x-empresa-id');
 
     const periodoTexto = generarTextoPeriodo(mes, anio);
 
-    const templatePath = path.join(process.cwd(), 'public', 'plantillas', '12_PLAN_SERVICIO.xlsx');
+    const esVehiculo = tipoUnidad === 'vehiculo';
+    const templateFileName = esVehiculo ? '18_PROGRAMA_MANTENIMIENTO_VEHICULOS.xlsx' : '12_PLAN_SERVICIO.xlsx';
+    const templatePath = path.join(process.cwd(), 'public', 'plantillas', templateFileName);
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile(templatePath);
     const worksheet = workbook.getWorksheet(1); 
 
-    let whereClause = "WHERE m.fecha_baja IS NULL"; 
+    let whereClause = "WHERE m.area = 'ambiental' ";
     const queryParams = [];
 
     if (mes && anio) {
       const lastDay = new Date(anio, mes, 0).getDate();
       const startDate = `${anio}-${mes}-01`;
       const endDate = `${anio}-${mes}-${lastDay}`;
-      whereClause = `WHERE DATE(m.fecha_ingreso_obra) <= ? AND (m.fecha_baja IS NULL OR DATE(m.fecha_baja) > ?)`;
+      whereClause += ` AND DATE(m.fecha_ingreso_obra) <= ? AND (m.fecha_baja IS NULL OR DATE(m.fecha_baja) >= ?) `;
       queryParams.push(endDate, startDate);
+    } else {
+      whereClause += ` AND m.fecha_baja IS NULL `;
+    }
+
+    if (tipoUnidad && tipoUnidad !== 'todos') {
+      whereClause += ` AND m.tipo_unidad = ? `;
+      queryParams.push(tipoUnidad);
     }
 
     // Aislamiento Multi-Tenant
@@ -51,7 +61,8 @@ export async function GET(request) {
       SELECT 
         m.*,
         (SELECT tipo_mantenimiento FROM Historial_Mantenimiento WHERE id_maquinaria = m.id_maquinaria ORDER BY fecha_mantenimiento DESC, id_mantenimiento DESC LIMIT 1) AS ultimo_tipo_mantenimiento,
-        (SELECT fecha_mantenimiento FROM Historial_Mantenimiento WHERE id_maquinaria = m.id_maquinaria ORDER BY fecha_mantenimiento DESC, id_mantenimiento DESC LIMIT 1) AS ultima_fecha_mantenimiento
+        (SELECT fecha_mantenimiento FROM Historial_Mantenimiento WHERE id_maquinaria = m.id_maquinaria ORDER BY fecha_mantenimiento DESC, id_mantenimiento DESC LIMIT 1) AS ultima_fecha_mantenimiento,
+        (SELECT horometro_mantenimiento FROM Historial_Mantenimiento WHERE id_maquinaria = m.id_maquinaria ORDER BY fecha_mantenimiento DESC, id_mantenimiento DESC LIMIT 1) AS ultimo_horometro_mantenimiento
       FROM Maquinaria_Equipo m
       ${whereClause}
       ORDER BY m.fecha_ingreso_obra DESC
@@ -61,7 +72,7 @@ export async function GET(request) {
     // Usaremos H3 como estaba en el HEAD.
     worksheet.getCell('H3').value = periodoTexto;
 
-    let currentRow = 7; 
+    let currentRow = esVehiculo ? 8 : 7; 
     let index = 1;
 
     for (let i = 0; i < rows.length; i++) {
@@ -75,43 +86,66 @@ export async function GET(request) {
 
       const toUpper = (val) => val ? String(val).toUpperCase() : 'N/A';
 
-      row.getCell('A').value = index;
-      row.getCell('B').value = toUpper(maquina.tipo);
-      row.getCell('C').value = toUpper(maquina.marca);
-      row.getCell('D').value = toUpper(maquina.anio);
-      row.getCell('E').value = toUpper(maquina.modelo);
-      row.getCell('F').value = toUpper(maquina.color);
-      row.getCell('G').value = toUpper(maquina.serie);
-      row.getCell('H').value = maquina.placa || 'N/A';
-      row.getCell('I').value = maquina.horometro ? `TOTAL DE H: ${maquina.horometro}` : 'N/A';
-      row.getCell('J').value = toUpper(maquina.ultimo_tipo_mantenimiento);
-
-      if (maquina.ultima_fecha_mantenimiento && maquina.ultima_fecha_mantenimiento > maquina.fecha_ingreso_obra && maquina.ultima_fecha_mantenimiento != maquina.fecha_ingreso_obra) {
-        const date = new Date(maquina.ultima_fecha_mantenimiento);
+      const formatFecha = (fecha) => {
+        if (!fecha) return 'N/A';
+        const date = new Date(fecha);
         const dia = String(date.getUTCDate()).padStart(2, '0');
-        const mes = String(date.getUTCMonth() + 1).padStart(2, '0');
-        const anio = date.getUTCFullYear();
-        row.getCell('K').value = `${dia}/${mes}/${anio}`;
+        const mStr = String(date.getUTCMonth() + 1).padStart(2, '0');
+        const aStr = date.getUTCFullYear();
+        return `${dia}/${mStr}/${aStr}`;
+      };
+
+      if (esVehiculo) {
+        // Mapeo Formato 18_PROGRAMA_MANTENIMIENTO_VEHICULOS.xlsx
+        row.getCell('A').value = index;
+        row.getCell('B').value = toUpper(maquina.tipo);
+        row.getCell('C').value = `${maquina.marca || ''} / ${maquina.modelo || ''}`.trim();
+        row.getCell('D').value = toUpper(maquina.color);
+        row.getCell('E').value = maquina.placa || maquina.num_economico || 'N/A';
+        
+        row.getCell('F').value = maquina.horometro ? Number(maquina.horometro) : 0;
+        row.getCell('G').value = formatFecha(maquina.ultima_modificacion || maquina.fecha_ingreso_obra);
+        
+        row.getCell('H').value = maquina.ultimo_horometro_mantenimiento ? Number(maquina.ultimo_horometro_mantenimiento) : 'N/A';
+        row.getCell('I').value = formatFecha(maquina.ultima_fecha_mantenimiento);
+
+        const kmBase = maquina.ultimo_horometro_mantenimiento ? Number(maquina.ultimo_horometro_mantenimiento) : (maquina.horometro ? Number(maquina.horometro) : 0);
+        row.getCell('J').value = kmBase > 0 ? kmBase + 10000 : 10000;
+
+        row.getCell('K').value = formatFecha(maquina.fecha_ingreso_obra);
+        row.getCell('M').value = maquina.fecha_baja ? formatFecha(maquina.fecha_baja) : 'N/A';
       } else {
-        row.getCell('K').value = 'N/A';
+        // Mapeo original Formato 12_PLAN_SERVICIO.xlsx
+        row.getCell('A').value = index;
+        row.getCell('B').value = toUpper(maquina.tipo);
+        row.getCell('C').value = toUpper(maquina.marca);
+        row.getCell('D').value = toUpper(maquina.anio);
+        row.getCell('E').value = toUpper(maquina.modelo);
+        row.getCell('F').value = toUpper(maquina.color);
+        row.getCell('G').value = toUpper(maquina.serie);
+        row.getCell('H').value = maquina.placa || 'N/A';
+        row.getCell('I').value = maquina.horometro ? `TOTAL DE H: ${maquina.horometro}` : 'N/A';
+        row.getCell('J').value = toUpper(maquina.ultimo_tipo_mantenimiento);
+
+        if (maquina.ultima_fecha_mantenimiento && maquina.ultima_fecha_mantenimiento > maquina.fecha_ingreso_obra && maquina.ultima_fecha_mantenimiento != maquina.fecha_ingreso_obra) {
+          row.getCell('K').value = formatFecha(maquina.ultima_fecha_mantenimiento);
+        } else {
+          row.getCell('K').value = 'N/A';
+        }
+
+        if (maquina.fecha_baja) {
+          row.getCell('L').value = 'N/A POR BAJA';
+        } else if (maquina.fecha_proximo_mantenimiento) {
+          row.getCell('L').value = `MANTENIMIENTO: ${formatFecha(maquina.fecha_proximo_mantenimiento)}`;
+        } else if (maquina.intervalo_mantenimiento) {
+          row.getCell('L').value = `CADA ${maquina.intervalo_mantenimiento} HORAS DE TRABAJO`;
+        } else {
+          row.getCell('L').value = 'CADA QUE SE REQUIERA';
+        } 
       }
 
-      if (maquina.fecha_baja) {
-        row.getCell('L').value = 'N/A POR BAJA';
-      } else if (maquina.fecha_proximo_mantenimiento) {
-        const date = new Date(maquina.fecha_proximo_mantenimiento);
-        const dia = String(date.getUTCDate()).padStart(2, '0');
-        const mesStr = String(date.getUTCMonth() + 1).padStart(2, '0');
-        const anioStr = date.getUTCFullYear();
-        row.getCell('L').value = `MANTENIMIENTO: ${dia}/${mesStr}/${anioStr}`;
-      } else if (maquina.intervalo_mantenimiento) {
-        row.getCell('L').value = `CADA ${maquina.intervalo_mantenimiento} HORAS DE TRABAJO`;
-      } else {
-        row.getCell('L').value = 'CADA QUE SE REQUIERA';
-      } 
-
       if (i > 0) {
-        const filaBase = worksheet.getRow(7);
+        const filaBase = worksheet.getRow(esVehiculo ? 8 : 7);
         let detenerCopia = false; 
         
         filaBase.eachCell({ includeEmpty: true }, (baseCell, colNumber) => {
@@ -151,7 +185,9 @@ export async function GET(request) {
     }
 
     const buffer = await workbook.xlsx.writeBuffer();
-    const nombreArchivo = `12. PROGRAMA DE MANTENIMIENTO DE MAQUINARIA Y EQUIPO MENOR - AMBIENTAL - ${periodoTexto}.xlsx`;
+    const tituloArchivo = esVehiculo ? 'PROGRAMA DE MANTENIMIENTO DE VEHICULOS' : 'PROGRAMA DE MANTENIMIENTO DE MAQUINARIA Y EQUIPO MENOR';
+    const numArchivo = esVehiculo ? '18' : '12';
+    const nombreArchivo = `${numArchivo}. ${tituloArchivo} - AMBIENTAL - ${periodoTexto}.xlsx`;
 
     return new NextResponse(buffer, {
       headers: {

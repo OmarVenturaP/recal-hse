@@ -84,7 +84,7 @@ export default function MaquinariaFormModal({
             {/* Fecha de Próximo Mantenimiento (Cualquiera excepto Herramientas) */}
             {formData.tipo_unidad !== 'herramienta' && (
               <div>
-                <label className="block text-sm font-bold text-indigo-900 dark:text-indigo-400 font-mono italic underline decoration-indigo-200">Próximo Mantenimiento (Manual)</label>
+                <label className="block text-sm font-bold text-indigo-900 dark:text-indigo-400 font-mono italic underline decoration-indigo-200">Próximo Mantenimiento</label>
                 <input 
                   type="date" 
                   className="mt-1 w-full bg-indigo-50 dark:bg-indigo-900/10 border border-indigo-200 dark:border-indigo-900/50 dark:text-white rounded-md p-2 outline-none focus:ring-indigo-500" 
@@ -111,6 +111,10 @@ export default function MaquinariaFormModal({
                 </select>
               </div>
             )}
+
+            {/* Campos de Actividad y Frente (Solicitados por Ambiental) */}
+            <div><label className="block text-sm font-medium text-gray-700 dark:text-gray-300 font-bold text-emerald-700 dark:text-emerald-400">Actividad</label><input type="text" className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 outline-none focus:ring-emerald-500" value={formData.actividad || ''} onChange={e => setFormData({...formData, actividad: e.target.value.toUpperCase()})} placeholder="Ejem: TRASLADO DE MATERIAL" /></div>
+            <div><label className="block text-sm font-medium text-gray-700 dark:text-gray-300 font-bold text-emerald-700 dark:text-emerald-400">Frente / Ubicación</label><input type="text" className="mt-1 w-full bg-transparent border border-gray-300 dark:border-slate-600 dark:text-white rounded-md p-2 outline-none focus:ring-emerald-500" value={formData.frente || ''} onChange={e => setFormData({...formData, frente: e.target.value.toUpperCase()})} placeholder="Ejem: FRENTE 1 / LADO SUR" /></div>
 
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Fotografía</label>

@@ -42,6 +42,7 @@ function MaquinariaPageContent() {
 
   const [userRole, setUserRole] = useState(null);
   const [userArea, setUserArea] = useState(null); 
+  const [userIdEmpresa, setUserIdEmpresa] = useState(null);
   const [userMaquinariaPermission, setUserMaquinariaPermission] = useState(null);
 
   useEffect(() => {
@@ -51,7 +52,8 @@ function MaquinariaPageContent() {
         if (data.success) {
           setUserRole(data.user.rol);
           setUserArea(data.user.area); 
-          console.log("Rol:", data.user.rol, "Area:", data.user.area);
+          setUserIdEmpresa(data.user.id_empresa);
+          console.log("Rol:", data.user.rol, "Area:", data.user.area, "Empresa:", data.user.id_empresa);
         }
       });
 
@@ -90,8 +92,8 @@ function MaquinariaPageContent() {
     setTutorialStep(null);
   };
 
-  const canManageMaquinaria = userRole === 'Admin' || userRole === 'Master';
-  const canOnlyDownload = userMaquinariaPermission === 1 && userRole !== 'Admin' && userRole !== 'Master';
+  const canManageMaquinaria = userRole === 'Admin' || userRole === 'Master' || (userRole === 'Usuario' && userMaquinariaPermission === 1);
+  const canOnlyDownload = false; // Ya no es necesario este estado separado si el permiso 1 permite gestión
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
@@ -135,6 +137,8 @@ function MaquinariaPageContent() {
     tipo_unidad: 'maquinaria', horometro_inicial: '',
     intervalo_mantenimiento: '', fecha_proximo_mantenimiento: '', fecha_ingreso_obra: '', id_subcontratista: '',
     area: 'seguridad', 
+    actividad: '',
+    frente: '',
     imagen_url_actual: ''
   };
   const [formData, setFormData] = useState(formInicial);
@@ -283,7 +287,7 @@ function MaquinariaPageContent() {
       if (userArea) url += `area_usuario=${userArea}&`;
       if (filtroArea) url += `area_filtro=${filtroArea}&`;
       
-      if (userArea === 'Medio Ambiente') {
+      if (userArea === 'Medio Ambiente' && userIdEmpresa !== 1) {
         url += `semana=${exportSemana}&`;
       } else {
         url += `mes=${exportMes}&anio=${exportAnio}&`;
@@ -424,6 +428,8 @@ function MaquinariaPageContent() {
       area: m.area || (userArea === 'Medio Ambiente' ? 'ambiental' : 'seguridad'),
       tipo_unidad: m.tipo_unidad || 'maquinaria',
       horometro_inicial: m.horometro_inicial || '',
+      actividad: m.actividad || '',
+      frente: m.frente || '',
       imagen_url_actual: m.imagen_url || ''
     });
     setImageFile(null); setEditId(m.id_maquinaria); setIsEditing(true); setIsModalOpen(true);
@@ -574,6 +580,21 @@ function MaquinariaPageContent() {
     } catch (error) {
       Swal.fire('Error', 'Problema de conexión al guardar', 'error');
     } finally { setSaving(false); }
+  };
+
+  const handleGenerarInspeccion = (idMaquinaria) => {
+    const isAmbiental = userArea === 'Medio Ambiente';
+    const isAmbientalSub = isAmbiental && userIdEmpresa !== 1;
+    
+    let exportUrl = "";
+    if (isAmbiental) {
+      exportUrl = isAmbientalSub 
+        ? `/api/maquinaria/ambiental/exportar-inspecciones?semana=${exportSemana}&id_maquinaria=${idMaquinaria}`
+        : `/api/maquinaria/ambiental/exportar-inspecciones?mes=${exportMes}&anio=${exportAnio}&id_maquinaria=${idMaquinaria}`;
+    } else {
+      exportUrl = `/api/maquinaria/exportar-inspecciones-masivas?mes=${exportMes}&anio=${exportAnio}&id_maquinaria=${idMaquinaria}`;
+    }
+    window.open(exportUrl, '_blank');
   };
 
   // Alias: abre historial de mtto para maquinaria/vehículo/equipo,
@@ -875,8 +896,8 @@ function MaquinariaPageContent() {
             </button>
           )}
 
-          {/* --- AJUSTE: MUESTRA SEMANA PARA AMBIENTAL, MES/AÑO PARA LOS DEMÁS --- */}
-          {userArea === 'Medio Ambiente' ? (
+          {/* --- AJUSTE: MUESTRA SEMANA PARA AMBIENTAL SUBCONTRATISTAS, MES/AÑO PARA RECAL Y SEGURIDAD --- */}
+          {(userArea === 'Medio Ambiente' && userIdEmpresa !== 1) ? (
             <div className="flex items-center justify-between sm:justify-start space-x-1 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 p-1 rounded-md shadow-sm w-full sm:w-auto">
               <input 
                 type="week" 
@@ -905,7 +926,20 @@ function MaquinariaPageContent() {
                   Swal.fire('Sin registros', 'No se han encontrado resultados con los filtros actuales para generar el paquete de inspecciones.', 'warning');
                   return;
                 }
-                window.open(`/api/maquinaria/exportar-inspecciones-masivas?mes=${exportMes}&anio=${exportAnio}`, '_blank');
+                const isAmbiental = userArea === 'Medio Ambiente';
+                const isAmbientalSub = isAmbiental && userIdEmpresa !== 1;
+                
+                let exportUrl = "";
+                if (isAmbiental) {
+                  exportUrl = isAmbientalSub 
+                    ? `/api/maquinaria/ambiental/exportar-inspecciones?semana=${exportSemana}&tipo_unidad=${filtroTipoUnidad}`
+                    : `/api/maquinaria/ambiental/exportar-inspecciones?mes=${exportMes}&anio=${exportAnio}&tipo_unidad=${filtroTipoUnidad}`;
+                } else {
+                  // Fallback para Master o Admin en Seguridad (Herramientas)
+                  exportUrl = `/api/maquinaria/exportar-inspecciones-masivas?mes=${exportMes}&anio=${exportAnio}&tipo_unidad=${filtroTipoUnidad}`;
+                }
+                
+                window.open(exportUrl, '_blank');
               }} 
               className="flex-1 sm:flex-none justify-center bg-teal-600 hover:bg-teal-700 text-white px-3 py-2 rounded-md font-bold shadow-sm transition-colors text-xs sm:text-sm flex items-center"
             >

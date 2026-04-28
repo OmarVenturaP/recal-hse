@@ -93,11 +93,11 @@ export async function POST(request) {
 
     // --- CÁLCULO AUTOMÁTICO DE PRÓXIMO MANTENIMIENTO ---
     try {
-      // 1. Obtener el tipo de unidad
-      const [maquinaRows] = await pool.query('SELECT tipo_unidad FROM Maquinaria_Equipo WHERE id_maquinaria = ?', [id_maquinaria]);
+      // 1. Obtener el tipo de unidad y el area
+      const [maquinaRows] = await pool.query('SELECT tipo_unidad, area FROM Maquinaria_Equipo WHERE id_maquinaria = ?', [id_maquinaria]);
       
       if (maquinaRows.length > 0) {
-        const { tipo_unidad } = maquinaRows[0];
+        const { tipo_unidad, area } = maquinaRows[0];
         let fechaProxima = null;
         const baseDate = new Date(fecha_mantenimiento);
 
@@ -105,8 +105,8 @@ export async function POST(request) {
           // Maquinaria: +36 días naturales
           fechaProxima = new Date(baseDate);
           fechaProxima.setDate(fechaProxima.getDate() + 36);
-        } else if (tipo_unidad === 'equipo') {
-          // Equipo Menor: +3 meses
+        } else if (tipo_unidad === 'equipo' || (tipo_unidad === 'vehiculo' && area !== 'ambiental')) {
+          // Equipo Menor y Vehículos de Seguridad: +3 meses
           fechaProxima = new Date(baseDate);
           fechaProxima.setMonth(fechaProxima.getMonth() + 3);
         }

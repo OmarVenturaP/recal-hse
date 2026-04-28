@@ -7,7 +7,7 @@ import BotonTema from '@/components/BotonTema';
 import { 
   LayoutDashboard, Tractor, Users, ClipboardList, 
   BookOpen, CalendarDays, ShieldCheck, LogOut, Menu, X, FileBarChart,
-  ChevronLeft, ChevronRight, Building, Lock, History
+  ChevronLeft, ChevronRight, Building, Lock, History, Sprout
 } from 'lucide-react';
 import ModalPlanDetalles from '@/components/ModalPlanDetalles';
 import DemoSystem from '@/components/DemoSystem';
@@ -121,6 +121,9 @@ export default function DashboardLayout({ children }) {
   const canSeeCatalogos  = isAdmin || hasFtPermission || hasDc3Permission || (planAllowsCertificados && isAdmin);
   const canSeeInformes   = planAllowsInformes && (isMaster || userPermisoInforme === 1);
   const canSeeCitas      = isMaster || (userIdEmpresa === 1); // RECAL bypass
+
+  const canSeeSeguridad = userArea?.toLowerCase().includes('seguridad') || userArea?.toLowerCase().includes('ambas') || isAdmin;
+  const canSeeAmbiental = userArea?.toLowerCase().includes('ambiental') || userArea?.toLowerCase().includes('ambiente') || userArea?.toLowerCase().includes('ambas') || isAdmin;
 
   const closeSidebar = () => setIsSidebarOpen(false);
   const toggleCollapse = () => {
@@ -246,39 +249,67 @@ export default function DashboardLayout({ children }) {
           </div>
           
           <NavItem href="/dashboard" icon={LayoutDashboard} label="Resumen Central" />
-          <NavItem href="/dashboard/maquinaria" icon={Tractor} label="Maquinaria y Equipo" isLocked={!planAllowsMaquinaria} />
-          <NavItem href="/dashboard/fuerza-trabajo" icon={Users} label="Fuerza de Trabajo" isLocked={!planAllowsFT} />
           
-          <NavItem 
-            href="/dashboard/informes-seguridad" 
-            icon={FileBarChart} 
-            label="Informes Seguridad" 
-            isLocked={!planAllowsInformes || !(isAdmin || userPermisoInforme === 1)} 
-            isPurple={isTotal} 
-          />
+          {/* SECCIÓN: ADMINISTRACIÓN / GENERAL */}
+          <div className={`pt-4 ${isCollapsed ? 'pt-2' : ''}`}>
+             {!isCollapsed && <span className="px-4 text-[10px] font-black tracking-[0.2em] text-blue-300/40 uppercase mb-2 block">Administración</span>}
+             <NavItem href="/dashboard/maquinaria" icon={Tractor} label="Maquinaria y Equipo" isLocked={!planAllowsMaquinaria} />
+          </div>
 
-          {userIdEmpresa === 1 && (
-            <NavItem 
-              href="/dashboard/actividades" 
-              icon={ClipboardList} 
-              label="Actividades" 
-              isLocked={!(userArea === 'Seguridad' || userArea === 'Ambas')}
-            />
+          {/* SECCIÓN: SEGURIDAD */}
+          {canSeeSeguridad && (
+            <div className={`pt-4 ${isCollapsed ? 'pt-2' : ''}`}>
+               {!isCollapsed && <span className="px-4 text-[10px] font-black tracking-[0.2em] text-blue-300/40 uppercase mb-2 block">Seguridad</span>}
+               <NavItem href="/dashboard/fuerza-trabajo" 
+               icon={Users} 
+               label="Fuerza de Trabajo" 
+               isLocked={!planAllowsFT} />
+               <NavItem 
+                href="/dashboard/informes-seguridad" 
+                icon={FileBarChart} 
+                label="Informes Seguridad" 
+                isLocked={!planAllowsInformes || !(isAdmin || userPermisoInforme === 1)} 
+                isPurple={isTotal} 
+               />
+               <NavItem 
+                href="/dashboard/actividades" 
+                icon={ClipboardList} 
+                label="Actividades"
+               />
+            </div>
           )}
-          
-          <NavItem 
-            href="/dashboard/catalogos" 
-            icon={BookOpen} 
-            label="Catálogos" 
-            isLocked={!canSeeCatalogos}
-          />
-          
-          {userIdEmpresa === 1 && !isDemo && (
-            <NavItem 
-              href="/dashboard/citas" 
-              icon={CalendarDays} 
-              label="Citas Dossier" 
-            />
+
+          {/* SECCIÓN: AMBIENTAL */}
+          {canSeeAmbiental && (
+            <div className={`pt-4 ${isCollapsed ? 'pt-2' : ''}`}>
+               {!isCollapsed && <span className="px-4 text-[10px] font-black tracking-[0.2em] text-emerald-400/40 uppercase mb-2 block">Ambiental</span>}
+               <NavItem 
+                href="/dashboard/informes-ambiental" 
+                icon={Sprout} 
+                label="Reportes Ambiental" 
+                isPurple={true}
+               />
+            </div>
+          )}
+
+          {/* CATÁLOGOS Y CITAS (Solo Recal Estructuras ID:1) */}
+          {userIdEmpresa === 1 && (
+            <div className={`pt-4 ${isCollapsed ? 'pt-2' : ''}`}>
+              {!isCollapsed && <span className="px-4 text-[10px] font-black tracking-[0.2em] text-amber-400/40 uppercase mb-2 block">Módulo Recal</span>}
+              <NavItem 
+                href="/dashboard/catalogos" 
+                icon={BookOpen} 
+                label="Catálogos" 
+                isLocked={!canSeeCatalogos}
+              />
+              {!isDemo && (
+                <NavItem 
+                  href="/dashboard/citas" 
+                  icon={CalendarDays} 
+                  label="Citas Dossier" 
+                />
+              )}
+            </div>
           )}
           
           {userRol === 'Master' && (

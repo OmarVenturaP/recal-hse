@@ -57,10 +57,12 @@ export async function middleware(request) {
       requestHeaders.delete('x-user-id');
       requestHeaders.delete('x-user-rol');
       requestHeaders.delete('x-empresa-id');
+      requestHeaders.delete('x-user-area');
       
       requestHeaders.set('x-user-id', payload.id_usuario || payload.id);
       requestHeaders.set('x-user-rol', payload.rol);
       requestHeaders.set('x-empresa-id', payload.id_empresa || ''); // <-- NUEVO: Inyección del ID de tenant
+      requestHeaders.set('x-user-area', payload.area || ''); // <-- NUEVO: Inyección del Área para permisos
 
       // La ruta de importar-sua (la única que se corrompía por el peso del PDF) ya fue aislada en el 'matcher' de abajo.
       // Así que obligamos a Next.js a inyectar las cabeceras para el resto de peticiones normales (como registrar maquinaria).

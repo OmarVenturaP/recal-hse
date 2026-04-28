@@ -31,7 +31,7 @@ export async function GET(request) {
     const worksheet = workbook.getWorksheet(1); 
 
     // Lógica estricta de filtros de fecha
-    let whereClause = "WHERE m.fecha_baja IS NULL"; 
+    let whereClause = "";
     const queryParams = [];
 
     if (mes && anio) {
@@ -39,8 +39,10 @@ export async function GET(request) {
       const startDate = `${anio}-${mes}-01`;
       const endDate = `${anio}-${mes}-${lastDay}`;
       
-      whereClause = `WHERE DATE(m.fecha_ingreso_obra) <= ? AND (m.fecha_baja IS NULL OR DATE(m.fecha_baja) >= ?)`;
+      whereClause = `WHERE m.area = 'ambiental' AND DATE(m.fecha_ingreso_obra) <= ? AND (m.fecha_baja IS NULL OR DATE(m.fecha_baja) >= ?)`;
       queryParams.push(endDate, startDate);
+    } else {
+      whereClause = `WHERE m.area = 'ambiental' AND m.fecha_baja IS NULL`;
     }
 
     // Aislamiento Multi-Tenant
@@ -82,33 +84,9 @@ export async function GET(request) {
       row.getCell('D').value = toUpper(maquina.color);
       row.getCell('E').value = toUpper(maquina.num_economico);
 
-      if (maquina.fecha_ingreso_obra) {
-        const date = new Date(maquina.fecha_ingreso_obra);
-        const dia = String(date.getUTCDate()).padStart(2, '0');
-        const mesStr = String(date.getUTCMonth() + 1).padStart(2, '0');
-        const meses = {
-            1: 'ENERO', 2: 'FEBRERO', 3: 'MARZO', 4: 'ABRIL', 5: 'MAYO', 6: 'JUNIO',
-            7: 'JULIO', 8: 'AGOSTO', 9: 'SEPTIEMBRE', 10: 'OCTUBRE', 11: 'NOVIEMBRE', 12: 'DICIEMBRE'
-          };
-        const anioStr = date.getUTCFullYear();
-        row.getCell('F').value = `${meses[parseInt(mesStr)]} / ${anioStr}`;
-      } else {
-        row.getCell('F').value = '-';
-      }
-
-      if (maquina.fecha_baja) {
-        const date = new Date(maquina.fecha_baja);
-        const dia = String(date.getUTCDate()).padStart(2, '0');
-        const mesStr = String(date.getUTCMonth() + 1).padStart(2, '0');
-        const meses = {
-            1: 'ENERO', 2: 'FEBRERO', 3: 'MARZO', 4: 'ABRIL', 5: 'MAYO', 6: 'JUNIO',
-            7: 'JULIO', 8: 'AGOSTO', 9: 'SEPTIEMBRE', 10: 'OCTUBRE', 11: 'NOVIEMBRE', 12: 'DICIEMBRE'
-          };
-        const anioStr = date.getUTCFullYear();
-        row.getCell('G').value = `${meses[parseInt(mesStr)]} / ${anioStr}`;
-      } else {
-        row.getCell('G').value = 'N/A';
-      }
+      // Reasignación de columnas: F para Actividad, G para Frente (Ubicación)
+      row.getCell('F').value = toUpper(maquina.actividad);
+      row.getCell('G').value = toUpper(maquina.frente);
 
       if (maquina.imagen_url) {
         try {

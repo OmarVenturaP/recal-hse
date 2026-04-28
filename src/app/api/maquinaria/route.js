@@ -93,7 +93,7 @@ export async function GET(request) {
     const query = `
       SELECT 
         m.id_maquinaria, m.num_economico, m.tipo, m.marca, m.anio, m.modelo, m.color, m.serie, m.placa, m.area,
-        m.tipo_unidad, m.horometro_inicial,
+        m.tipo_unidad, m.horometro_inicial, m.actividad, m.frente,
         m.horometro AS horometro_actual, m.intervalo_mantenimiento, m.fecha_proximo_mantenimiento, m.fecha_ingreso_obra, m.fecha_baja, m.imagen_url,
         m.id_subcontratista,
         s.razon_social AS nombre_subcontratista,
@@ -165,6 +165,8 @@ export async function POST(request) {
     const fecha_proximo_mantenimiento = extractField('fecha_proximo_mantenimiento');
     const tipo_unidad = extractField('tipo_unidad') || 'maquinaria';
     const horometro_inicial = extractField('horometro_inicial') || 0;
+    const actividad = extractField('actividad');
+    const frente = extractField('frente');
 
     // Validaciones de obligatoriedad (Tipo, Marca, Año, Fecha, Contratista y Área)
     if (!tipo || !marca || !anio || !fecha_ingreso_obra || !id_subcontratista || !area) {
@@ -205,13 +207,13 @@ export async function POST(request) {
     // Inyectamos el campo 'area' e 'id_empresa' en el INSERT
     const query = `
       INSERT INTO Maquinaria_Equipo 
-      (num_economico, tipo, marca, anio, modelo, color, serie, placa, horometro, intervalo_mantenimiento, fecha_proximo_mantenimiento, fecha_ingreso_obra, id_subcontratista, area, imagen_url, usuario_registro, id_empresa, fecha_creacion, tipo_unidad, horometro_inicial) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (num_economico, tipo, marca, anio, modelo, color, serie, placa, horometro, intervalo_mantenimiento, fecha_proximo_mantenimiento, fecha_ingreso_obra, id_subcontratista, area, imagen_url, usuario_registro, id_empresa, fecha_creacion, tipo_unidad, horometro_inicial, actividad, frente) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     
     const [result] = await pool.query(query, [
       num_economico, tipo, marca, anio, modelo, color, serie, placa, horometro, 
-      intervalo_mantenimiento, fecha_proximo_mantenimiento, fecha_ingreso_obra, id_subcontratista, area, imagen_url, id_usuario_actual, idEmpresa || 1, fechaCDMX(), tipo_unidad, horometro_inicial
+      intervalo_mantenimiento, fecha_proximo_mantenimiento, fecha_ingreso_obra, id_subcontratista, area, imagen_url, id_usuario_actual, idEmpresa || 1, fechaCDMX(), tipo_unidad, horometro_inicial, actividad, frente
     ]);
 
     return NextResponse.json({ success: true, id: result.insertId, imagen_url });
@@ -250,6 +252,8 @@ export async function PUT(request) {
     const fecha_proximo_mantenimiento = extractField('fecha_proximo_mantenimiento');
     const tipo_unidad = extractField('tipo_unidad');
     const horometro_inicial = extractField('horometro_inicial');
+    const actividad = extractField('actividad');
+    const frente = extractField('frente');
 
     if (!tipo || !marca || !anio || !fecha_ingreso_obra || !id_subcontratista || !area) {
       return NextResponse.json({ success: false, error: "Los campos Tipo, Marca, Año, Fecha de Ingreso, Área y Contratista son obligatorios." }, { status: 400 });
@@ -290,10 +294,10 @@ export async function PUT(request) {
 
     let query = `
       UPDATE Maquinaria_Equipo 
-      SET num_economico=?, tipo=?, marca=?, anio=?, modelo=?, color=?, serie=?, placa=?, horometro=?, intervalo_mantenimiento=?, fecha_proximo_mantenimiento=?, fecha_ingreso_obra=?, id_subcontratista=?, area=?, imagen_url=?, usuario_actualizacion=?, ultima_modificacion=?, tipo_unidad=?, horometro_inicial=?
+      SET num_economico=?, tipo=?, marca=?, anio=?, modelo=?, color=?, serie=?, placa=?, horometro=?, intervalo_mantenimiento=?, fecha_proximo_mantenimiento=?, fecha_ingreso_obra=?, id_subcontratista=?, area=?, imagen_url=?, usuario_actualizacion=?, ultima_modificacion=?, tipo_unidad=?, horometro_inicial=?, actividad=?, frente=?
       WHERE id_maquinaria=?
     `;
-    let qParams = [num_economico, tipo, marca, anio, modelo, color, serie, placa, horometro, intervalo_mantenimiento, fecha_proximo_mantenimiento, fecha_ingreso_obra, id_subcontratista, area, imagen_url, id_usuario_actual, fechaCDMX(), tipo_unidad, horometro_inicial, id_maquinaria];
+    let qParams = [num_economico, tipo, marca, anio, modelo, color, serie, placa, horometro, intervalo_mantenimiento, fecha_proximo_mantenimiento, fecha_ingreso_obra, id_subcontratista, area, imagen_url, id_usuario_actual, fechaCDMX(), tipo_unidad, horometro_inicial, actividad, frente, id_maquinaria];
 
     if (userRol !== 'Master' && idEmpresa) {
       query += ` AND id_empresa=?`;

@@ -1,10 +1,72 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Tractor, Users, CalendarDays, BookOpen, Clock, Activity, Zap, ShieldCheck, FileBarChart, Crown, Lock, Database, Loader2, X } from 'lucide-react';
+import { Tractor, Users, CalendarDays, BookOpen, Clock, Activity, Zap, ShieldCheck, FileBarChart, Crown, Lock, Database, Loader2, X, Leaf, Sprout, ClipboardCheck, FolderDown, Settings } from 'lucide-react';
 import Swal from 'sweetalert2';
 import Link from 'next/link';
 import ModalPlanDetalles from '@/components/ModalPlanDetalles';
+
+// Componente de tarjeta de módulo - MOVIDO FUERA para evitar errores de hidratación
+const ModuleCard = ({ href, icon: Icon, title, desc, isLocked, isVisible, statsVal, statsLabel, colorClass, shadowColor, badgeText, loading, onClickPlan }) => {
+  if (!isVisible) return null;
+
+  const cardContent = (
+    <div className={`h-full flex flex-col relative overflow-hidden bg-white/90 dark:bg-slate-800/70 backdrop-blur-xl border border-white/80 dark:border-slate-700/50 rounded-[2rem] p-8 transition-all duration-500 shadow-xl shadow-gray-200/50 ${isLocked ? 'grayscale-[0.5] opacity-70 cursor-not-allowed' : `hover:-translate-y-2 hover:shadow-2xl hover:shadow-${shadowColor}/10 dark:shadow-none dark:hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.6)]`}`}>
+      
+      {/* Locked Badge */}
+      {isLocked && (
+        <div className="absolute top-6 right-6 z-20 bg-slate-900/80 text-white px-3 py-1 rounded-full backdrop-blur-md flex items-center gap-1.5 border border-white/10 shadow-lg">
+          <Lock className="w-3 h-3 text-amber-400" />
+          <span className="text-[10px] font-black uppercase tracking-widest">Plan Superior</span>
+        </div>
+      )}
+
+      {/* Custom Badge (e.g. New) */}
+      {badgeText && !isLocked && (
+        <div className="absolute top-6 right-6 z-20 bg-emerald-500 text-white px-3 py-1 rounded-full backdrop-blur-md flex items-center gap-1.5 border border-white/10 shadow-lg">
+          <span className="text-[10px] font-black uppercase tracking-widest">{badgeText}</span>
+        </div>
+      )}
+
+      <div className={`absolute -right-10 -top-10 w-40 h-40 rounded-full blur-3xl transition-colors duration-500 ${isLocked ? 'bg-gray-200 dark:bg-gray-900/40' : colorClass + '/20'}`}></div>
+      
+      <div className="relative z-10 flex-grow">
+        <div className={`w-16 h-16 rounded-2xl shadow-lg flex items-center justify-center text-white mb-6 transition-transform duration-300 ${isLocked ? 'bg-gray-400 dark:bg-slate-700' : 'bg-gradient-to-br ' + colorClass + ' group-hover:scale-110 group-hover:rotate-3 shadow-' + shadowColor + '/30'}`}>
+          <Icon className="w-8 h-8" />
+        </div>
+        <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight mb-3">{title}</h3>
+        <p className="text-gray-500 dark:text-gray-400 text-sm font-medium mb-8 leading-relaxed">
+          {desc}
+        </p>
+      </div>
+
+      <div className="mt-auto flex items-center justify-between border-t border-gray-200/60 dark:border-slate-700 pt-5">
+        <span className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest flex items-center gap-1.5">
+          <Activity className="w-3 h-3"/> {statsLabel}
+        </span>
+        {loading ? (
+          <div className="w-12 h-8 bg-gray-200 dark:bg-slate-700 rounded-lg animate-pulse"></div>
+        ) : (
+          <span className={`text-3xl font-black ${isLocked ? 'text-gray-400' : ''}`}>{statsVal}</span>
+        )}
+      </div>
+    </div>
+  );
+
+  if (isLocked) {
+    return (
+      <div className="group h-full cursor-pointer" onClick={onClickPlan}>
+        {cardContent}
+      </div>
+    );
+  }
+
+  return (
+    <Link href={href} className="group">
+      {cardContent}
+    </Link>
+  );
+};
 
 export default function DashboardHome() {
   const [stats, setStats] = useState({ maquinaria: 0, personal: 0, fechaInicioPlan: null });
@@ -14,18 +76,20 @@ export default function DashboardHome() {
   const [greeting, setGreeting] = useState('');
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
   const [isBackingUp, setIsBackingUp] = useState(false);
-  const [showTutorialCard, setShowTutorialCard] = useState(false);
+  const [showUpdatesModal, setShowUpdatesModal] = useState(false);
+  const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
-    const hasSeen = localStorage.getItem('recal_hse_announcement_machinery_v1');
-    if (!hasSeen) {
-      setShowTutorialCard(true);
+    setHasMounted(true);
+    const hasSeenUpdates = localStorage.getItem('recal_hse_updates_v1_1');
+    if (!hasSeenUpdates) {
+      setShowUpdatesModal(true);
     }
   }, []);
 
-  const closeTutorialCard = () => {
-    localStorage.setItem('recal_hse_announcement_machinery_v1', 'true');
-    setShowTutorialCard(false);
+  const closeUpdatesModal = () => {
+    localStorage.setItem('recal_hse_updates_v1_1', 'true');
+    setShowUpdatesModal(false);
   };
 
   useEffect(() => {
@@ -137,61 +201,6 @@ export default function DashboardHome() {
   const canSeeInformesDash  = isMasterDash || userPerms.informe === 1;
   const canSeeCitasDash     = isMasterDash || userAuth?.id_empresa === 1;
 
-  const ModuleCard = ({ href, icon: Icon, title, desc, isLocked, isVisible, statsVal, statsLabel, colorClass, shadowColor }) => {
-    if (!isVisible) return null;
-
-    const cardContent = (
-      <div className={`h-full flex flex-col relative overflow-hidden bg-white/90 dark:bg-slate-800/70 backdrop-blur-xl border border-white/80 dark:border-slate-700/50 rounded-[2rem] p-8 transition-all duration-500 shadow-xl shadow-gray-200/50 ${isLocked ? 'grayscale-[0.5] opacity-70 cursor-not-allowed' : `hover:-translate-y-2 hover:shadow-2xl hover:shadow-${shadowColor}/10 dark:shadow-none dark:hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.6)]`}`}>
-        
-        {/* Locked Badge */}
-        {isLocked && (
-          <div className="absolute top-6 right-6 z-20 bg-slate-900/80 text-white px-3 py-1 rounded-full backdrop-blur-md flex items-center gap-1.5 border border-white/10 shadow-lg">
-            <Lock className="w-3 h-3 text-amber-400" />
-            <span className="text-[10px] font-black uppercase tracking-widest">Plan Superior</span>
-          </div>
-        )}
-
-        <div className={`absolute -right-10 -top-10 w-40 h-40 rounded-full blur-3xl transition-colors duration-500 ${isLocked ? 'bg-gray-200 dark:bg-gray-900/40' : colorClass + '/20'}`}></div>
-        
-        <div className="relative z-10 flex-grow">
-          <div className={`w-16 h-16 rounded-2xl shadow-lg flex items-center justify-center text-white mb-6 transition-transform duration-300 ${isLocked ? 'bg-gray-400 dark:bg-slate-700' : 'bg-gradient-to-br ' + colorClass + ' group-hover:scale-110 group-hover:rotate-3 shadow-' + shadowColor + '/30'}`}>
-            <Icon className="w-8 h-8" />
-          </div>
-          <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight mb-3">{title}</h3>
-          <p className="text-gray-500 dark:text-gray-400 text-sm font-medium mb-8 leading-relaxed">
-            {desc}
-          </p>
-        </div>
-
-        <div className="mt-auto flex items-center justify-between border-t border-gray-200/60 dark:border-slate-700 pt-5">
-          <span className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest flex items-center gap-1.5">
-            <Activity className="w-3 h-3"/> {statsLabel}
-          </span>
-          {loading ? (
-            <div className="w-12 h-8 bg-gray-200 dark:bg-slate-700 rounded-lg animate-pulse"></div>
-          ) : (
-            <span className={`text-3xl font-black ${isLocked ? 'text-gray-400' : ''}`}>{statsVal}</span>
-          )}
-        </div>
-      </div>
-    );
-
-    if (isLocked) {
-      return (
-        <div className="group h-full" onClick={() => setIsPlanModalOpen(true)}>
-          {cardContent}
-        </div>
-      );
-    }
-
-    return (
-      <Link href={href} className="group h-full">
-        {cardContent}
-      </Link>
-    );
-  };
-
-  // Fecha capitalizada y legible en español
   const currentDate = new Date().toLocaleDateString('es-MX', { 
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
   });
@@ -356,16 +365,14 @@ export default function DashboardHome() {
 
       {/* 2. BENTO GRID - TARJETAS DE ACCESO RÁPIDO */}
       <div className="mt-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
-        <div className="flex items-center gap-3 mb-8 px-2">
-          <Activity className={`w-7 h-7 ${isTotalDash ? 'text-amber-600' : 'text-[var(--recal-blue)]'} dark:text-blue-400`} />
-          <h2 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight">Módulos Activos</h2>
-          
-          {/* Botón de Respaldo Manual exclusivamente para Master */}
-          {isMasterDash && (
+        
+        {/* BOTONES DE ADMINISTRACIÓN (SOLO MASTER) */}
+        {isMasterDash && (
+          <div className="flex justify-end mb-8">
             <button
               onClick={handleManualBackup}
               disabled={isBackingUp}
-              className={`ml-auto flex items-center gap-2 px-6 py-2.5 rounded-2xl font-bold transition-all duration-300 shadow-lg ${
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl font-bold transition-all duration-300 shadow-lg ${
                 isBackingUp 
                 ? 'bg-gray-400 cursor-not-allowed' 
                 : 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-slate-700 hover:shadow-blue-200/50 hover:-translate-y-0.5'
@@ -383,139 +390,246 @@ export default function DashboardHome() {
                 </>
               )}
             </button>
-          )}
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:col-span-3 gap-6 lg:gap-8">
-          
-          {/* TARJETA DE ANUNCIO: NUEVA FUNCIONALIDAD MAQUINARIA */}
-          {showTutorialCard && (
-            <div className="md:col-span-2 lg:col-span-3 bg-gradient-to-r from-orange-500 to-orange-700 rounded-[2rem] p-6 text-white shadow-xl shadow-orange-500/30 relative overflow-hidden animate-in slide-in-from-top-8 duration-700">
-              <div className="absolute top-0 right-0 p-4">
-                <button 
-                  onClick={closeTutorialCard}
-                  className="text-white/60 hover:text-white transition-colors"
-                >
+          </div>
+        )}
+
+        {/* MODAL DE ACTUALIZACIONES RECIENTES */}
+        {showUpdatesModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={closeUpdatesModal}></div>
+            <div className="relative w-full max-w-2xl bg-white dark:bg-slate-800 rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+              <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 md:p-8 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-md">
+                    <Zap className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-black text-white tracking-tight">¡Nuevas Mejoras!</h2>
+                    <p className="text-blue-100 text-sm font-medium">HSE-Recal se ha actualizado</p>
+                  </div>
+                </div>
+                <button onClick={closeUpdatesModal} className="text-white/60 hover:text-white transition-colors p-2 bg-black/10 rounded-full hover:bg-black/20">
                   <X className="w-5 h-5" />
                 </button>
               </div>
               
-              <div className="flex flex-col md:flex-row items-center gap-6 relative z-10">
-                <div className="w-20 h-20 bg-white/20 backdrop-blur-md rounded-3xl flex items-center justify-center shrink-0 shadow-lg">
-                  <Zap className="w-10 h-10 text-white" />
-                </div>
+              <div className="p-6 md:p-8 space-y-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
                 
-                <div className="flex-1 text-center md:text-left">
-                  <div className="flex flex-wrap justify-center md:justify-start items-center gap-2 mb-2">
-                    <span className="bg-white text-orange-600 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-[0.2em] shadow-sm">Nueva Funcionalidad</span>
-                    <h2 className="text-2xl font-black tracking-tight">Gestión Inteligente de Bitácoras</h2>
+                <div className="flex gap-4">
+                  <div className="shrink-0 mt-1">
+                    <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                      <FolderDown className="w-4 h-4" />
+                    </div>
                   </div>
-                  <p className="text-orange-50 font-medium text-sm md:text-base max-w-2xl opacity-90">
-                    Hemos actualizado el módulo de Maquinaria. Ahora puedes generar bitácoras masivas en ZIP, asignar folios automáticos por empresa y usar plantillas personalizadas.
-                  </p>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-1">Dossier Ambiental</h3>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                      Se ha integrado la capacidad de generar y exportar el reporte fotográfico para el dossier ambiental con soporte para los reportes que no se requieren.
+                    </p>
+                  </div>
                 </div>
-                
-                <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-                  <button 
-                    onClick={closeTutorialCard}
-                    className="px-6 py-3 bg-orange-800/40 hover:bg-orange-800/60 border border-white/20 rounded-2xl text-xs font-black uppercase tracking-widest transition-all"
-                  >
-                    Omitir
-                  </button>
-                  <Link 
-                    href="/dashboard/maquinaria?tutorial=true"
-                    onClick={closeTutorialCard}
-                    className="px-8 py-3 bg-white text-orange-600 hover:bg-orange-50 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl transition-all hover:-translate-y-1 active:scale-95 text-center"
-                  >
-                    Explorar y Ver Tutorial
-                  </Link>
+
+                <div className="flex gap-4">
+                  <div className="shrink-0 mt-1">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                      <Settings className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-1">Mantenimiento Vehicular Inteligente</h3>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                      El sistema ahora soporta plantillas separadas para Vehículos, Maquinaria, Equipos y Herramientas y automatiza el cálculo del próximo mantenimiento al guardar un servicio.
+                    </p>
+                  </div>
                 </div>
+
+                <div className="flex gap-4">
+                  <div className="shrink-0 mt-1">
+                    <div className="w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center text-orange-600 dark:text-orange-400">
+                      <FileBarChart className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-1">Exportaciones Masivas Universales</h3>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                      Exportación de reportes de maquinaria para ambas áreas; ahora genera automáticamente las inspecciones semanales del dossier ambiental, los servicios de mantenimiento de cada unidad con plantillas precargadas y formatos estandarizados.
+                    </p>
+                  </div>
+                </div>
+
               </div>
-
-              {/* Decoración abstracta */}
-              <div className="absolute -right-10 bottom-0 w-64 h-64 bg-white/10 rounded-full blur-3xl pointer-events-none"></div>
+              
+              <div className="bg-slate-50 dark:bg-slate-900/50 p-6 border-t border-slate-100 dark:border-slate-700/50 flex justify-end">
+                <button 
+                  onClick={closeUpdatesModal}
+                  className="px-8 py-3 bg-[var(--recal-blue)] text-white hover:bg-blue-700 rounded-xl text-sm font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 transition-all hover:-translate-y-0.5 active:scale-95"
+                >
+                  Entendido
+                </button>
+              </div>
             </div>
-          )}
+          </div>
+        )}
 
-          <ModuleCard
-            href="/dashboard/maquinaria"
-            icon={Tractor}
-            title="Maquinaria"
-            desc="Control interno, inventario, administración, programas de utilización y mantenimiento de maquinaria y equipo."
-            isLocked={!planAllowsMaquinariaDash}
-            isVisible={true}
-            statsVal={stats.maquinaria}
-            statsLabel="Activas Hoy"
-            colorClass="from-orange-400 to-orange-600"
-            shadowColor="orange-900"
-          />
+        {/* SECCIÓN SEGURIDAD */}
+        {hasMounted && (userAuth?.area === 'Seguridad' || userAuth?.area === 'Ambas' || !userAuth?.area) && (
+          <div className="mb-12">
+            <div className="flex items-center gap-3 mb-8 px-2">
+              <ShieldCheck className="w-7 h-7 text-blue-600 dark:text-blue-400" />
+              <h2 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight">HSE - SEGURIDAD</h2>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+              <ModuleCard
+                href="/dashboard/fuerza-trabajo"
+                icon={Users}
+                title="Fuerza de Trabajo"
+                desc="Administración de personal, certificados, constancias DC-3 e ingreso a obra."
+                isLocked={!planAllowsFTDash}
+                isVisible={true}
+                statsVal={stats.personal}
+                statsLabel="Plantilla"
+                colorClass={isTotalDash ? "from-[#2a1e12] to-[#0f0d0b]" : "from-blue-600 to-blue-500"}
+                shadowColor={isTotalDash ? "amber-900" : "blue-900"}
+                loading={loading}
+                onClickPlan={() => setIsPlanModalOpen(true)}
+              />
 
-          <ModuleCard
-            href="/dashboard/fuerza-trabajo"
-            icon={Users}
-            title="Fuerza de Trabajo"
-            desc="Administración de personal, certificados, constancias DC-3 e ingreso a obra."
-            isLocked={!planAllowsFTDash}
-            isVisible={true}
-            statsVal={stats.personal}
-            statsLabel="Plantilla"
-            colorClass={isTotalDash ? "from-[#2a1e12] to-[#0f0d0b]" : "from-blue-600 to-blue-500"}
-            shadowColor={isTotalDash ? "amber-900" : "blue-900"}
-          />
+              <ModuleCard
+                href="/dashboard/informes-seguridad"
+                icon={FileBarChart}
+                title="Informes de Seguridad"
+                desc="Control semanal de reportes, horas hombre y fuerza de trabajo por subcontratista."
+                isLocked={!planAllowsInformesDash || !canSeeInformesDash}
+                isVisible={true}
+                statsVal=""
+                statsLabel="Reportes Semanales"
+                colorClass="from-red-600 to-red-700"
+                shadowColor="red-900"
+                loading={loading}
+                onClickPlan={() => setIsPlanModalOpen(true)}
+              />
 
-          <ModuleCard
-            href="/dashboard/informes-seguridad"
-            icon={FileBarChart}
-            title="Informes de Seguridad"
-            desc="Control semanal de reportes, horas hombre y fuerza de trabajo por subcontratista."
-            isLocked={!planAllowsInformesDash || !canSeeInformesDash}
-            isVisible={true}
-            statsVal=""
-            statsLabel="Reportes Semanales"
-            colorClass="from-red-600 to-red-700"
-            shadowColor="red-900"
-          />
+              <ModuleCard
+                href="/dashboard/actividades"
+                icon={Activity}
+                title="Actividades"
+                desc="Seguimiento de actividades diarias, checklists y cumplimiento en campo."
+                isLocked={!(userAuth?.area === 'Seguridad' || userAuth?.area === 'Ambas')}
+                isVisible={userAuth?.id_empresa === 1}
+                statsVal=""
+                statsLabel="Gestión de Campo"
+                colorClass="from-blue-400 to-blue-600"
+                shadowColor="blue-900"
+                loading={loading}
+                onClickPlan={() => setIsPlanModalOpen(true)}
+              />
+            </div>
+          </div>
+        )}
 
-          <ModuleCard
-            href="/dashboard/actividades"
-            icon={Activity}
-            title="Actividades"
-            desc="Seguimiento de actividades diarias, checklists y cumplimiento en campo."
-            isLocked={!(userAuth?.area === 'Seguridad' || userAuth?.area === 'Ambas')}
-            isVisible={userAuth?.id_empresa === 1}
-            statsVal=""
-            statsLabel="Gestión de Campo"
-            colorClass="from-blue-400 to-blue-600"
-            shadowColor="blue-900"
-          />
+        {/* SECCIÓN AMBIENTAL */}
+        {hasMounted && (userAuth?.area === 'Medio Ambiente' || userAuth?.area === 'Ambas' || !userAuth?.area) && (
+          <div className="mb-12">
+            <div className="flex items-center gap-3 mb-8 px-2">
+              <Leaf className="w-7 h-7 text-emerald-600 dark:text-emerald-400" />
+              <h2 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight">HSE - MEDIO AMBIENTE</h2>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+              <ModuleCard
+                href="/dashboard/informes-ambiental"
+                icon={Sprout}
+                title="Informes Ambientales"
+                desc="Gestión de reportes mensuales, residuos, derrames y cumplimiento ambiental."
+                isLocked={false}
+                isVisible={true}
+                statsVal=""
+                statsLabel="Dossier Mensual"
+                colorClass="from-emerald-500 to-emerald-700"
+                shadowColor="emerald-900"
+                badgeText="NUEVO"
+                loading={loading}
+                onClickPlan={() => setIsPlanModalOpen(true)}
+              />
 
-          <ModuleCard
-            href="/dashboard/catalogos"
-            icon={BookOpen}
-            title="Administración"
-            desc="Catálogos del sistema: Gestiona Altas, Bajas y Cambios de Subcontratistas, Agentes y Cursos STPS."
-            isLocked={!canSeeCatalogosDash}
-            isVisible={true}
-            statsVal=""
-            statsLabel="Ajustes Generales"
-            colorClass="from-purple-500 to-purple-700"
-            shadowColor="purple-900"
-          />
+              <ModuleCard
+                href="/dashboard/maquinaria"
+                icon={Tractor}
+                title="Maquinaria y Equipo"
+                desc="Control de inventario, mantenimiento y programas de utilización ambiental."
+                isLocked={!planAllowsMaquinariaDash}
+                isVisible={true}
+                statsVal={stats.maquinaria}
+                statsLabel="Activas Hoy"
+                colorClass="from-orange-400 to-orange-600"
+                shadowColor="orange-900"
+                loading={loading}
+                onClickPlan={() => setIsPlanModalOpen(true)}
+              />
 
-          <ModuleCard
-            href="/dashboard/citas"
-            icon={CalendarDays}
-            title="Citas Dossier"
-            desc="Agenda de citas, control de revisiones para contratistas."
-            isLocked={!canSeeCitasDash}
-            isVisible={true}
-            statsVal=""
-            statsLabel="Agenda de Citas"
-            colorClass="from-emerald-500 to-emerald-700"
-            shadowColor="emerald-900"
-          />
+              {userAuth?.id_empresa === 1 && (
+                <ModuleCard
+                  href="/dashboard/actividades-ambiental"
+                  icon={ClipboardCheck}
+                  title="Gestión de Campo"
+                  desc="Checklists ambientales específicos y supervisión de frentes de trabajo."
+                  isLocked={false}
+                  isVisible={true}
+                  statsVal=""
+                  statsLabel="Operativo"
+                  colorClass="from-teal-500 to-teal-700"
+                  shadowColor="teal-900"
+                  loading={loading}
+                  onClickPlan={() => setIsPlanModalOpen(true)}
+                />
+              )}
+            </div>
+          </div>
+        )}
 
-        </div>
+        {/* SECCIÓN ADMINISTRATIVA (COMPARTIDA) */}
+        {hasMounted && (
+          <div className="mb-12">
+            <div className="flex items-center gap-3 mb-8 px-2">
+              <Database className="w-7 h-7 text-purple-600 dark:text-purple-400" />
+              <h2 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight">SISTEMA Y CATÁLOGOS</h2>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+              <ModuleCard
+                href="/dashboard/catalogos"
+                icon={BookOpen}
+                title="Administración"
+                desc="Catálogos del sistema: Gestiona Altas, Bajas y Cambios de Subcontratistas, Agentes y Cursos STPS."
+                isLocked={!canSeeCatalogosDash}
+                isVisible={userAuth?.id_empresa === 1}
+                statsVal=""
+                statsLabel="Ajustes Generales"
+                colorClass="from-purple-500 to-purple-700"
+                shadowColor="purple-900"
+                loading={loading}
+                onClickPlan={() => setIsPlanModalOpen(true)}
+              />
+
+              <ModuleCard
+                href="/dashboard/citas"
+                icon={CalendarDays}
+                title="Citas Dossier"
+                desc="Agenda de citas, control de revisiones para contratistas."
+                isLocked={!canSeeCitasDash}
+                isVisible={userAuth?.id_empresa === 1}
+                statsVal=""
+                statsLabel="Agenda de Citas"
+                colorClass="from-slate-600 to-slate-800"
+                shadowColor="slate-900"
+                loading={loading}
+                onClickPlan={() => setIsPlanModalOpen(true)}
+              />
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );

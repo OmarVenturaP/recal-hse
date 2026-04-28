@@ -5,12 +5,23 @@ import archiver from 'archiver';
 import { PassThrough } from 'stream';
 import path from 'path';
 
-const generarTextoPeriodo = (mes, anio) => {
-  const meses = {
-    1: 'ENERO', 2: 'FEBRERO', 3: 'MARZO', 4: 'ABRIL', 5: 'MAYO', 6: 'JUNIO',
-    7: 'JULIO', 8: 'AGOSTO', 9: 'SEPTIEMBRE', 10: 'OCTUBRE', 11: 'NOVIEMBRE', 12: 'DICIEMBRE'
-  };
-  
+const meses = {
+  1: 'ENERO', 2: 'FEBRERO', 3: 'MARZO', 4: 'APRIL', 5: 'MAYO', 6: 'JUNIO',
+  7: 'JULIO', 8: 'AGOSTO', 9: 'SEPTIEMBRE', 10: 'OCTUBRE', 11: 'NOVIEMBRE', 12: 'DICIEMBRE'
+};
+
+const formatDate = (date) => {
+  if (!date) return 'SIN FECHA';
+  const d = new Date(date);
+  // Ajuste offset
+  d.setMinutes(d.getMinutes() + d.getTimezoneOffset());
+  return d.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' }).toUpperCase();
+};
+
+const generarTextoPeriodo = (mes, anio, semana, fecha_inspeccion) => {
+  if (semana && fecha_inspeccion) {
+    return `FECHA DE INSPECCIÓN: ${formatDate(fecha_inspeccion)}`;
+  }
   if (mes && anio) {
     return `PERIODO: ${meses[parseInt(mes)]} DE ${anio}`;
   }
@@ -22,14 +33,30 @@ export async function GET(request) {
     const userRol = request.headers.get('x-user-rol');
     const idEmpresa = request.headers.get('x-empresa-id');
 
+    const { searchParams } = new URL(request.url);
+    const mes = searchParams.get('mes');
+    const anio = searchParams.get('anio');
+    const semana = searchParams.get('semana');
+
     let query = `
-      SELECT * FROM Maquinaria_Equipo 
-      WHERE area = 'ambiental' AND fecha_baja IS NULL
+      SELECT m.*, ih.fecha_inspeccion 
+      FROM Maquinaria_Equipo m
+      INNER JOIN Inspecciones_Herramienta ih ON m.id_maquinaria = ih.id_maquinaria
+      WHERE m.area = 'ambiental' AND m.fecha_baja IS NULL
     `;
     const params = [];
 
+    if (semana) {
+      const [sAnio, sSem] = semana.split('-W');
+      query += ` AND YEARWEEK(ih.fecha_inspeccion, 1) = ? `;
+      params.push(`${sAnio}${sSem}`);
+    } else if (mes && anio) {
+      query += ` AND ih.mes = ? AND ih.anio = ? `;
+      params.push(parseInt(mes), parseInt(anio));
+    }
+
     if (userRol !== 'Master' && idEmpresa) {
-      query += ` AND id_empresa = ?`;
+      query += ` AND m.id_empresa = ?`;
       params.push(idEmpresa);
     }
 
@@ -44,12 +71,7 @@ export async function GET(request) {
     
     archive.pipe(stream);
 
-    const { searchParams } = new URL(request.url);
-    const mes = searchParams.get('mes');
-    const anio = searchParams.get('anio');
-    const templatePath = path.join(process.cwd(), 'public', 'plantillas', '22_INSPECCION_SEMANAL.xlsx');
-    
-    const periodoTexto = generarTextoPeriodo(mes, anio);
+    // Ya no generamos periodoTexto aquí, se hará dentro del loop
 
     for (const equipo of equipos) {
       const tiposVehiculos = ['CAMIONETA', 'VEHICULO', 'PICK UP'];
@@ -67,6 +89,7 @@ export async function GET(request) {
 
       const ws = workbook.getWorksheet(sheetToKeep);
 
+      const periodoTexto = generarTextoPeriodo(mes, anio, semana, equipo.fecha_inspeccion);
       ws.getCell('F3').value = periodoTexto;
       ws.getCell('A13').value = `Tipo: \n ${equipo.tipo}`;
       ws.getCell('C13').value = `Marca/Modelo: \n ${equipo.marca || ''} / ${equipo.modelo || ''}`;
