@@ -405,7 +405,7 @@ export default function DashboardHome() {
                   </div>
                   <div>
                     <h2 className="text-2xl font-black text-white tracking-tight">¡Nuevas Mejoras!</h2>
-                    <p className="text-blue-100 text-sm font-medium">HSE-Recal se ha actualizado</p>
+                    <p className="text-blue-100 text-sm font-medium">ObrasOS DOCS se ha actualizado</p>
                   </div>
                 </div>
                 <button onClick={closeUpdatesModal} className="text-white/60 hover:text-white transition-colors p-2 bg-black/10 rounded-full hover:bg-black/20">
@@ -422,9 +422,9 @@ export default function DashboardHome() {
                     </div>
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-1">Dossier Ambiental</h3>
+                    <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-1">Reportes fotográficos Ambiental</h3>
                     <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                      Se ha integrado la capacidad de generar y exportar el reporte fotográfico para el dossier ambiental con soporte para los reportes que no se requieren.
+                      Se ha integrado la capacidad de generar y exportar el reporte fotográfico para el área de ambiental.
                     </p>
                   </div>
                 </div>
@@ -438,7 +438,7 @@ export default function DashboardHome() {
                   <div>
                     <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-1">Mantenimiento Vehicular Inteligente</h3>
                     <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                      El sistema ahora soporta plantillas separadas para Vehículos, Maquinaria, Equipos y Herramientas y automatiza el cálculo del próximo mantenimiento al guardar un servicio.
+                      El sistema ahora soporta plantillas separadas (ambiental y seguridad) para Vehículos, Maquinaria, Equipos y Herramientas y automatiza el cálculo del próximo mantenimiento al guardar un servicio.
                     </p>
                   </div>
                 </div>
@@ -452,7 +452,20 @@ export default function DashboardHome() {
                   <div>
                     <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-1">Exportaciones Masivas Universales</h3>
                     <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                      Exportación de reportes de maquinaria para ambas áreas; ahora genera automáticamente las inspecciones semanales del dossier ambiental, los servicios de mantenimiento de cada unidad con plantillas precargadas y formatos estandarizados.
+                      Exportación de reportes de maquinaria y vehículos (ambiental y seguridad), además de los programas de mantenimiento y bitacoras de servicio, también se agregó la capacidad de generar automáticamente las inspecciones semanales para el dossier ambiental.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-4">
+                  <div className="shrink-0 mt-1">
+                    <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                      <Users className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-1">Soporte Técnico Especializado</h3>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                      Si presentas algún inconveniente en la plataforma, puedes contactarnos por WhatsApp al <a href="https://wa.me/5219619326182" target="_blank" rel="noopener noreferrer" className="font-bold text-blue-600 hover:underline">961 932 61 82</a> o vía correo a <a href="mailto:soporte@obras-os.com" className="font-bold text-blue-600 hover:underline">soporte@obras-os.com</a> para asistencia inmediata.
                     </p>
                   </div>
                 </div>
