@@ -31,6 +31,7 @@ export async function GET(request) {
     const fechaInicio = searchParams.get('fechaInicio'); 
     const fechaFin = searchParams.get('fechaFin'); 
     const idPrincipal = searchParams.get('subcontratista');
+    const obra = searchParams.get('obra');
     const esValidacion = searchParams.get('validar') === 'true'; // <- NUEVO PARÁMETRO
 
     if (!fechaInicio || !fechaFin) {
@@ -52,13 +53,25 @@ export async function GET(request) {
       WHERE DATE(f.fecha_ingreso_obra) <= ? 
       AND (f.fecha_baja IS NULL OR DATE(f.fecha_baja) >= ?)
       AND f.bActivo != 0
+      AND NOT EXISTS (
+        SELECT 1 FROM FT_Inactividad i 
+        WHERE i.id_trabajador = f.id_trabajador 
+          AND i.mes = ? 
+          AND i.anio = ?
+      )
     `;
 
-    const queryParams = [fechaInicio, fechaFin, fechaInicio];
+    const [anioFiltro, mesFiltro] = fechaInicio.split('-').map(Number);
+    const queryParams = [fechaInicio, fechaFin, fechaInicio, mesFiltro, anioFiltro];
 
     if (idPrincipal) {
       query += ` AND f.id_subcontratista_principal = ?`;
       queryParams.push(idPrincipal);
+    }
+
+    if (obra) {
+      query += ` AND p.puentes_viaducto = ?`;
+      queryParams.push(obra);
     }
 
     query += ` ORDER BY es_nuevo ASC, f.apellido_trabajador ASC, f.nombre_trabajador ASC`;
